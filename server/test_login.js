@@ -1,0 +1,1 @@
+﻿import { login } from './controllers/authController.js'; import { pool } from './config/db.js'; const req = { body: { email: 'testuser123@example.com', password: 'password123' } }; const res = { status: (code) => ({ json: (data) => console.log('STATUS', code, 'DATA', data) }) }; login(req, res).finally(() => pool.end());

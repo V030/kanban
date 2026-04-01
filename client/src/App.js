@@ -48,7 +48,8 @@ function App() {
             
           }>
           
-            <Route index element={<Dashboard />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
             <Route path="projects" element={<Projects />} />
             <Route path="profile" element={<Profile />} />
           </Route>
@@ -58,7 +59,7 @@ function App() {
           path='/'
           element= {
             auth 
-              ? <Navigate to="/main-page" replace /> 
+              ? <Navigate to="/main-page/dashboard" replace /> 
               : <Navigate to="/login" replace />
           }>
         </Route>
