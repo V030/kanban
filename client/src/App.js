@@ -18,6 +18,7 @@ import MainPage from "./pages/MainPage";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Friends from "./pages/Friends";
+import KanbanPage from "./pages/KanbanPage";
 import Profile from "./pages/Profile";
 import { ProtectedRoute } from './components/protected/ProtectedRoutes';
 import { PublicRoute } from './components/public/PublicRoutes';
@@ -52,6 +53,7 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="projects" element={<Projects />} />
+            <Route path="kanban" element={<KanbanPage />} />
             <Route path="friends" element={<Friends />} />
             <Route path="profile" element={<Profile />} />
           </Route>

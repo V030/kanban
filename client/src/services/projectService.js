@@ -45,3 +45,36 @@ export async function declineProjectInvitation(requestId) {
     method: "PATCH",
   });
 }
+
+export async function getTaskCategories(projectId) {
+  if (!projectId) throw new Error('projectId is required');
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/get-task-categories`, {
+    method: 'GET',
+  });
+}
+
+export async function getProjectTasks(projectId) {
+  if (!projectId) throw new Error("projectId is required");
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/tasks`, {
+    method: "GET",
+  });
+}
+
+export async function createNewTaskCategory(project) {
+  const projectId = project?.projectId;
+
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/create-task-category`, {
+    method: 'POST',
+    body: JSON.stringify(project || {}),
+  });
+}
+
+export async function createNewTask(taskContent) {
+  const projectId = taskContent?.projectId;
+  const categoryId = taskContent?.categoryId;
+
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/${categoryId}/create-new-task`, {
+    method: 'POST',
+    body: JSON.stringify(taskContent || {}),
+  });
+}

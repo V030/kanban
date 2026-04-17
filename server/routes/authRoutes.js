@@ -9,6 +9,9 @@ import {
 	getProjectInvitations,
 	acceptProjectInvitation,
 	declineProjectInvitation,
+	getTaskCategories,
+	createTaskCategory,
+	createNewTask,
 } from "../controllers/projectController.js";
 import {
 	addFriend,
@@ -41,5 +44,7 @@ router.post("/projects/send-invite/", authenticateToken, inviteMemberToProject);
 router.get("/projects/get-invites/", authenticateToken, getProjectInvitations);
 router.patch("/projects/invitations/:requestId/accept", authenticateToken, acceptProjectInvitation);
 router.patch("/projects/invitations/:requestId/decline", authenticateToken, declineProjectInvitation);
-
+router.get("/projects/:projectId/get-task-categories", authenticateToken, getTaskCategories);
+router.post("/projects/:projectId/create-task-category", authenticateToken, createTaskCategory);
+router.post("/projects/:projectId/:categoryId/create-new-task", authenticateToken, createNewTask);
 export default router;

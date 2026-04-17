@@ -1,0 +1,67 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.modal-header h2 { margin: 0; font-size: 1.125rem; color: #111827; font-weight: 600; }
+
+.close-btn { background: none; border: none; font-size: 1.4rem; color: #9ca3af; cursor: pointer; padding: 0; }
+.close-btn:hover { color: #4b5563; }
+
+.modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+
+.form-group { display: flex; flex-direction: column; gap: 8px; }
+.form-group label { font-size: 0.875rem; font-weight: 600; color: #1f2937; }
+.form-group label .required { color: #ef4444; }
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  outline: none;
+  font-family: inherit;
+}
+
+.form-group input::placeholder, .form-group textarea::placeholder { color: #9ca3af; }
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #7aa1e5; box-shadow: 0 0 0 1px #7aa1e5; }
+.form-group textarea { resize: vertical; min-height: 80px; }
+
+.modal-footer { padding: 14px 22px; display: flex; justify-content: flex-end; gap: 12px; }
+.cancel-btn { background: transparent; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; color: #4b5563; cursor: pointer; }
+.cancel-btn:hover { background-color: #f3f4f6; }
+.submit-btn { background-color: #82a8e5; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 600; color: white; cursor: pointer; }
+.submit-btn:hover { background-color: #6a91d1; }
+
+.error-message { color: #b91c1c; padding: 12px 22px; margin: 0; }
+
+/* small helper: match select appearance on most browsers */
+.form-group select { appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: linear-gradient(45deg, transparent 50%, #6b7280 50%), linear-gradient(135deg, #6b7280 50%, transparent 50%); background-position: calc(100% - 18px) calc(1em + 2px), calc(100% - 13px) calc(1em + 2px); background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }

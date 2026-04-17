@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import CreateProjectModal from "../components/common/CreateProjectModal";
 import AddMemberModal from "../components/common/AddMemberModal";
 import ProjectInvitesModal from "../components/common/ProjectInvitesModal";
@@ -6,6 +7,7 @@ import "../components/common/CreateProjectModal.css";
 import { getProjects, getMemberProjects } from "../services/projectService";
 
 function Projects() {
+  const navigate = useNavigate();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [projects, setProjects] = useState([]);
     const [memberProjects, setMemberProjects] = useState([]);
@@ -13,8 +15,8 @@ function Projects() {
     const [isInvitesOpen, setIsInvitesOpen] = useState(false);
 
     const [loading, setLoading] = useState(true);
-    const [memberLoading, setMemberLoading] = useState(true);
     const [error, setError] = useState("");
+    const [memberLoading, setMemberLoading] = useState(true);
     const [memberError, setMemberError] = useState("");
 
     const loadProjects = async () => {
@@ -48,7 +50,12 @@ function Projects() {
     useEffect(() => {
       loadProjects();
       loadOtherProjects();
-    }, [])
+    }, []);
+
+    const openKanban = (project) => {
+      localStorage.setItem("selectedProject", JSON.stringify(project));
+      navigate("/main-page/kanban", { state: { project } });
+    };
 
     return (
         <div>
@@ -79,12 +86,32 @@ function Projects() {
              <div>
                <h3 style={{ marginTop: 6 }}>My Projects</h3>
                {projects.map((project) => (
-                 <div key={project.id} style={{ border: "1px solid #ddd", padding: "12px", marginTop: "12px", position: 'relative' }}>
+                 <div
+                   key={project.id}
+                   style={{ border: "1px solid #ddd", padding: "12px", marginTop: "12px", position: "relative", cursor: "pointer" }}
+                   onClick={() => openKanban(project)}
+                   role="button"
+                   tabIndex={0}
+                   onKeyDown={(event) => {
+                     if (event.key === "Enter" || event.key === " ") {
+                       event.preventDefault();
+                       openKanban(project);
+                     }
+                   }}
+                 >
                  <h3>{project.name}</h3>
                  <p>{project.description || "No description"}</p>
                  <small>Created: {new Date(project.created_at).toLocaleString()}</small>
                  <div style={{ marginTop: 10 }}>
-                   <button className="add-member-btn" onClick={() => setSelectedProject(project)}>+ Add Someone</button>
+                   <button
+                     className="add-member-btn"
+                     onClick={(event) => {
+                       event.stopPropagation();
+                       setSelectedProject(project);
+                     }}
+                   >
+                     + Add Someone
+                   </button>
                  </div>
               </div>
             ))}
@@ -98,7 +125,19 @@ function Projects() {
             <div style={{ marginTop: 20 }}>
               <h3>Other Projects</h3>
               {memberProjects.map((project) => (
-                <div key={project.id} style={{ border: "1px solid #ddd", padding: "12px", marginTop: "12px" }}>
+                <div
+                  key={project.id}
+                  style={{ border: "1px solid #ddd", padding: "12px", marginTop: "12px", cursor: "pointer" }}
+                  onClick={() => openKanban(project)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openKanban(project);
+                    }
+                  }}
+                >
                   <h3>{project.name}</h3>
                   <p>{project.description || "No description"}</p>
                   <small>Joined: {new Date(project.joined_at).toLocaleString()}</small>

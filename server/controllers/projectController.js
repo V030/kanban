@@ -5,6 +5,9 @@ import { createProject as createProjectModel,
          getProjectInvitations as getProjectInvitationsModel,
          acceptProjectInvitation as acceptProjectInvitationModel,
          declineProjectInvitation as declineProjectInvitationModel,
+         getTaskCategories as getTaskCategoriesModel,
+         createTaskCategory as createTaskCategoryModel,
+         createTask as createTaskModel,
  } from "../models/projectModel.js";
 
 export async function createProject(req, res) {
@@ -174,4 +177,133 @@ export async function declineProjectInvitation(req, res) {
   }
 }
 
+export async function getTaskCategories(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  const { projectId } = req.params;
 
+  if (!projectId) {
+    return res.status(400).json({ message: "project id is required" });
+  }
+
+  try {
+    const categories = await getTaskCategoriesModel(projectId);
+    return res.status(200).json({ categories });
+  } catch (error) {
+    console.error("Get tasks categories error: ", error);
+    return res.status(500).json({ message: error.message || "Unable to fetch tasks categories" });
+  }
+}
+
+export async function createTaskCategory(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  const { projectId } = req.params;
+  const name = (req.body?.name || "").trim();
+
+  if (!projectId) {
+    return res.status(400).json({ message: "projectId parameter is required" });
+  }
+
+  if (!name) {
+    return res.status(400).json({ message: "Category name is required" });
+  }
+
+  try {
+    const ownerProjects = await getProjectsByOwner(req.user.userId);
+    const isOwner = ownerProjects.some((p) => p.id === projectId);
+
+    let isMember = false;
+
+    if (!isOwner) {
+      const memberProjects = await getProjectsByMember(req.user.userId);
+      isMember = memberProjects.some((p) => p.id === projectId);
+    }
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ message: "Forbidden: you are not a member of this project" });
+    }
+
+    // let isAdmin = false;
+
+    // if (!isAdmin) {
+    //   return res.status(403).json({ message: "Forbidden: you don't have permission to modify the board"});
+    // }
+
+    // Call model to create category (model should return the created row)
+    const created = await createTaskCategoryModel({ projectId, name });
+    return res.status(201).json({ category: created });
+    console.log(projectId, name);
+  } catch (error) {
+    console.error("Create task category error:", error);
+    return res.status(500).json({ message: error.message || "Unable to create task category" });
+  }
+}
+
+export async function createNewTask(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  const { projectId, categoryId } = req.params;
+
+  if (!projectId) {
+    return res.status(400).json({ message: "projectId parameter is required" });
+  }
+
+  if (!categoryId) {
+    return res.status(400).json({ message: "categoryId parameter is required" });
+  }
+
+  // console.log("Project ID: ", projectId);  
+  // console.log("Category ID: ",categoryId); 
+
+  						// ...payload,
+							// projectId: project?.id,
+							// categoryId: payload.categoryId || selectedCategoryId,
+							// taskName: payload.title,
+							// taskDescription: payload.description,
+
+  const taskData = {
+    projectId: req.body.projectId || projectId,
+    categoryId: req.body.categoryId || categoryId,
+    taskName: req.body.taskName || req.body.title,
+    taskDescription: req.body.taskDescription || req.body.description,
+    priority: req.body.priority,
+    createdBy: req.user.userId,
+  };
+
+  try {
+    const taskCreated = await createTaskModel(taskData);
+    return res.status(201).json({ message: "Task created successfully", task: taskCreated });
+  } catch (error) {
+    if (
+      error?.code === "INVALID_PROJECT" ||
+      error?.code === "INVALID_CATEGORY" ||
+      error?.code === "INVALID_TASK_TITLE" ||
+      error?.code === "INVALID_USER"
+    ) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "BOARD_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "23514") {
+      return res.status(400).json({ message: error.message || "Constraint validation failed while creating task" });
+    }
+
+    if (error?.code === "23503") {
+      return res.status(400).json({ message: error.message || "Invalid relation reference while creating task" });
+    }
+
+    if (error?.code === "22P02") {
+      return res.status(400).json({ message: error.message || "Invalid id format while creating task" });
+    }
+
+    console.error("Create new task error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to create task" });
+  }
+}

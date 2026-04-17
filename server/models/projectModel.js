@@ -1,5 +1,103 @@
 import { pool } from "../config/db.js";
 
+export async function createTask(taskData) {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const projectId = (taskData?.projectId || taskData?.project_id || "").trim();
+    const categoryIdRaw = taskData?.categoryId ?? taskData?.category_id;
+    const categoryId = Number(categoryIdRaw);
+    const title = (taskData?.taskName || taskData?.title || "").trim();
+    const description = (taskData?.taskDescription || taskData?.description || "").trim();
+    const createdBy = (taskData?.createdBy || taskData?.created_by || "").trim();
+
+    if (!projectId) {
+      const error = new Error("projectId is required");
+      error.code = "INVALID_PROJECT";
+      throw error;
+    }
+
+    if (!Number.isInteger(categoryId) || categoryId <= 0) {
+      const error = new Error("categoryId is required");
+      error.code = "INVALID_CATEGORY";
+      throw error;
+    }
+
+    if (!title) {
+      const error = new Error("task title is required");
+      error.code = "INVALID_TASK_TITLE";
+      throw error;
+    }
+
+    if (!createdBy) {
+      const error = new Error("createdBy is required");
+      error.code = "INVALID_USER";
+      throw error;
+    }
+
+    const boardResult = await client.query(
+      `
+      SELECT id
+      FROM board
+      WHERE project_id = $1::uuid
+      ORDER BY created_at ASC
+      LIMIT 1
+      `,
+      [projectId]
+    );
+
+    const board = boardResult.rows[0];
+
+    if (!board) {
+      const error = new Error("Board not found for this project");
+      error.code = "BOARD_NOT_FOUND";
+      throw error;
+    }
+
+    const positionResult = await client.query(
+      `
+      SELECT COALESCE(MAX(position), 0) AS max_position
+      FROM tasks
+      WHERE category_id = $1
+      `,
+      [categoryId]
+    );
+
+    const position = Number(positionResult.rows[0]?.max_position || 0) + 1;
+    const priority = "unset";
+
+    const newTaskResult = await client.query(
+      `
+      INSERT INTO tasks (board_id, category_id, title, description, priority, created_by, position)
+      VALUES ($1::uuid, $2, $3, $4, $5, $6::uuid, $7)
+      RETURNING id, board_id, category_id, title, description, priority, created_by, position
+      `,
+      [board.id, categoryId, title, description || null, priority, createdBy, position]
+    );
+
+    await client.query("COMMIT");
+
+    const row = newTaskResult.rows[0];
+    return {
+      id: row.id,
+      boardId: row.board_id,
+      categoryId: row.category_id,
+      title: row.title,
+      description: row.description,
+      priority: row.priority,
+      createdBy: row.created_by,
+      position: row.position,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function createProject(projectData) {
   const client = await pool.connect();
 
@@ -417,3 +515,119 @@ export async function declineProjectInvitation({ requestId, userId }) {
   return result.rows[0];
 }
 
+export async function getTaskCategories(projectId) {
+  const normalizedId = (projectId || "").trim();
+
+  if (!normalizedId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      tc.id,
+      tc.project_id,
+      tc.name,
+      tc."position",
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', t.id,
+            'boardId', t.board_id,
+            'categoryId', t.category_id,
+            'title', t.title,
+            'description', t.description,
+            'priority', t.priority,
+            'createdBy', t.created_by,
+            'createdAt', t.created_at,
+            'position', t."position",
+            'creator', json_build_object(
+              'id', u.id,
+              'firstName', u.first_name,
+              'lastName', u.last_name,
+              'email', u.email
+            )
+          )
+          ORDER BY t."position" ASC, t.created_at ASC
+        ) FILTER (WHERE t.id IS NOT NULL),
+        '[]'::json
+      ) AS tasks
+    FROM tasks_categories tc
+    LEFT JOIN LATERAL (
+      SELECT b.id
+      FROM board b
+      WHERE b.project_id = tc.project_id
+      ORDER BY b.created_at ASC
+      LIMIT 1
+    ) project_board ON true
+    LEFT JOIN tasks t
+      ON t.category_id = tc.id
+      AND t.board_id = project_board.id
+    LEFT JOIN users u
+      ON t.created_by = u.id
+    WHERE tc.project_id = $1::uuid
+    GROUP BY tc.id, tc.project_id, tc.name, tc."position"
+    ORDER BY tc."position" ASC
+    `,
+    [normalizedId]
+  );
+
+  return result.rows.map((r) => ({
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name,
+    position: r.position,
+    tasks: r.tasks || [],
+  }));
+}
+
+export async function createTaskCategory(input) {
+  // Accept either createTaskCategory({ projectId, name, position })
+  // or createTaskCategory(projectIdString)
+  let projectId = "";
+  let name = "";
+  let position = null;
+
+  if (input && typeof input === "object") {
+    projectId = (input.projectId || input.project_id || "").trim();
+    name = (input.name || "").trim();
+    position = Number.isFinite(Number(input.position)) ? Number(input.position) : null;
+  } else {
+    projectId = (input || "").trim();
+  }
+
+  if (!projectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!name) {
+    const error = new Error("name is required");
+    error.code = "INVALID_NAME";
+    throw error;
+  }
+
+  // determine position if not provided
+  if (position === null) {
+    const posRes = await pool.query(
+      `SELECT COALESCE(MAX("position"), 0) AS maxpos FROM tasks_categories WHERE project_id = $1::uuid`,
+      [projectId]
+    );
+    position = (posRes.rows[0]?.maxpos || 0) + 1;
+  }
+
+  const insertResult = await pool.query(
+    `
+    INSERT INTO tasks_categories (project_id, name, "position")
+    VALUES ($1::uuid, $2, $3)
+    RETURNING id, project_id, name, "position"
+    `,
+    [projectId, name, position]
+  );
+
+  const row = insertResult.rows[0];
+  return { id: row.id, projectId: row.project_id, name: row.name, position: row.position };
+}
