@@ -120,6 +120,22 @@ export async function createProject(projectData) {
 
     const project = projectResult.rows[0];
 
+    await client.query(
+      `
+      INSERT INTO project_settings (
+        project_id,
+        allow_member_create_task,
+        allow_member_take_task,
+        allow_member_edit_task,
+        allow_member_delete_task,
+        allow_member_add_board,
+        allow_member_add_member
+      )
+      VALUES ($1, true, true, true, true, true, true)
+      `,
+      [project.id]
+    );
+
     const boardResult = await client.query(
       `
       INSERT INTO board (id, project_id, name, created_by)
@@ -170,10 +186,24 @@ export async function createProject(projectData) {
 
 export async function getProjectsByOwner(ownerId) {
   const query = `
-    SELECT id, name, description, owner, created_by, created_at
-    FROM projects
-    WHERE owner = $1 
-    ORDER BY created_at DESC
+    SELECT 
+      p.id,
+      p.name,
+      p.description,
+      p.owner,
+      p.created_by,
+      p.created_at,
+      COALESCE(ps.allow_member_create_task, true) AS allow_member_create_task,
+      COALESCE(ps.allow_member_take_task, true)   AS allow_member_take_task,
+      COALESCE(ps.allow_member_edit_task, true)   AS allow_member_edit_task,
+      COALESCE(ps.allow_member_delete_task, true) AS allow_member_delete_task,
+      COALESCE(ps.allow_member_add_board, true)   AS allow_member_add_board,
+      COALESCE(ps.allow_member_add_member, true)  AS allow_member_add_member
+    FROM projects p
+    LEFT JOIN project_settings ps
+      ON p.id = ps.project_id
+    WHERE p.owner = $1
+    ORDER BY p.created_at DESC
   `;
 
   const result = await pool.query(query, [ownerId]);
@@ -190,10 +220,17 @@ export async function getProjectsByMember(userId) {
       p.created_by,
       p.created_at,
       pm.role,
-      pm.joined_at
+      pm.joined_at,
+      COALESCE(ps.allow_member_create_task, true) AS allow_member_create_task,
+      COALESCE(ps.allow_member_take_task, true)   AS allow_member_take_task,
+      COALESCE(ps.allow_member_edit_task, true)   AS allow_member_edit_task,
+      COALESCE(ps.allow_member_delete_task, true) AS allow_member_delete_task,
+      COALESCE(ps.allow_member_add_board, true)   AS allow_member_add_board,
+      COALESCE(ps.allow_member_add_member, true)  AS allow_member_add_member
     FROM users u
     JOIN project_members pm ON pm.user_id = u.id
     JOIN projects p ON p.id = pm.project_id
+    LEFT JOIN project_settings ps ON p.id = ps.project_id
     WHERE u.id = $1
       AND p.owner <> $1
     ORDER BY pm.joined_at DESC
@@ -203,6 +240,216 @@ export async function getProjectsByMember(userId) {
   return result.rows;
 }
 
+export async function getProjectMembers({ projectId, requesterId }) {
+  const normalizedProjectId = (projectId || "").trim();
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const permissionResult = await pool.query(
+    `
+    SELECT 1
+    FROM project_members pm
+    WHERE pm.project_id = $1::uuid
+      AND pm.user_id = $2::uuid
+    LIMIT 1
+    `,
+    [normalizedProjectId, normalizedRequesterId]
+  );
+
+  if (permissionResult.rows.length === 0) {
+    const error = new Error("Forbidden: you are not a member of this project");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      u.id,
+      u.first_name,
+      u.last_name,
+      u.email,
+      pm.role,
+      pm.joined_at
+    FROM project_members pm
+    JOIN users u ON u.id = pm.user_id
+    WHERE pm.project_id = $1::uuid
+    ORDER BY
+      CASE pm.role
+        WHEN 'owner' THEN 1
+        WHEN 'admin' THEN 2
+        WHEN 'member' THEN 3
+        ELSE 4
+      END,
+      pm.joined_at ASC,
+      u.first_name ASC,
+      u.last_name ASC
+    `,
+    [normalizedProjectId]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    role: row.role,
+    joinedAt: row.joined_at,
+  }));
+}
+
+export async function getProjectSettings({ projectId, requesterId }) {
+  const normalizedProjectId = (projectId || "").trim();
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const accessResult = await pool.query(
+    `
+    SELECT 1
+    FROM project_members
+    WHERE project_id = $1::uuid
+      AND user_id = $2::uuid
+    LIMIT 1
+    `,
+    [normalizedProjectId, normalizedRequesterId]
+  );
+
+  if (accessResult.rows.length === 0) {
+    const error = new Error("Forbidden: you are not a member of this project");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      COALESCE(allow_member_create_task, true) AS allow_member_create_task,
+      COALESCE(allow_member_take_task, true) AS allow_member_take_task,
+      COALESCE(allow_member_edit_task, true) AS allow_member_edit_task,
+      COALESCE(allow_member_delete_task, true) AS allow_member_delete_task,
+      COALESCE(allow_member_add_board, true) AS allow_member_add_board,
+      COALESCE(allow_member_add_member, true) AS allow_member_add_member,
+      COALESCE(allow_assign_task_to_member, false) AS allow_assign_task_to_member
+    FROM project_settings
+    WHERE project_id = $1::uuid
+    `,
+    [normalizedProjectId]
+  );
+
+  if (result.rows.length === 0) {
+    return {
+      allow_member_create_task: true,
+      allow_member_take_task: true,
+      allow_member_edit_task: true,
+      allow_member_delete_task: true,
+      allow_member_add_board: true,
+      allow_member_add_member: true,
+      allow_assign_task_to_member: false
+    };
+  }
+
+  return result.rows[0];
+}
+
+export async function updateProjectSettings({ projectId, requesterId, setting, value }) {
+  const normalizedProjectId = (projectId || "").trim();
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const allowedKeys = [
+    "allow_member_create_task",
+    "allow_member_take_task",
+    "allow_member_edit_task",
+    "allow_member_delete_task",
+    "allow_member_add_board",
+    "allow_member_add_member",
+    "allow_assign_task_to_member"
+  ];
+
+  if (!allowedKeys.includes(setting)) {
+    const error = new Error("No valid settings provided");
+    error.code = "INVALID_SETTINGS";
+    throw error;
+  }
+
+  if (typeof value !== "boolean") {
+    const error = new Error("value must be boolean");
+    error.code = "INVALID_SETTINGS";
+    throw error;
+  }
+
+  const permissionResult = await pool.query(
+    `
+    SELECT 1
+    FROM project_members pm
+    WHERE pm.project_id = $1::uuid
+      AND pm.user_id = $2::uuid
+      AND pm.role IN ('owner', 'admin')
+    LIMIT 1
+    `,
+    [normalizedProjectId, normalizedRequesterId]
+  );
+
+  if (permissionResult.rows.length === 0) {
+    const error = new Error("Forbidden: only owners and admins can update project settings");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    INSERT INTO project_settings (project_id, ${setting})
+    VALUES ($1::uuid, $2)
+    ON CONFLICT (project_id)
+    DO UPDATE SET ${setting} = EXCLUDED.${setting}
+    RETURNING
+      project_id,
+      allow_member_create_task,
+      allow_member_take_task,
+      allow_member_edit_task,
+      allow_member_delete_task,
+      allow_member_add_board,
+      allow_member_add_member,
+      allow_assign_task_to_member
+    `,
+    [normalizedProjectId, value]
+  );
+
+  return result.rows[0];
+}
 
 
 export async function inviteMemberToProject(inviteData) {
@@ -245,6 +492,23 @@ export async function inviteMemberToProject(inviteData) {
     throw error;
   }
 
+  // const membershipResult = await pool.query(
+  //   `
+  //   SELECT 1
+  //   FROM project_members pm
+  //   WHERE pm.project_id = $1::uuid
+  //     AND pm.user_id = $2::uuid
+  //   LIMIT 1
+  //   `,
+  //   [projectId, inviteeId]
+  // );
+
+  // if (membershipResult.rows.length > 0) {
+  //   const error = new Error("User is already a member of this project");
+  //   error.code = "ALREADY_MEMBER";
+  //   throw error;
+  // }
+
   const insertResult = await pool.query(
     `
     INSERT INTO project_requests (
@@ -270,9 +534,14 @@ export async function inviteMemberToProject(inviteData) {
         SELECT 1
         FROM project_requests pr
         WHERE pr.project_id = p.id
-          AND pr.requester_id = $1::uuid
           AND pr.recipient_id = u.id
-          AND pr.status = 'pending'
+          AND pr.status IN ('pending', 'accepted')
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM project_members pm
+        WHERE pm.project_id = p.id
+          AND pm.user_id = u.id
       )
     RETURNING id, requester_id, recipient_id, project_id, status, requested_at
     `,
@@ -282,19 +551,18 @@ export async function inviteMemberToProject(inviteData) {
   if (insertResult.rows.length === 0) {
     const duplicateResult = await pool.query(
       `
-      SELECT id
+      SELECT 1
       FROM project_requests
-      WHERE project_id = $1
-        AND requester_id = $2
-        AND recipient_id = $3
-        AND status = 'pending'
+      WHERE project_id = $1::uuid
+        AND recipient_id = $2::uuid
+        AND status IN ('accepted', 'pending')
       LIMIT 1
       `,
-      [projectId, inviterId, inviteeId]
+      [projectId, inviteeId]
     );
 
     if (duplicateResult.rows.length > 0) {
-      const error = new Error("A pending invite already exists for this user in this project");
+      const error = new Error("A pending invite already exists for this user in this project or user is already in the project.");
       error.code = "ALREADY_PENDING";
       throw error;
     }
@@ -548,6 +816,21 @@ export async function getTaskCategories(projectId) {
               'firstName', u.first_name,
               'lastName', u.last_name,
               'email', u.email
+            ),
+            'assignees', COALESCE(
+              (
+                SELECT json_agg(
+                  json_build_object(
+                    'id', au.id,
+                    'firstName', au.first_name,
+                    'lastName', au.last_name,
+                    'email', au.email
+                  ) ORDER BY au.first_name ASC, au.last_name ASC
+                )
+                FROM task_assignees ta
+                JOIN users au ON ta.user_id = au.id
+                WHERE ta.task_id = t.id
+              ), '[]'::json
             )
           )
           ORDER BY t."position" ASC, t.created_at ASC
@@ -630,4 +913,114 @@ export async function createTaskCategory(input) {
 
   const row = insertResult.rows[0];
   return { id: row.id, projectId: row.project_id, name: row.name, position: row.position };
+}
+
+export async function takeProjectTask({ taskId, userId }) {
+  const insertTakenTask = await pool.query(
+    `
+    INSERT INTO task_assignees (task_id, user_id)
+    VALUES ($1, $2::uuid)
+    RETURNING id, task_id, user_id
+    `,
+    [taskId, userId]
+  );
+
+  const row = insertTakenTask.rows[0];
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    userId: row.user_id
+  };
+}
+
+export async function updateTaskStatus({ taskId, userId, categoryId }) {
+  const normalizedUserId = (userId || "").trim();
+  const normalizedTaskId = Number(taskId);
+  const normalizedCategoryId = Number(categoryId);
+
+  if (!normalizedUserId) {
+    const error = new Error("userId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!Number.isInteger(normalizedCategoryId) || normalizedCategoryId <= 0) {
+    const error = new Error("categoryId is required");
+    error.code = "INVALID_CATEGORY";
+    throw error;
+  }
+
+  const taskResult = await pool.query(
+    `
+    SELECT t.id, t.category_id, tc.project_id
+    FROM tasks t
+    JOIN tasks_categories tc ON tc.id = t.category_id
+    WHERE t.id = $1
+    LIMIT 1
+    `,
+    [normalizedTaskId]
+  );
+
+  const taskRow = taskResult.rows[0];
+  if (!taskRow) {
+    const error = new Error("Task not found");
+    error.code = "TASK_NOT_FOUND";
+    throw error;
+  }
+
+  const assignmentResult = await pool.query(
+    `
+    SELECT 1
+    FROM task_assignees
+    WHERE task_id = $1
+      AND user_id = $2::uuid
+    LIMIT 1
+    `,
+    [normalizedTaskId, normalizedUserId]
+  );
+
+  if (assignmentResult.rows.length === 0) {
+    const error = new Error("Forbidden: you can only move tasks assigned to you");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
+  const targetCategoryResult = await pool.query(
+    `
+    SELECT id
+    FROM tasks_categories
+    WHERE id = $1
+      AND project_id = $2::uuid
+    LIMIT 1
+    `,
+    [normalizedCategoryId, taskRow.project_id]
+  );
+
+  if (targetCategoryResult.rows.length === 0) {
+    const error = new Error("Target category not found in this project");
+    error.code = "INVALID_CATEGORY";
+    throw error;
+  }
+
+  const movedTaskResult = await pool.query(
+    `
+    UPDATE tasks
+    SET category_id = $2
+    WHERE id = $1
+    RETURNING id, category_id
+    `,
+    [normalizedTaskId, normalizedCategoryId]
+  );
+
+  const movedTask = movedTaskResult.rows[0];
+  return {
+    id: movedTask.id,
+    categoryId: movedTask.category_id,
+  };
 }

@@ -49,7 +49,7 @@ function IncomingFriendRequests({ requests = [] }) {
     }
   };
 
-  if (loading) return <p>Loading sent friend requests...</p>;
+  if (loading) return <p className="status-text">Loading incoming requests...</p>;
   if (error) return <p className="friends-error">{error}</p>; 
   if (myFriendRequests.length === 0) {
     return <p className="friends-empty">No incoming requests.</p>;
@@ -60,7 +60,7 @@ function IncomingFriendRequests({ requests = [] }) {
       {myFriendRequests.map((friendRequests) => (
         <div key={friendRequests.id} className="friends-row friends-row-actions">
           <div className="friends-row-main">
-            <div className="friends-avatar">{friendRequests.initials}</div>
+            <div className="friends-avatar">{`${(friendRequests.first_name || "").charAt(0)}${(friendRequests.last_name || "").charAt(0)}`.toUpperCase()}</div>
             <div className="friends-meta">
                 <p className="friends-name">{friendRequests.first_name} {friendRequests.last_name}</p>
                 <p className="friends-email">{friendRequests.email}</p>

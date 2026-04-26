@@ -38,7 +38,7 @@ function SentFriendRequests() {
         }
     }
 
-    if (loading) return <p>Loading sent friend requests...</p>;
+    if (loading) return <p className="status-text">Loading sent requests...</p>;
     if (error) return <p className="friends-error">{error}</p>; 
     if (sentFriendRequests.length === 0) {
         return <p className="friends-empty">No sent requests.</p>;
@@ -49,10 +49,10 @@ function SentFriendRequests() {
         {sentFriendRequests.map((sentRequests) => (
             <div key={sentRequests.id} className="friends-row friends-row-actions">
             <div className="friends-row-main">
-                <div className="friends-avatar">{sentRequests.initials}</div>
+                <div className="friends-avatar">{`${(sentRequests.first_name || "").charAt(0)}${(sentRequests.last_name || "").charAt(0)}`.toUpperCase()}</div>
                 <div className="friends-meta">
                     <p className="friends-name">{sentRequests.first_name} {sentRequests.last_name}</p>
-                    <p className="friends-email">{sentRequests.last_name}</p>
+                    <p className="friends-email">{sentRequests.email}</p>
                 </div>
             </div>
 

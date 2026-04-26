@@ -1,0 +1,86 @@
+.pmv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(14, 26, 39, 0.42);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.pmv-modal {
+  width: min(620px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 20px;
+  background: linear-gradient(180deg, var(--color-bg-surface) 0%, #f8fcff 100%);
+  box-shadow: var(--shadow-lg);
+}
+
+.pmv-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.pmv-header h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+  color: var(--color-text-primary);
+}
+
+.pmv-header p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.pmv-close-btn {
+  border: 1px solid #d5e2ef;
+  background: #f2f7fb;
+  color: var(--color-text-secondary);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pmv-close-btn:hover {
+  background: #e6eff6;
+}
+
+.pmv-footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 14px 22px;
+}
+
+.pmv-done-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pmv-done-btn:hover {
+  background: var(--color-bg-subtle);
+}
+
+@media (max-width: 760px) {
+  .pmv-modal {
+    border-radius: 16px;
+  }
+}

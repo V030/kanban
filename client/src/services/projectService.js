@@ -21,6 +21,14 @@ export async function getMemberProjects() {
   });
 }
 
+export async function getProjectMembers(projectId) {
+  if (!projectId) throw new Error("projectId is required");
+
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/members`, {
+    method: "GET",
+  });
+}
+
 export async function inviteMemberToProject(inviteData) {
   return fetchWithAuth(`${API_URL}/auth/projects/send-invite`, {
     method: "POST",
@@ -76,5 +84,44 @@ export async function createNewTask(taskContent) {
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/${categoryId}/create-new-task`, {
     method: 'POST',
     body: JSON.stringify(taskContent || {}),
+  });
+}
+
+export async function getProjectSettings(projectId) {
+  if (!projectId) throw new Error("projectId is required");
+  return fetchWithAuth(`${API_URL}/auth/project-settings/${projectId}`, {
+    method: "GET",
+  });
+}
+
+export async function updateProjectSettings(projectId, setting, value) {
+  if (!projectId) throw new Error("projectId is required");
+  if (!setting) throw new Error("setting is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project-settings`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      projectId,
+      setting,
+      value,
+    }),
+  });
+}
+
+export async function takeTask(taskId) {
+  if (!taskId) throw new Error("task id is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/take-task/${taskId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export async function updateTaskStatus(taskId, columnStatus) {
+  if (!taskId) throw new Error("taskId is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ categoryId: columnStatus }),
   });
 }

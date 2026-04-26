@@ -1,14 +1,6 @@
-import logo from './logo.svg';
 import './App.css';
 
-import { BrowserRouter, 
-         createBrowserRouter, 
-         RouterProvider, 
-         useActionData,
-         Routes, 
-         Route,
-         Navigate 
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { isAuthenticated } from './services/authService';
 
@@ -19,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Friends from "./pages/Friends";
 import KanbanPage from "./pages/KanbanPage";
+import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
 import { ProtectedRoute } from './components/protected/ProtectedRoutes';
 import { PublicRoute } from './components/public/PublicRoutes';
@@ -55,6 +48,7 @@ function App() {
             <Route path="projects" element={<Projects />} />
             <Route path="kanban" element={<KanbanPage />} />
             <Route path="friends" element={<Friends />} />
+            <Route path="my-tasks" element={<MyTasks />} />
             <Route path="profile" element={<Profile />} />
           </Route>
 

@@ -64,7 +64,7 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: 720 }}>
+      <div className="modal-content modal-content-wide">
         <div className="modal-header">
           <h2>Project Invitations</h2>
           <button className="close-btn" onClick={onClose} aria-label="Close">&times;</button>
@@ -78,18 +78,18 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
           {!loading && !error && invites.length === 0 && <p>No pending invitations right now.</p>}
 
           {!loading && !error && invites.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+          <div className="invite-list">
             {invites.map((inv) => (
               <div key={inv.id} className="invite-row">
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                  <div className="friend-initials" style={{ width: 48, height: 48, fontSize: 16 }}>{`${(inv.senderFirstName || "").charAt(0)}${(inv.senderLastName || "").charAt(0)}`.toUpperCase()}</div>
+                <div className="invite-main">
+                  <div className="friend-initials large">{`${(inv.senderFirstName || "").charAt(0)}${(inv.senderLastName || "").charAt(0)}`.toUpperCase()}</div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{inv.projectName}</div>
-                    <div style={{ color: '#6b7280', fontSize: 13 }}>Invited by {`${inv.senderFirstName || ""} ${inv.senderLastName || ""}`.trim() || inv.senderEmail}</div>
+                    <div className="invite-project-name">{inv.projectName}</div>
+                    <div className="invite-sender">Invited by {`${inv.senderFirstName || ""} ${inv.senderLastName || ""}`.trim() || inv.senderEmail}</div>
                   </div>
                 </div>
 
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="invite-actions">
                   <div className="invite-date">{new Date(inv.requestedAt).toLocaleString()}</div>
                   <button
                     className="accept-btn"

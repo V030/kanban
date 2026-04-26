@@ -1,54 +1,154 @@
-.App {
-  text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Layout for MainPage (Sidebar + Content) */
 .app-layout {
-  display: flex;
   height: 100vh;
-  width: 100vw;
+  display: grid;
+  grid-template-columns: 286px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  align-items: stretch;
   overflow: hidden;
 }
 
 .content {
-  flex: 1;
-  padding: 32px;
-  background-color: #ffffff;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.content-inner {
+  height: 100%;
+  min-height: 0;
   overflow-y: auto;
+  padding-right: 4px;
+}
+
+.content-inner > * {
+  min-height: calc(100vh - 32px);
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 18px;
+}
+
+.auth-panel {
+  width: min(940px, 100%);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(186, 204, 224, 0.6);
+  border-radius: 26px;
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.auth-brand {
+  padding: clamp(24px, 5vw, 48px);
+  background:
+    linear-gradient(140deg, rgba(15, 127, 143, 0.12) 0%, rgba(15, 127, 143, 0.24) 100%),
+    radial-gradient(circle at 90% 14%, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0) 42%);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.auth-brand h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  line-height: 1.06;
+}
+
+.auth-brand p {
+  margin-top: 10px;
+  max-width: 28ch;
+}
+
+.auth-brand-list {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-brand-list span {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  padding: 9px 11px;
+}
+
+.auth-content {
+  padding: clamp(20px, 4.2vw, 38px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-content h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+}
+
+.auth-content p {
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 1080px) {
+  .app-layout {
+    grid-template-columns: 236px minmax(0, 1fr);
+    gap: 14px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 920px) {
+  .app-layout {
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 10px;
+    overflow: visible;
+  }
+
+  .content-inner > * {
+    min-height: auto;
+  }
+
+  .auth-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-brand {
+    padding-bottom: 24px;
+  }
+}
+
+@media (max-width: 560px) {
+  .auth-page {
+    padding: 12px;
+  }
+
+  .auth-panel {
+    border-radius: 20px;
+  }
+
+  .auth-content,
+  .auth-brand {
+    padding: 16px;
+  }
+
+  .auth-brand-list {
+    gap: 8px;
+  }
+
+  .auth-brand-list span {
+    font-size: 0.8rem;
+  }
 }
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { login } from "../../services/authService";
 import { useNavigate } from "react-router-dom";
+import "../styles/WorkspacePages.css";
 
 function LoginForm() {
     const [email, setEmail] = useState("");
@@ -14,7 +15,6 @@ function LoginForm() {
 
     try {
       await login(email, password);
-      alert("Login success");
       navigate("/main-page");
     } catch (err) {
       setError("Invalid email or password");
@@ -26,25 +26,35 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+    <form className="auth-form" onSubmit={handleSubmit}>
+      <div className="auth-field">
+        <label htmlFor="login-email">Email</label>
+        <input
+          id="login-email"
+          type="email"
+          placeholder="name@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      <div className="auth-field">
+        <label htmlFor="login-password">Password</label>
+        <input
+          id="login-password"
+          type="password"
+          placeholder="Enter password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </div>
 
-      <button type="submit">Login</button>
-      <button type="button" onClick={ toRegister }>Register</button>      
+      <div className="auth-actions">
+        <button className="btn btn-primary" type="submit">Log In</button>
+        <button className="btn btn-secondary" type="button" onClick={ toRegister }>Create Account</button>
+      </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className="auth-error">{error}</p>}
     </form>
   );
 }

@@ -1,12 +1,24 @@
-import React, { useState, useEffect } from "react";
+import "../styles/ProjectMembersModal.css";
+import "./CreateProjectModal.css";
+import ProjectMembersList from "./ProjectMembersList";
 import { getFriends } from "../../services/friendService";
 import { inviteMemberToProject } from "../../services/projectService";
-import "./CreateProjectModal.css";
+import { useState, useEffect } from "react";
 
-export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
+export default function ProjectMembersModal({
+  isOpen,
+  onClose,
+  project,
+  members = [],
+  loading = false,
+  error = "",
+  currentUserId = "",
+  onAdded,
+}) {
+
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [friends, setFriends] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
 
@@ -27,18 +39,35 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
     }
   }
 
-  if (!isOpen) return null;
+  const handleSelectFriend = async (friend, project) => {
+    setInviteLoading(true);
+    setInviteError("");
+
+    try {
+      await inviteMemberToProject ({
+        projectId: project,
+        friendId: friend,
+      });
+      if (onAdded) {
+        await onAdded();
+      }
+    } catch (err) {
+      setInviteError(err?.message || "Failed to send an invite.");
+    } finally {
+      setInviteLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setInviteError("");
 
     if (!email || !email.trim()) {
-      setError("Please enter an email");
+      setInviteError("Please enter an email");
       return;
     }
 
-    setLoading(true);
+    setInviteLoading(true);
     try {
       if (!project?.id) {
         throw new Error("Project is missing");
@@ -54,31 +83,35 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
       }
       onClose();
     } catch(err) {
-      setError(err?.message || "Failed to send an invite.");
+      setInviteError(err?.message || "Failed to send an invite.");
     } finally {
-      setLoading(false);
+      setInviteLoading(false);
     }
   };
-
-  const handleSelectFriend = async (friend, project) => {
-    setLoading(true);
-    setError("");
-
-    try {
-      await inviteMemberToProject ({
-        projectId: project,
-        friendId: friend,
-      });
-    } catch (err) {
-      setError(err?.message || "Failed to send an invite.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  
+  if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
+    <div className="pmv-overlay" role="dialog" aria-modal="true" aria-label="Project members">
+      <div className="pmv-modal">
+        <header className="pmv-header">
+          <div>
+            <h2>Project Members</h2>
+            <p>{project?.name ? `People currently collaborating in ${project?.name}.` : "People currently collaborating in this project."}</p>
+          </div>
+          <button type="button" className="pmv-close-btn" onClick={onClose} aria-label="Close project members">
+            &times;
+          </button>
+        </header>
+
+        <ProjectMembersList
+          members={members}
+          loading={loading}
+          error={error}
+          currentUserId={currentUserId}
+          compact
+        />
+
         <div className="modal-header">
           <h2>Add Someone to "{project?.name || 'Project'}"</h2>
           <button className="close-btn" onClick={onClose} aria-label="Close">&times;</button>
@@ -127,12 +160,20 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
 
           <div className="modal-footer">
             <button type="button" className="cancel-btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'Sending...' : 'Send Invite'}</button>
+            <button type="submit" className="submit-btn" disabled={inviteLoading}>{inviteLoading ? 'Sending...' : 'Send Invite'}</button>
           </div>
         </form>
 
-        {error && <p className="error-message">{error}</p>}
+        {inviteError && <p className="error-message">{inviteError}</p>}
+
+        <footer className="pmv-footer">
+          <button type="button" className="pmv-done-btn" onClick={onClose}>
+            Done
+          </button>
+        </footer>
       </div>
+
+
     </div>
   );
 }

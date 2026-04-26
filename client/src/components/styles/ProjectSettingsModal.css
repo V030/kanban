@@ -1,0 +1,239 @@
+.ps-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(14, 26, 39, 0.42);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.ps-modal {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 20px;
+  background: linear-gradient(180deg, var(--color-bg-surface) 0%, #f8fcff 100%);
+  box-shadow: var(--shadow-lg);
+}
+
+.ps-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.ps-header h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+  color: var(--color-text-primary);
+}
+
+.ps-header p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.ps-close-btn {
+  border: 1px solid #d5e2ef;
+  background: #f2f7fb;
+  color: var(--color-text-secondary);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ps-close-btn:hover {
+  background: #e6eff6;
+}
+
+.ps-section {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.ps-section h3 {
+  margin: 0 0 12px;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+.ps-toggle-row {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: #fbfdff;
+}
+
+.ps-toggle-row + .ps-toggle-row {
+  margin-top: 10px;
+}
+
+.ps-readonly-note {
+  margin: 0;
+  color: #8f5600;
+  border: 1px solid #f0d4ab;
+  background: #fff6e8;
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ps-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ps-toggle-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.ps-toggle-description {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.86rem;
+}
+
+.ps-switch {
+  position: relative;
+  display: inline-flex;
+  width: 48px;
+  height: 28px;
+  min-width: 48px;
+  cursor: pointer;
+}
+
+.ps-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.ps-switch.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ps-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #d0dbe7;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+
+.ps-slider::before {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  left: 3px;
+  top: 3px;
+  border-radius: 999px;
+  background: var(--color-bg-surface);
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.ps-switch input:checked + .ps-slider {
+  background-color: var(--color-primary);
+}
+
+.ps-switch input:checked + .ps-slider::before {
+  transform: translateX(20px);
+}
+
+.ps-preview-intro {
+  margin: 0 0 10px;
+  color: #475569;
+  font-size: var(--text-sm);
+}
+
+.ps-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ps-preview-card {
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  padding: 12px;
+}
+
+.ps-preview-card.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.16);
+}
+
+.ps-preview-card h4 {
+  margin: 0;
+  font-size: 0.93rem;
+  color: var(--color-text-primary);
+}
+
+.ps-preview-card ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #525f73;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.ps-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 22px;
+}
+
+.ps-footer p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+}
+
+.ps-done-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ps-done-btn:hover {
+  background: var(--color-bg-subtle);
+}
+
+@media (max-width: 760px) {
+  .ps-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ps-toggle-row {
+    align-items: flex-start;
+  }
+}

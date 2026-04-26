@@ -4,6 +4,7 @@ import CreateProjectModal from "../components/common/CreateProjectModal";
 import AddMemberModal from "../components/common/AddMemberModal";
 import ProjectInvitesModal from "../components/common/ProjectInvitesModal";
 import "../components/common/CreateProjectModal.css"; 
+import "../components/styles/WorkspacePages.css";
 import { getProjects, getMemberProjects } from "../services/projectService";
 
 function Projects() {
@@ -57,111 +58,133 @@ function Projects() {
       navigate("/main-page/kanban", { state: { project } });
     };
 
-    return (
-        <div>
-           <h1>Projects</h1>
-           <p>Manage and organize all your projects</p>
-
-           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-             <button className="add-project-btn" onClick={() => setIsCreateModalOpen(true)}>
-               + Create Project
-             </button>
-             <button className="invites-btn" onClick={() => setIsInvitesOpen(true)}>
-               Project Invitations
-             </button>
-           </div>
-
-           <CreateProjectModal 
-               isOpen={isCreateModalOpen} 
-               onClose={() => setIsCreateModalOpen(false)} 
-               onCreated={loadProjects}
-           />
-
-           {loading && <p>Loading your projects...</p>}
-           {error && <p style={{ color: "red" }}>{error}</p>}
-
-           {!loading && !error && projects.length === 0 && <p>No owned projects yet.</p>}
-
-           {!loading && !error && projects.length > 0 && (
-             <div>
-               <h3 style={{ marginTop: 6 }}>My Projects</h3>
-               {projects.map((project) => (
-                 <div
-                   key={project.id}
-                   style={{ border: "1px solid #ddd", padding: "12px", marginTop: "12px", position: "relative", cursor: "pointer" }}
-                   onClick={() => openKanban(project)}
-                   role="button"
-                   tabIndex={0}
-                   onKeyDown={(event) => {
-                     if (event.key === "Enter" || event.key === " ") {
-                       event.preventDefault();
-                       openKanban(project);
-                     }
-                   }}
-                 >
-                 <h3>{project.name}</h3>
-                 <p>{project.description || "No description"}</p>
-                 <small>Created: {new Date(project.created_at).toLocaleString()}</small>
-                 <div style={{ marginTop: 10 }}>
-                   <button
-                     className="add-member-btn"
-                     onClick={(event) => {
-                       event.stopPropagation();
-                       setSelectedProject(project);
-                     }}
-                   >
-                     + Add Someone
-                   </button>
-                 </div>
-              </div>
-            ))}
-          </div>
+    const renderProjectCard = (project, type = "owner") => (
+      <article
+        key={project.id}
+        className="project-card"
+        onClick={() => openKanban(project)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openKanban(project);
+          }
+        }}
+      >
+        <h3>{project.name}</h3>
+        <p>{project.description || "No description added yet."}</p>
+        <p className="meta-line">
+          {type === "owner"
+            ? `Created ${new Date(project.created_at).toLocaleString()}`
+            : `Joined ${new Date(project.joined_at).toLocaleString()}`}
+        </p>
+        <div className="project-card-foot">
+          <span className={`pill ${type}`}>{type === "owner" ? "Owner" : "Member"}</span>
+          {type === "owner" && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedProject(project);
+              }}
+            >
+              Add Member
+            </button>
           )}
+        </div>
+      </article>
+    );
 
-          {memberLoading && <p>Loading projects you joined...</p>}
-          {memberError && <p style={{ color: "red" }}>{memberError}</p>}
+    return (
+      <section className="page-shell projects-page">
+        <header className="page-header">
+          <div>
+            <h1 className="page-title">Projects</h1>
+            <p className="page-subtitle">
+              Create, review, and open boards quickly with a clean overview of ownership and collaboration.
+            </p>
+          </div>
 
-          {!memberLoading && !memberError && memberProjects.length > 0 && (
-            <div style={{ marginTop: 20 }}>
-              <h3>Other Projects</h3>
-              {memberProjects.map((project) => (
-                <div
-                  key={project.id}
-                  style={{ border: "1px solid #ddd", padding: "12px", marginTop: "12px", cursor: "pointer" }}
-                  onClick={() => openKanban(project)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openKanban(project);
-                    }
-                  }}
+          <div className="projects-header-actions">
+            <button type="button" className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+              Create Project
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsInvitesOpen(true)}>
+              Project Invitations
+            </button>
+          </div>
+        </header>
+
+        <CreateProjectModal 
+          isOpen={isCreateModalOpen} 
+          onClose={() => setIsCreateModalOpen(false)} 
+          onCreated={loadProjects}
+        />
+
+        <section className="project-section">
+          <div className="section-heading">
+            <h2>My Projects</h2>
+            <p>{projects.length} total</p>
+          </div>
+
+          {loading && <p className="status-text">Loading your projects...</p>}
+          {error && <p className="status-text error">{error}</p>}
+
+          {!loading && !error && projects.length === 0 && (
+            <div className="empty-state-card">
+              <h3>No owned projects yet</h3>
+              <p>Start by creating a project, then add members and set up your board workflow.</p>
+              <div className="empty-state-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setIsCreateModalOpen(true)}
                 >
-                  <h3>{project.name}</h3>
-                  <p>{project.description || "No description"}</p>
-                  <small>Joined: {new Date(project.joined_at).toLocaleString()}</small>
-                </div>
-              ))}
+                  Create First Project
+                </button>
+              </div>
             </div>
           )}
 
+          {!loading && !error && projects.length > 0 && (
+            <div className="project-grid">{projects.map((project) => renderProjectCard(project, "owner"))}</div>
+          )}
+        </section>
+
+        <section className="project-section">
+          <div className="section-heading">
+            <h2>Projects You Joined</h2>
+            <p>{memberProjects.length} total</p>
+          </div>
+
+          {memberLoading && <p className="status-text">Loading shared projects...</p>}
+          {memberError && <p className="status-text error">{memberError}</p>}
+
           {!memberLoading && !memberError && memberProjects.length === 0 && (
-            <p style={{ marginTop: 16 }}>You're not a member of any other project yet.</p>
+            <p className="status-text">You are not a member of other projects yet.</p>
           )}
 
-          <AddMemberModal
-            isOpen={!!selectedProject}
-            project={selectedProject}
-            onClose={() => setSelectedProject(null)}
-            onAdded={loadProjects}
-          />
+          {!memberLoading && !memberError && memberProjects.length > 0 && (
+            <div className="project-grid">
+              {memberProjects.map((project) => renderProjectCard(project, "member"))}
+            </div>
+          )}
+        </section>
 
-          <ProjectInvitesModal
-            isOpen={isInvitesOpen}
-            onClose={() => setIsInvitesOpen(false)}
-          />
-        </div>
+        <AddMemberModal
+          isOpen={!!selectedProject}
+          project={selectedProject}
+          onClose={() => setSelectedProject(null)}
+          onAdded={loadProjects}
+        />
+
+        <ProjectInvitesModal
+          isOpen={isInvitesOpen}
+          onClose={() => setIsInvitesOpen(false)}
+        />
+      </section>
     );
 }
 

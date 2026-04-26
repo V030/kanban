@@ -6,7 +6,9 @@ function MainPage() {
         <div className="app-layout">
             <SideBar />
             <main className="content">
-                <Outlet />  {/* This renders Dashboard/Projects/Profile based on route */}
+                <div className="content-inner">
+                    <Outlet />
+                </div>
             </main>
         </div>
     );

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { register } from "../../services/authService";
 import { useNavigate } from "react-router-dom";
+import "../styles/WorkspacePages.css";
 
 function RegisterForm() {
     const [first_name, setFirstName] = useState("");
@@ -21,7 +22,7 @@ function RegisterForm() {
 
     try {
       await register(first_name, last_name, email, password);
-      alert("Register success");
+      navigate("/main-page");
     } catch (err) {
       setError("Registration failed");
     }
@@ -32,46 +33,69 @@ function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="text"
-        placeholder="First Name"
-        value={first_name}
-        onChange={(e) => setFirstName(e.target.value)}
-      />
+    <form className="auth-form" onSubmit={handleSubmit}>
+      <div className="auth-field">
+        <label htmlFor="register-first-name">First Name</label>
+        <input
+          id="register-first-name"
+          type="text"
+          placeholder="First name"
+          value={first_name}
+          onChange={(e) => setFirstName(e.target.value)}
+        />
+      </div>
 
-      <input
-        type="text"
-        placeholder="Last Name"
-        value={last_name}
-        onChange={(e) => setLastName(e.target.value)}
-      />
+      <div className="auth-field">
+        <label htmlFor="register-last-name">Last Name</label>
+        <input
+          id="register-last-name"
+          type="text"
+          placeholder="Last name"
+          value={last_name}
+          onChange={(e) => setLastName(e.target.value)}
+        />
+      </div>
 
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+      <div className="auth-field">
+        <label htmlFor="register-email">Email</label>
+        <input
+          id="register-email"
+          type="email"
+          placeholder="name@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      <div className="auth-field">
+        <label htmlFor="register-password">Password</label>
+        <input
+          id="register-password"
+          type="password"
+          placeholder="Create password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </div>
 
-      <input
-        type="password"
-        placeholder="Confirm Password"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-      />
+      <div className="auth-field">
+        <label htmlFor="register-confirm-password">Confirm Password</label>
+        <input
+          id="register-confirm-password"
+          type="password"
+          placeholder="Repeat password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+        <small>Use at least 8 characters to improve account security.</small>
+      </div>
 
-      <button type="submit">Register</button>
-      <button type="button" onClick={toLogin}>Log In</button>
+      <div className="auth-actions">
+        <button className="btn btn-primary" type="submit">Create Account</button>
+        <button className="btn btn-secondary" type="button" onClick={toLogin}>Back to Login</button>
+      </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className="auth-error">{error}</p>}
     </form>
   );
 }

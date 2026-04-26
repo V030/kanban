@@ -1,6 +1,7 @@
 import { createProject as createProjectModel,
          getProjectsByOwner,
          getProjectsByMember,
+         getProjectMembers as getProjectMembersModel,
          inviteMemberToProject as inviteMemberToProjectModel,
          getProjectInvitations as getProjectInvitationsModel,
          acceptProjectInvitation as acceptProjectInvitationModel,
@@ -8,6 +9,10 @@ import { createProject as createProjectModel,
          getTaskCategories as getTaskCategoriesModel,
          createTaskCategory as createTaskCategoryModel,
          createTask as createTaskModel,
+         getProjectSettings as getProjectSettingsModel,
+         updateProjectSettings as updateProjectSettingsModel,
+         takeProjectTask as takeProjectTaskModel,
+         updateTaskStatus as updateTaskStatusModel,
  } from "../models/projectModel.js";
 
 export async function createProject(req, res) {
@@ -73,6 +78,38 @@ export async function getMemberProjects(req, res) {
     }
 }
 
+export async function getProjectMembers(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { projectId } = req.params;
+
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  try {
+    const members = await getProjectMembersModel({
+      projectId,
+      requesterId: req.user.userId,
+    });
+
+    return res.status(200).json({ members });
+  } catch (error) {
+    if (error?.code === "INVALID_PROJECT") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    console.error("Get project members error:", error);
+    return res.status(500).json({ message: "Unable to fetch project members" });
+  }
+}
+
 export async function inviteMemberToProject(req, res) {
   const projectId = (req.body?.project || req.body?.projectId || "").trim();
   const inviteeId = (req.body?.friend || req.body?.friendId || "").trim();
@@ -97,6 +134,10 @@ export async function inviteMemberToProject(req, res) {
     });
     return res.status(201).json({ message: "Invite sent", inviteRequest });
   } catch (error) {
+    if (error?.code === "ALREADY_PENDING" || error?.code === "ALREADY_MEMBER") {
+      return res.status(409).json({ message: error.message });
+    }
+
     return res.status(500).json({ message: error.message || "Failed to send invite" });
   }
 }
@@ -305,5 +346,132 @@ export async function createNewTask(req, res) {
 
     console.error("Create new task error:", error);
     return res.status(500).json({ message: error?.message || "Unable to create task" });
+  }
+}
+
+export async function takeProjectTask(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+
+  if (!taskId) {
+    return res.status(400).json({ message: "task id parameter is required" });
+  }
+
+  try {
+    const taskTaken = await takeProjectTaskModel({taskId: taskId, userId: req.user?.userId} );
+    return res.status(201).json({ message: "Task taken successfully" });
+  } catch (error) {
+    console.error("Error taking task:", error);
+
+    if (error.message.includes("required")) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    return res.status(500).json({ message: "Failed to take task", error: error.message });
+  }
+}
+
+export async function updateTaskStatus(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+  const { categoryId } = req.body || {};
+
+  if (!taskId) {
+    return res.status(400).json({ message: "taskId parameter is required" });
+  }
+
+  if (categoryId === undefined || categoryId === null) {
+    return res.status(400).json({ message: "categoryId is required" });
+  }
+
+  try {
+    const task = await updateTaskStatusModel({
+      taskId,
+      userId: req.user.userId,
+      categoryId,
+    });
+
+    return res.status(200).json({ message: "Task moved successfully", task });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_CATEGORY" || error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    console.error("Update task status error:", error);
+    return res.status(500).json({ message: "Unable to move task" });
+  }
+}
+
+export async function updateProjectSettings(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { projectId, setting, value } = req.body || {};
+
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  if (!setting) {
+    return res.status(400).json({ message: "setting is required" });
+  }
+
+  if (typeof value !== "boolean") {
+    return res.status(400).json({ message: "No valid settings provided" });
+  }
+
+  try {
+    const updated = await updateProjectSettingsModel({
+      projectId,
+      requesterId: req.user.userId,
+      setting,
+      value,
+    });
+
+    return res.status(200).json(updated);
+  } catch (error) {
+    if (error?.code === "PROJECT_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "INVALID_PROJECT") return res.status(400).json({ message: error.message });
+    if (error?.code === "INVALID_SETTINGS") return res.status(400).json({ message: error.message });
+    return res.status(500).json({ message: "Unable to update project settings" });
+  }
+}
+
+export async function getProjectSettings(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { projectId } = req.params;
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  try {
+    const settings = await getProjectSettingsModel({
+      projectId,
+      requesterId: req.user.userId,
+    });
+
+    return res.status(200).json(settings);
+  } catch (error) {
+    if (error?.code === "PROJECT_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "INVALID_PROJECT") return res.status(400).json({ message: error.message });
+    return res.status(500).json({ message: "Unable to fetch project settings" });
   }
 }

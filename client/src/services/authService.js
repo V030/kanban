@@ -24,8 +24,8 @@ export async function fetchWithAuth(url, options = {}) {
     headers
   });
   
-  // handles token expiration
-  if (response.status === 401 || response.status === 403) {
+  // handle token expiration/authentication failure
+  if (response.status === 401) {
     console.log("Token invalid or expired. Logging out...");
     logout();
     window.location.href = "/login";

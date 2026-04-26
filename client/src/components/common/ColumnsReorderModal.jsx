@@ -4,17 +4,15 @@ import { createNewTaskCategory } from "../../services/projectService";
 
 function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave }) {
   const [localColumns, setLocalColumns] = useState([]);
-  const [newVisible, setNewVisible] = useState("");
+  const [newVisible, setNewVisible] = useState(false);
   const [newName, setNewName] = useState("");
-  const [error, setError] = useState(false);
-    const [newTaskCategory, setNewTaskCategory] = useState({
-      name: "",
-    });
+  const [error, setError] = useState("");
 
   useEffect(() => {
     setLocalColumns(columns.map((c) => ({ id: c.id, name: c.name || c.title || "Untitled" })));
     setNewVisible(false);
     setNewName("");
+    setError("");
   }, [open, columns]);
 
   if (!open) return null;
@@ -40,7 +38,9 @@ function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave })
     setNewVisible(true);
   }
 
-  const confirmAddColumn = async (e) => {
+  const confirmAddColumn = async () => {
+    setError("");
+
     if (!newName.trim()) return;
     const col = { id: `new-${Date.now()}`, name: newName.trim() };
     setLocalColumns((s) => [...s, col]);
@@ -48,11 +48,9 @@ function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave })
     setNewName("");
 
     if (!newName.trim()) {
-        setError('Task category name required');
+        setError("Task category name required");
         return;
     }
-
-    console.log("New Category: ", newName);
 
     try {
       await createNewTaskCategory({ projectId, name: newName.trim() });
@@ -79,11 +77,11 @@ function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave })
       <div className="crm-modal">
         <div className="crm-header">
           <h3>Re-order Columns</h3>
-          <button className="crm-close" onClick={onClose}>✕</button>
+          <button type="button" className="crm-close" onClick={onClose}>x</button>
         </div>
 
         <div className="crm-body">
-          <p className="crm-note">Columns shown in top → bottom order. Dragging not implemented; use arrows.</p>
+          <p className="crm-note">Columns shown in top to bottom order. Dragging is not enabled yet, so use arrows.</p>
           <div className="crm-list">
             {localColumns.map((col, i) => (
               <div className="crm-row" key={col.id}>
@@ -96,15 +94,15 @@ function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave })
                   />
                 </div>
                 <div className="crm-row-actions">
-                  <button onClick={() => move(i, -1)} aria-label="Move up">▲</button>
-                  <button onClick={() => move(i, 1)} aria-label="Move down">▼</button>
+                  <button type="button" onClick={() => move(i, -1)} aria-label="Move up">Up</button>
+                  <button type="button" onClick={() => move(i, 1)} aria-label="Move down">Down</button>
                 </div>
               </div>
             ))}
           </div>
           <div className="crm-add-row">
             {!newVisible && (
-              <button className="crm-add" onClick={startAddColumn}>Add Column</button>
+              <button type="button" className="crm-add" onClick={startAddColumn}>Add Column</button>
             )}
 
             {newVisible && (
@@ -116,17 +114,19 @@ function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave })
                   onChange={(e) => setNewName(e.target.value)}
                 />
                 <div className="crm-new-actions">
-                  <button className="crm-add" onClick={confirmAddColumn}>Add</button>
-                  <button className="crm-cancel" onClick={cancelAddColumn}>Cancel</button>
+                  <button type="button" className="crm-add" onClick={confirmAddColumn}>Add</button>
+                  <button type="button" className="crm-cancel" onClick={cancelAddColumn}>Cancel</button>
                 </div>
               </div>
             )}
           </div>
+
+          {error && <p className="crm-error">{error}</p>}
         </div>
 
         <div className="crm-footer">
-          <button className="crm-save" onClick={handleSave}>Save</button>
-          <button className="crm-cancel" onClick={onClose}>Cancel</button>
+          <button type="button" className="crm-save" onClick={handleSave}>Save</button>
+          <button type="button" className="crm-cancel" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>

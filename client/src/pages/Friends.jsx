@@ -15,8 +15,6 @@ function Friends() {
 
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [friendsError, setFriendsError] = useState("");
-  const [sentLoading, setSentLoading] = useState(false);
-  const [sentError, setSentError] = useState("");
 
   const loadFriends = async () => {
     setFriendsLoading(true);
@@ -43,16 +41,11 @@ function Friends() {
   }, []);
 
   const loadSentFriendRequests = async () => {
-    setSentLoading(true);
-    setSentError("");
-
     try {
       const data = await getSentFriendRequests();
       setSentFriendRequests(data.sentFriendRequests || []);
     } catch (err) {
-      setSentError(err.message || "Failed to load sent requests");
-    } finally {
-      setSentLoading(false);
+      console.error(err.message || "Failed to load sent requests");
     }
   };
 
@@ -61,16 +54,11 @@ function Friends() {
   }, []);
 
   const loadIncomingFriendRequests = async () => {
-    setSentLoading(true);
-    setSentError("");
-
     try {
       const data = await getFriendRequests();
       setMyFriendRequests(data.myFriendRequests || []);
     } catch (err) {
-      setSentError(err.message || "Failed to load friend requests");
-    } finally {
-      setSentLoading(false);
+      console.error(err.message || "Failed to load friend requests");
     }
   };
 
@@ -85,13 +73,17 @@ function Friends() {
   };
 
   return (
-    <div className="friends-page">
-      <h1 className="friends-title">Friends</h1>
-      <p className="friends-subtitle">Connect with team members and collaborate.</p>
+    <section className="page-shell friends-page">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Team Network</h1>
+          <p className="page-subtitle">Manage collaborators, incoming requests, and outgoing invitations.</p>
+        </div>
 
-      <button type="button" className="friends-add-btn" onClick={() => setIsAddFriendOpen(true)}>
-        + Add Friend
-      </button>
+        <button type="button" className="btn btn-primary" onClick={() => setIsAddFriendOpen(true)}>
+          Add Member
+        </button>
+      </header>
 
       <div className="friends-tabs">
         <button
@@ -113,21 +105,21 @@ function Friends() {
 
       {activeTab === "friends" ? (
         friendsLoading ? (
-          <p>Loading friends...</p>
+          <p className="status-text">Loading members...</p>
         ) : friendsError ? (
-          <p className="friends-error">{friendsError}</p>
+          <p className="status-text error">{friendsError}</p>
         ) : (
           <FriendsList friends={friends} />
         )
       ) : (
         <div className="requests-grid">
           <section>
-            <h2 className="request-section-title">INCOMING REQUESTS ({myFriendRequests.length})</h2>
+            <h2 className="request-section-title">Incoming Requests ({myFriendRequests.length})</h2>
             <IncomingFriendRequests requests={myFriendRequests} />
           </section>
 
           <section>
-            <h2 className="request-section-title">SENT REQUESTS ({sentFriendRequests.length})</h2>
+            <h2 className="request-section-title">Sent Requests ({sentFriendRequests.length})</h2>
             <SentFriendRequests requests={sentFriendRequests} />
           </section>
         </div>
@@ -138,7 +130,7 @@ function Friends() {
         onClose={() => setIsAddFriendOpen(false)}
         onCreated={handleFriendRequestCreated}
       />
-    </div>
+    </section>
   );
 }
 
