@@ -13,6 +13,17 @@ import { createProject as createProjectModel,
          updateProjectSettings as updateProjectSettingsModel,
          takeProjectTask as takeProjectTaskModel,
          updateTaskStatus as updateTaskStatusModel,
+         assignTaskToOthers as assignTaskToOthersModel,
+         unassignTaskFromMember as unassignTaskFromMemberModel,
+         unassignTaskFromSelf as unassignTaskFromSelfModel,
+         createSubtask as createSubtaskModel,
+         createTaskComment as createTaskCommentModel,
+         createTaskCommentReply as createTaskCommentReplyModel,
+         getTaskComments as getTaskCommentsModel,
+         getProjectTags as getProjectTagsModel,
+         getTaskTags as getTaskTagsModel,
+         createTaskTag as createTaskTagModel,
+         deleteTaskTag as deleteTaskTagModel,
  } from "../models/projectModel.js";
 
 export async function createProject(req, res) {
@@ -113,32 +124,53 @@ export async function getProjectMembers(req, res) {
 export async function inviteMemberToProject(req, res) {
   const projectId = (req.body?.project || req.body?.projectId || "").trim();
   const inviteeId = (req.body?.friend || req.body?.friendId || "").trim();
+  
+  const inviteeEmail = (req.body?.email || "").trim();
 
   if (!req.user?.userId) {
     return res.status(401).json({ message: "Authentication required" });
   }
 
-  if(!projectId) {
-    return res.status(400).json({ message: "A project is required."});
-  }
-
-  if(!inviteeId) {
-    return res.status(400).json({ message: "You need to invite someone to this project."});
-  }
-
-  try {
-    const inviteRequest = await inviteMemberToProjectModel({
-      inviter_id: req.user.userId,
-      invitee_id: inviteeId,
-      project_id: projectId,
-    });
-    return res.status(201).json({ message: "Invite sent", inviteRequest });
-  } catch (error) {
-    if (error?.code === "ALREADY_PENDING" || error?.code === "ALREADY_MEMBER") {
-      return res.status(409).json({ message: error.message });
+  if (inviteeId) {
+    if(!projectId) {
+      return res.status(400).json({ message: "A project is required."});
     }
 
-    return res.status(500).json({ message: error.message || "Failed to send invite" });
+    try {
+      const inviteRequest = await inviteMemberToProjectModel({
+        inviter_id: req.user.userId,
+        invitee_id: inviteeId,
+        project_id: projectId,
+      });
+      return res.status(201).json({ message: "Invite sent", inviteRequest });
+    } catch (error) {
+        if (error?.code === "ALREADY_PENDING" || error?.code === "ALREADY_MEMBER") {
+          return res.status(409).json({ message: error.message });
+        }
+
+        return res.status(500).json({ message: error.message || "Failed to send invite" });
+      }
+  }
+
+  if (inviteeEmail) {
+    if(!projectId) {
+      return res.status(400).json({ message: "A project is required."});
+    }
+
+    try {
+      const inviteRequest = await inviteMemberToProjectModel({
+        inviter_id: req.user.userId,
+        invitee_email: inviteeEmail,
+        project_id: projectId,
+      });
+      return res.status(201).json({ message: "Invite sent", inviteRequest });
+    } catch (error) {
+        if (error?.code === "ALREADY_PENDING" || error?.code === "ALREADY_MEMBER") {
+          return res.status(409).json({ message: error.message });
+        }
+        return res.status(500).json({ message: error.message || "Failed to send invite" });
+    }
+
   }
 }
 
@@ -473,5 +505,385 @@ export async function getProjectSettings(req, res) {
     if (error?.code === "PROJECT_FORBIDDEN") return res.status(403).json({ message: error.message });
     if (error?.code === "INVALID_PROJECT") return res.status(400).json({ message: error.message });
     return res.status(500).json({ message: "Unable to fetch project settings" });
+  }
+}
+
+export async function assignTaskToOthers(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { memberId, taskId } = req.params;
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  if (!memberId) {
+    return res.status(400).json({ message: "Member ID is required" });
+  }
+
+  try {
+    const assignedMember = await assignTaskToOthersModel({
+      taskId, 
+      memberId,
+    });
+
+    return res.status(201).json({
+      message: "Member assigned to task successfully",
+      assignment: assignedMember,
+    });
+  } catch (error) {
+    if (error?.code === "23505") {
+      return res.status(409).json({ message: "Member is already assigned to this task" });
+    }
+
+    return res.status(500).json({ message: 'Unable to add member to this task' });
+  }
+
+}
+
+export async function createSubtask(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  const { title, createdBy, status } = req.body.subtaskData;
+  if (!title || !createdBy || !status) {
+    return res.status(400).json({ message: "Missing required subtask fields" });
+  }
+
+  try {
+    // Call your model/service layer to insert into DB
+    const newSubtask = await createSubtaskModel({
+      taskId,
+      title,
+      createdBy,
+      status,
+    });
+
+    return res.status(201).json(newSubtask);
+  } catch (err) {
+    console.error("Error creating subtask:", err);
+    return res.status(500).json({ message: "Failed to create subtask" });
+  }
+}
+
+export async function getTaskComments(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  try {
+    const comments = await getTaskCommentsModel(taskId);
+    return res.status(200).json({ comments });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    console.error("Get task comments error:", error);
+    return res.status(500).json({ message: "Unable to fetch task comments" });
+  }
+}
+
+export async function createTaskComment(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId, userId } = req.params;
+  const comment = (req.body?.comment || "").trim();
+
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  if (!userId) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
+
+  if (!comment) {
+    return res.status(400).json({ message: "Comment is required" });
+  }
+
+  try {
+    const createdComment = await createTaskCommentModel({
+      taskId,
+      userId,
+      comment,
+    });
+
+    return res.status(201).json({
+      message: "Comment added successfully",
+      comment: createdComment,
+    });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER" || error?.code === "INVALID_COMMENT") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "23503") {
+      return res.status(400).json({ message: error.message || "Invalid reference while adding comment" });
+    }
+
+    if (error?.code === "22P02") {
+      return res.status(400).json({ message: error.message || "Invalid id format while adding comment" });
+    }
+
+    console.error("Create task comment error:", error);
+    return res.status(500).json({ message: "Unable to add comment" });
+  }
+}
+
+export async function createTaskCommentReply(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId, commentId, userId } = req.params;
+  const commentReply = (req.body?.comment_reply || req.body?.commentReply || "").trim();
+
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  if (!commentId) {
+    return res.status(400).json({ message: "Comment ID is required" });
+  }
+
+  if (!userId) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
+
+  if (!commentReply) {
+    return res.status(400).json({ message: "Comment reply is required" });
+  }
+
+  try {
+    const createdReply = await createTaskCommentReplyModel({
+      taskId,
+      commentId,
+      userId,
+      commentReply,
+    });
+
+    return res.status(201).json({
+      message: "Reply added successfully",
+      reply: createdReply,
+    });
+  } catch (error) {
+    if (
+      error?.code === "INVALID_TASK" ||
+      error?.code === "INVALID_USER" ||
+      error?.code === "INVALID_COMMENT" ||
+      error?.code === "INVALID_COMMENT_REPLY"
+    ) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "23503") {
+      return res.status(400).json({ message: error.message || "Invalid reference while adding reply" });
+    }
+
+    if (error?.code === "22P02") {
+      return res.status(400).json({ message: error.message || "Invalid id format while adding reply" });
+    }
+
+    console.error("Create task comment reply error:", error);
+    return res.status(500).json({ message: "Unable to add reply" });
+  }
+}
+
+export async function getProjectTags(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+
+  const { projectId } = req.params;
+  if (!projectId) return res.status(400).json({ message: "Project ID is required" });
+
+  try {
+    // ensure requester is a member of the project
+    await getProjectMembersModel({ projectId, requesterId: req.user.userId });
+
+    const tags = await getProjectTagsModel(projectId);
+    return res.status(200).json({ tags });
+  } catch (error) {
+    if (error?.code === "PROJECT_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "INVALID_PROJECT") return res.status(400).json({ message: error.message });
+    console.error("Get project tags error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to fetch project tags" });
+  }
+}
+
+export async function getTaskTags(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+
+  const { taskId } = req.params;
+  if (!taskId) return res.status(400).json({ message: "Task ID is required" });
+
+  try {
+    const tags = await getTaskTagsModel(taskId);
+    return res.status(200).json({ tags });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK") return res.status(400).json({ message: error.message });
+    console.error("Get task tags error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to fetch task tags" });
+  }
+}
+
+export async function createTaskTag(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+
+  const { taskId } = req.params;
+  const tagName = (req.body?.tagName || req.body?.tag_name || "").trim();
+  const projectId = (req.body?.projectId || req.body?.project_id || "").trim();
+
+  if (!taskId) return res.status(400).json({ message: "Task ID is required" });
+  if (!tagName) return res.status(400).json({ message: "tagName is required" });
+  if (!projectId) return res.status(400).json({ message: "projectId is required" });
+
+  try {
+    const created = await createTaskTagModel({ taskId, tagName, projectId });
+    return res.status(201).json({ tag: created });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_PROJECT" || error?.code === "INVALID_TAG") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TAG_EXISTS") return res.status(409).json({ message: error.message });
+    if (error?.code === "MAX_TAGS") return res.status(400).json({ message: error.message });
+
+    if (error?.code === "23503") return res.status(400).json({ message: error.message || "Invalid reference while creating tag" });
+    if (error?.code === "22P02") return res.status(400).json({ message: error.message || "Invalid id format while creating tag" });
+
+    console.error("Create task tag error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to create task tag" });
+  }
+}
+
+export async function deleteTaskTag(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+
+  const { taskId, tagId } = req.params;
+  if (!taskId) return res.status(400).json({ message: "Task ID is required" });
+  if (!tagId) return res.status(400).json({ message: "Tag ID is required" });
+
+  try {
+    const deleted = await deleteTaskTagModel(tagId);
+    if (String(deleted.taskId) !== String(taskId)) {
+      return res.status(400).json({ message: "Tag does not belong to the specified task" });
+    }
+
+    return res.status(200).json({ tag: deleted });
+  } catch (error) {
+    if (error?.code === "INVALID_TAG" || error?.code === "TAG_NOT_FOUND") return res.status(404).json({ message: error.message });
+    console.error("Delete task tag error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to delete tag" });
+  }
+}
+
+export async function updateSubtask(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId, subtaskId } = req.params;
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  if (!subtaskId) {
+    return res.status(400).json({ message: "Subtask ID is required" });
+  }
+
+  return res.status(501).json({ message: "Subtasks not implemented yet" });
+}
+
+export async function deleteSubtask(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId, subtaskId } = req.params;
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  if (!subtaskId) {
+    return res.status(400).json({ message: "Subtask ID is required" });
+  }
+
+  return res.status(501).json({ message: "Subtasks not implemented yet" });
+}
+
+export async function unassignTaskFromMember(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { memberId, taskId } = req.params;
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  if (!memberId) {
+    return res.status(400).json({ message: "Member ID is required" });
+  }
+
+  try {
+    const unassignedMember = await unassignTaskFromMemberModel({
+      taskId,
+      memberId,
+    });
+
+    return res.status(200).json({
+      message: "Member unassigned from task successfully",
+      assignment: unassignedMember,
+    });
+  } catch (error) {
+    if (error?.code === "TASK_NOT_ASSIGNED") {
+      return res.status(409).json({ message: error.message });
+    }
+
+    return res.status(500).json({ message: "Unable to unassign member from task" });
+  }
+}
+
+export async function unassignTaskFromSelf(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+  if (!taskId) {
+    return res.status(400).json({ message: "Task ID is required" });
+  }
+
+  try {
+    const unassigned = await unassignTaskFromSelfModel({
+      taskId,
+      userId: req.user.userId,
+    });
+
+    return res.status(200).json({
+      message: "Task unassigned successfully",
+      assignment: unassigned,
+    });
+  } catch (error) {
+    if (error?.code === "TASK_NOT_ASSIGNED") {
+      return res.status(409).json({ message: error.message });
+    }
+
+    return res.status(500).json({ message: "Unable to unassign task" });
   }
 }

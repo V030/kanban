@@ -5,11 +5,10 @@ import AddTaskModal from "../components/common/AddTaskModal";
 import ColumnsReorderModal from "../components/common/ColumnsReorderModal";
 import ProjectSettingsModal from "../components/common/ProjectSettingsModal";
 import ProjectMembersModal from "../components/common/ProjectMembersModal";
-import TaskDetailsModal from "../components/common/TaskDetailsModal";
 import "../components/styles/KanbanPage.css";
 import "../components/styles/ColumnsReorderModal.css";
 import { getCurrentUser } from "../services/authService";
-import { getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, takeTask, updateTaskStatus } from "../services/projectService";
+import { getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, takeTask, updateTaskStatus, assignTaskToOthers, unassignTask, unassignTaskFromMember, createSubtask, getSubtasks, getTaskComments, createTaskComment, createTaskCommentReply } from "../services/projectService";
 
 const DEFAULT_TASK_PERMISSIONS = {
 	allow_member_create_task: false,
@@ -76,7 +75,7 @@ function KanbanPage() {
 	const [projectMembers, setProjectMembers] = useState([]);
 	const [membersLoading, setMembersLoading] = useState(false);
 	const [membersError, setMembersError] = useState("");
-	const [selectedTask, setSelectedTask] = useState(null);
+
 
 	const currentUser = useMemo(() => getCurrentUser(), []);
 
@@ -187,14 +186,13 @@ function KanbanPage() {
 			setLocalTaskAssignees({});
 			setProjectMembers([]);
 			setMembersError("");
-			setSelectedTask(null);
 			return;
 		}
 
 		loadProjectSettings();
 
 		setLocalTaskAssignees({});
-		setSelectedTask(null);
+		
 	}, [project, loadProjectSettings]);
 
 	const handleSettingChange = useCallback(
@@ -253,9 +251,10 @@ function KanbanPage() {
 						email: currentUser.email,
 					},
 				}));
+				loadTaskCategories();
 			}
 		},
-		[currentUser, canTakeTask, getTaskAssignee]
+		[currentUser, canTakeTask, getTaskAssignee, loadTaskCategories]
 	);
 
 	const handleTaskDrop = async (taskId, column) => {
@@ -267,6 +266,68 @@ function KanbanPage() {
 			setError(dropError?.message || "Unable to move task.");
 		}
 	};
+
+	const handleUnassignTask = useCallback(
+		async (task) => {
+			if (!task?.id || !currentUser) return;
+			if (!canTakeTask) return;
+			if (!isTaskAssignedToMe(task)) return;
+
+			await unassignTask(task.id);
+			setLocalTaskAssignees((prev) => {
+				const next = { ...prev };
+				delete next[task.id];
+				return next;
+			});
+			loadTaskCategories();
+		},
+		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories]
+	);
+
+	const assignMemberToTask = useCallback (
+		async (taskId, member) => {
+			if (!taskId || !member) return;
+
+			await assignTaskToOthers(taskId, member);
+		}
+	);
+
+	const unassignMemberFromTask = useCallback(
+		async (taskId, memberId) => {
+			if (!taskId || !memberId) return;
+
+			await unassignTaskFromMember(taskId, memberId);
+			loadTaskCategories();
+		},
+		[loadTaskCategories]
+	);
+
+	const createSubtasks = async ({ subtaskData }) => {
+		try {
+			await createSubtask(subtaskData);
+		} catch (err) {
+			console.error("Failed to create subtask:", err);
+		}
+	};
+
+	const fetchTaskComments = useCallback(async (taskId) => {
+		if (!taskId) return { comments: [] };
+
+		return getTaskComments(taskId);
+	}, []);
+
+	const addTaskComment = useCallback(async (taskId, userId, comment) => {
+		if (!taskId || !userId || !comment) return null;
+
+		return createTaskComment(taskId, userId, comment);
+	}, []);
+
+	const addTaskCommentReply = useCallback(async (taskId, commentId, userId, commentReply) => {
+		if (!taskId || !commentId || !userId || !commentReply) return null;
+
+		return createTaskCommentReply(taskId, commentId, userId, commentReply);
+	}, []);
+
 
 	function openReorder() {
 		setReorderOpen(true);
@@ -300,7 +361,9 @@ function KanbanPage() {
 					<h1 className="page-title">{project.name}</h1>
 					<p>{project.description || ""}</p>
 				</div>
-				<div className="kanban-actions">
+			</div>
+
+			<div className="kanban-actions">
 					<button className="btn btn-secondary" onClick={() => setMembersOpen(true)}>
 						Project Members
 					</button>
@@ -308,17 +371,16 @@ function KanbanPage() {
 						Project Settings
 					</button>
 					<button className="btn btn-primary" onClick={openReorder}>Organize Columns</button>
-				</div>
 			</div>
 
-			<div className="permission-summary" role="status" aria-live="polite">
+			{/* <div className="permission-summary" role="status" aria-live="polite">
 				<p>
 					<strong>{projectRole}</strong> role view
 				</p>
 				<p>Create Task action: {canCreateTask ? "Visible" : "Hidden"}</p>
 				<p>Take Task action: {canTakeTask ? "Available for unassigned tasks" : "Hidden"}</p>
 				<p>Manual assignments: {isAdminOrOwner ? "Enabled" : "Admin or owner only"}</p>
-			</div>
+			</div> */}
 
 			<div className="kanban-shell">
 				{loading && <p>Loading columns...</p>}
@@ -326,7 +388,7 @@ function KanbanPage() {
 				<KanbanBoard
 					columns={columnsForBoard}
 					isTaskAssignedToMe={isTaskAssignedToMe}
-					onTaskClick={(task) => setSelectedTask(task)}
+					onTaskClick={(task) => navigate(`/main-page/kanban/task/${task.id}`, { state: { task, project, projectMembers, isAdminOrOwner, canMembersAssignTaskToOthers } })}
 					showAddTaskButton={canCreateTask}
 					onTaskDrop={handleTaskDrop}
 					onAddTask={(column) => {
@@ -337,8 +399,11 @@ function KanbanPage() {
 					renderTask={(task) => {
 						const assignee = getTaskAssignee(task);
 						const isUnassigned = !assignee;
-						const showTakeAction = isUnassigned && canTakeTask;
-						const actionLabel = isAdminOrOwner ? "Assign to me" : "Take Task";
+						const isAssignedToMe = isTaskAssignedToMe(task);
+						const showTaskAction = canTakeTask && (isUnassigned || isAssignedToMe);
+						const actionLabel = isAssignedToMe ? "Unassign" : "Take Task";
+
+						
 							const creatorName = `${task.creator?.firstName || ""} ${task.creator?.lastName || ""}`.trim();
 						
 
@@ -360,17 +425,25 @@ function KanbanPage() {
 									)}
 								</div>
 
-								{showTakeAction && (
+								{showTaskAction && (
 									<button
 										type="button"
-										className="kb-task-action"
-										onClick={() => handleTakeTask(task)}
+										className={`kb-task-action${isAssignedToMe ? " kb-task-action--unassign" : ""}`}
+										onClick={(event) => {
+											event.stopPropagation();
+											if (isAssignedToMe) {
+												handleUnassignTask(task);
+												return;
+											}
+
+											handleTakeTask(task);
+										}}
 									>
 										{actionLabel}
 									</button>
 								)}
 
-								{isUnassigned && !showTakeAction && projectRole === "member" && (
+								{isUnassigned && !showTaskAction && projectRole === "member" && (
 									<p className="kb-task-helper">Take Task is hidden in strict mode.</p>
 								)}
 							</>
@@ -435,15 +508,7 @@ function KanbanPage() {
 					onSave={handleReorderSave}
 				/>
 
-				{selectedTask && (
-					<TaskDetailsModal
-						task={selectedTask}
-						projectMembers={projectMembers}
-						isAdminOrOwner={isAdminOrOwner}
-						canMembersAssignTaskToOthers={canMembersAssignTaskToOthers}
-						onClose={() => setSelectedTask(null)}
-					/>
-				)}
+				{/* Task details are now a dedicated page: /main-page/kanban/task/:taskId */}
 			</div>
 		</section>
 	);

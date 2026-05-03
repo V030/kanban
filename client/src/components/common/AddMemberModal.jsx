@@ -46,6 +46,7 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
 
       await inviteMemberToProject({
         projectId: project.id,
+        email: email.trim(),
       });
 
       setEmail("");

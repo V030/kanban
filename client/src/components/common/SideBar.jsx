@@ -72,14 +72,33 @@ const navItems = [
     { to: "/main-page/dashboard", label: "Dashboard", icon: <DashboardIcon /> },
     { to: "/main-page/projects", label: "Projects", icon: <ProjectsIcon /> },
     { to: "/main-page/kanban", label: "Boards", icon: <BoardIcon /> },
-    { to: "/main-page/friends", label: "Members", icon: <TeamIcon /> },
+    { to: "/main-page/friends", label: "Connections", icon: <TeamIcon /> },
     { to: "/main-page/my-tasks", label: "My Tasks", icon: <TasksIcon /> },
     { to: "/main-page/profile", label: "Settings", icon: <SettingsIcon /> },
 ];
 
+function getUserFullName(user) {
+    if (!user) return "";
+    const first = user.first_name || user.firstName || "";
+    const last = user.last_name || user.lastName || "";
+    const fullName = `${first} ${last}`.trim();
+    return fullName || user.username || user.email || "";
+}
+
+function getUserInitials(user) {
+    const fullName = getUserFullName(user);
+    if (!fullName) return "";
+    const parts = fullName.split(" ").filter(Boolean);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+}
+
 export default function SideBar () {
     const [currentUser, setCurrentUser] = useState(false);
     const navigate = useNavigate();
+
+    const displayName = getUserFullName(currentUser);
+    const displayInitials = getUserInitials(currentUser);
 
     useEffect(() => {
       const user = getCurrentUser();
@@ -118,9 +137,9 @@ export default function SideBar () {
 
             <div className="sidebar-bottom">
               <div className="user">
-                <div className="avatar">{(currentUser?.first_name || "").charAt(0).toUpperCase() || "J"}</div>
+                                <div className="avatar">{displayInitials || "U"}</div>
                 <div className="meta">
-                  <div className="name">{currentUser ? `${currentUser.first_name || ""} ${currentUser.last_name || ""}`.trim() : "Guest"}</div>
+                                    <div className="name">{displayName || "Guest"}</div>
                   <div className="email">{currentUser?.email || "Not signed in"}</div>
                 </div>
               </div>

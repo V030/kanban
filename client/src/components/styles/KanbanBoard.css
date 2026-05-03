@@ -181,6 +181,16 @@
   background: #cee6ea;
 }
 
+.kb-task-action--unassign {
+  border-color: #d1d5db;
+  background: #ffffff;
+  color: #6b7280;
+}
+
+.kb-task-action--unassign:hover {
+  background: #f7f7f8;
+}
+
 .kb-task-helper {
   margin: 0;
   color: var(--color-text-tertiary);

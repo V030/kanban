@@ -1,5 +1,202 @@
 import { pool } from "../config/db.js";
 
+export async function createSubtask({ taskId, title, createdBy, status }) {
+  const client = await pool.connect();
+
+  try {
+    if (!taskId) {
+      const error = new Error("taskId is required");
+      error.code = "INVALID_TASK";
+      throw error;
+    }
+
+    if (!title) {
+      const error = new Error("sub task title is required");
+      error.code = "INVALID_SUBTASK_TITLE";
+      throw error;
+    }
+
+    if (!createdBy) {
+      const error = new Error("createdBy is required");
+      error.code = "INVALID_USER";
+      throw error;
+    }
+
+    const result = await client.query(
+      `
+      INSERT INTO subtasks (task_id, title, created_by, status)
+      VALUES ($1::int, $2, $3::uuid, $4)
+      RETURNING id, task_id, title, created_by, status, created_at;
+      `,
+      [taskId, title, createdBy, status]
+    );
+
+    // return the inserted row
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
+}
+
+export async function createTaskComment({ taskId, userId, comment }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedUserId = (userId || "").trim();
+  const normalizedComment = (comment || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedUserId) {
+    const error = new Error("userId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!normalizedComment) {
+    const error = new Error("comment is required");
+    error.code = "INVALID_COMMENT";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    INSERT INTO task_comments (task_id, user_id, comment)
+    VALUES ($1::int, $2::uuid, $3)
+    RETURNING id, task_id, user_id, comment, created_at
+    `,
+    [normalizedTaskId, normalizedUserId, normalizedComment]
+  );
+
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    userId: row.user_id,
+    comment: row.comment,
+    createdAt: row.created_at,
+  };
+}
+
+export async function createTaskCommentReply({ taskId, commentId, userId, commentReply }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedCommentId = Number(commentId);
+  const normalizedUserId = (userId || "").trim();
+  const normalizedReply = (commentReply || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!Number.isInteger(normalizedCommentId) || normalizedCommentId <= 0) {
+    const error = new Error("commentId is required");
+    error.code = "INVALID_COMMENT";
+    throw error;
+  }
+
+  if (!normalizedUserId) {
+    const error = new Error("userId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!normalizedReply) {
+    const error = new Error("comment reply is required");
+    error.code = "INVALID_COMMENT_REPLY";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    INSERT INTO task_comments_replies (comment_id, task_id, user_id, comment_reply)
+    VALUES ($1::int, $2::int, $3::uuid, $4)
+    RETURNING id, comment_id, task_id, user_id, comment_reply, created_at
+    `,
+    [normalizedCommentId, normalizedTaskId, normalizedUserId, normalizedReply]
+  );
+
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    commentId: row.comment_id,
+    taskId: row.task_id,
+    userId: row.user_id,
+    commentReply: row.comment_reply,
+    createdAt: row.created_at,
+  };
+}
+
+export async function getTaskComments(taskId) {
+  const normalizedTaskId = Number(taskId);
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      tc.id,
+      tc.comment,
+      tc.created_at AS "createdAt",
+      json_build_object(
+        'id', u.id,
+        'firstName', u.first_name,
+        'lastName', u.last_name,
+        'role', pm.role
+      ) AS "user",
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', tcr.id,
+              'commentReply', tcr.comment_reply,
+              'createdAt', tcr.created_at,
+              'user', json_build_object(
+                'id', ru.id,
+                'firstName', ru.first_name,
+                'lastName', ru.last_name,
+                'role', pmr.role
+              )
+            )
+            ORDER BY tcr.created_at ASC
+          )
+          FROM task_comments_replies tcr
+          JOIN users ru ON tcr.user_id = ru.id
+          LEFT JOIN tasks t2 ON tcr.task_id = t2.id
+          LEFT JOIN tasks_categories tcg2 ON t2.category_id = tcg2.id
+          LEFT JOIN project_members pmr ON pmr.user_id = ru.id AND pmr.project_id = tcg2.project_id
+          WHERE tcr.comment_id = tc.id
+            AND tcr.task_id = tc.task_id
+        ), '[]'::json
+      ) AS replies
+    FROM task_comments tc
+    JOIN users u ON tc.user_id = u.id
+    LEFT JOIN tasks t ON tc.task_id = t.id
+    LEFT JOIN tasks_categories tcg ON t.category_id = tcg.id
+    LEFT JOIN project_members pm ON pm.user_id = u.id AND pm.project_id = tcg.project_id
+    WHERE tc.task_id = $1::int
+    ORDER BY tc.created_at ASC
+    `,
+    [normalizedTaskId]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    comment: row.comment,
+    createdAt: row.createdAt,
+    user: row.user,
+    replies: row.replies || [],
+  }));
+}
+
+
 export async function createTask(taskData) {
   const client = await pool.connect();
 
@@ -451,11 +648,27 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
   return result.rows[0];
 }
 
-
 export async function inviteMemberToProject(inviteData) {
   const inviterId = (inviteData?.inviter_id || "").trim();
-  const inviteeId = (inviteData?.invitee_id || "").trim();
+  let inviteeId = (inviteData?.invitee_id || "").trim();
   const projectId = (inviteData?.project_id || "").trim();
+  const inviteeEmail = (inviteData?.invitee_email || "").trim();
+
+  if (!inviterId) throw new Error("Inviter is required");
+  if (!projectId) throw new Error("Project is required");
+
+  if (!inviteeId && inviteeEmail) {
+    const result = await pool.query(
+      `SELECT id FROM users WHERE email = $1 LIMIT 1`,
+      [inviteeEmail]
+    );
+    if (result.rows.length === 0) {
+      const error = new Error("Invitee not found");
+      error.code = "USER_NOT_FOUND";
+      throw error;
+    }
+    inviteeId = result.rows[0].id;
+  }
 
   if (!inviterId) {
     const error = new Error("Inviter is required");
@@ -491,23 +704,6 @@ export async function inviteMemberToProject(inviteData) {
     error.code = "USER_NOT_FOUND";
     throw error;
   }
-
-  // const membershipResult = await pool.query(
-  //   `
-  //   SELECT 1
-  //   FROM project_members pm
-  //   WHERE pm.project_id = $1::uuid
-  //     AND pm.user_id = $2::uuid
-  //   LIMIT 1
-  //   `,
-  //   [projectId, inviteeId]
-  // );
-
-  // if (membershipResult.rows.length > 0) {
-  //   const error = new Error("User is already a member of this project");
-  //   error.code = "ALREADY_MEMBER";
-  //   throw error;
-  // }
 
   const insertResult = await pool.query(
     `
@@ -831,6 +1027,42 @@ export async function getTaskCategories(projectId) {
                 JOIN users au ON ta.user_id = au.id
                 WHERE ta.task_id = t.id
               ), '[]'::json
+            ),
+            'subtasks', COALESCE(
+              (
+                SELECT json_agg(
+                  json_build_object(
+                    'id', st.id,
+                    'title', st.title,
+                    'createdBy', json_build_object(
+                      'id', cu.id,
+                      'firstName', cu.first_name,
+                      'lastName', cu.last_name,
+                      'email', cu.email
+                    ),
+                    'status', st.status,
+                    'createdAt', st.created_at
+                  ) ORDER BY st.created_at ASC
+                )
+                FROM subtasks st
+                LEFT JOIN users cu ON st.created_by = cu.id
+                WHERE st.task_id = t.id
+              ), '[]'::json
+            )
+            ,
+            'tags', COALESCE(
+              (
+                SELECT json_agg(
+                  json_build_object(
+                    'id', tt.id,
+                    'tagName', tt.tag_name,
+                    'taskId', tt.task_id,
+                    'projectId', tt.project_id
+                  ) ORDER BY tt.tag_name ASC
+                )
+                FROM task_tags tt
+                WHERE tt.task_id = t.id
+              ), '[]'::json
             )
           )
           ORDER BY t."position" ASC, t.created_at ASC
@@ -915,6 +1147,49 @@ export async function createTaskCategory(input) {
   return { id: row.id, projectId: row.project_id, name: row.name, position: row.position };
 }
 
+export async function assignTaskToOthers({ taskId, memberId }) {
+  const assignTask = await pool.query(
+    `
+    INSERT INTO task_assignees (task_id, user_id)
+    VALUES ($1, $2::uuid)
+    RETURNING id, task_id, user_id
+    `,
+    [taskId, memberId]
+  );
+
+  const row = assignTask.rows[0];
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    memberId: row.user_id
+  };
+}
+
+export async function unassignTaskFromMember({ taskId, memberId }) {
+  const deleteResult = await pool.query(
+    `
+    DELETE FROM task_assignees
+    WHERE task_id = $1
+      AND user_id = $2::uuid
+    RETURNING id, task_id, user_id
+    `,
+    [taskId, memberId]
+  );
+
+  const row = deleteResult.rows[0];
+  if (!row) {
+    const error = new Error("Task is not assigned to this member");
+    error.code = "TASK_NOT_ASSIGNED";
+    throw error;
+  }
+
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    memberId: row.user_id,
+  };
+}
+
 export async function takeProjectTask({ taskId, userId }) {
   const insertTakenTask = await pool.query(
     `
@@ -931,6 +1206,162 @@ export async function takeProjectTask({ taskId, userId }) {
     taskId: row.task_id,
     userId: row.user_id
   };
+}
+
+export async function unassignTaskFromSelf({ taskId, userId }) {
+  const deleteResult = await pool.query(
+    `
+    DELETE FROM task_assignees
+    WHERE task_id = $1
+      AND user_id = $2::uuid
+    RETURNING id, task_id, user_id
+    `,
+    [taskId, userId]
+  );
+
+  const row = deleteResult.rows[0];
+  if (!row) {
+    const error = new Error("Task is not assigned to this user");
+    error.code = "TASK_NOT_ASSIGNED";
+    throw error;
+  }
+
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    userId: row.user_id,
+  };
+}
+
+export async function getProjectTags(projectId) {
+  const normalizedProjectId = (projectId || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT id, task_id, tag_name, project_id
+    FROM task_tags
+    WHERE project_id = $1::uuid
+    ORDER BY tag_name ASC
+    `,
+    [normalizedProjectId]
+  );
+
+  return result.rows.map((r) => ({ id: r.id, taskId: r.task_id, tagName: r.tag_name, projectId: r.project_id }));
+}
+
+export async function getTaskTags(taskId) {
+  const normalizedTaskId = Number(taskId);
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT id, task_id, tag_name, project_id
+    FROM task_tags
+    WHERE task_id = $1::int
+    ORDER BY tag_name ASC
+    `,
+    [normalizedTaskId]
+  );
+
+  return result.rows.map((r) => ({ id: r.id, taskId: r.task_id, tagName: r.tag_name, projectId: r.project_id }));
+}
+
+export async function createTaskTag({ taskId, tagName, projectId }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedTag = (tagName || "").trim();
+  const normalizedProjectId = (projectId || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedTag) {
+    const error = new Error("tagName is required");
+    error.code = "INVALID_TAG";
+    throw error;
+  }
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  const countRes = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM task_tags WHERE task_id = $1::int`,
+    [normalizedTaskId]
+  );
+  const currentCount = Number(countRes.rows[0]?.cnt || 0);
+
+  if (currentCount >= 5) {
+    const error = new Error("A task may have up to 5 tags");
+    error.code = "MAX_TAGS";
+    throw error;
+  }
+
+  const dupRes = await pool.query(
+    `SELECT id FROM task_tags WHERE task_id = $1::int AND LOWER(tag_name) = LOWER($2) LIMIT 1`,
+    [normalizedTaskId, normalizedTag]
+  );
+
+  if (dupRes.rows.length > 0) {
+    const error = new Error("Tag already exists for this task");
+    error.code = "TAG_EXISTS";
+    throw error;
+  }
+
+  const insertRes = await pool.query(
+    `
+    INSERT INTO task_tags (task_id, tag_name, project_id)
+    VALUES ($1::int, $2, $3::uuid)
+    RETURNING id, task_id, tag_name, project_id
+    `,
+    [normalizedTaskId, normalizedTag, normalizedProjectId]
+  );
+
+  const row = insertRes.rows[0];
+  return { id: row.id, taskId: row.task_id, tagName: row.tag_name, projectId: row.project_id };
+}
+
+export async function deleteTaskTag(tagId) {
+  const normalizedTagId = Number(tagId);
+
+  if (!Number.isInteger(normalizedTagId) || normalizedTagId <= 0) {
+    const error = new Error("tagId is required");
+    error.code = "INVALID_TAG";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    DELETE FROM task_tags
+    WHERE id = $1
+    RETURNING id, task_id, tag_name, project_id
+    `,
+    [normalizedTagId]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    const error = new Error("Tag not found");
+    error.code = "TAG_NOT_FOUND";
+    throw error;
+  }
+
+  return { id: row.id, taskId: row.task_id, tagName: row.tag_name, projectId: row.project_id };
 }
 
 export async function updateTaskStatus({ taskId, userId, categoryId }) {
@@ -1024,3 +1455,37 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
     categoryId: movedTask.category_id,
   };
 }
+
+// export async function getSubtasksByTask(taskId) {
+//   const client = await pool.connect();
+
+//   try {
+//     const normalizedTaskId = Number(taskId);
+//     if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+//       const error = new Error("taskId is required");
+//       error.code = "INVALID_TASK";
+//       throw error;
+//     }
+
+//     const result = await client.query(
+//       `
+//       SELECT id, task_id, title, created_by, status, created_at
+//       FROM subtasks
+//       WHERE task_id = $1::int
+//       ORDER BY created_at ASC
+//       `,
+//       [normalizedTaskId]
+//     );
+
+//     return result.rows.map((row) => ({
+//       id: row.id,
+//       taskId: row.task_id,
+//       title: row.title,
+//       createdBy: row.created_by,
+//       status: row.status,
+//       createdAt: row.created_at,
+//     }));
+//   } finally {
+//     client.release();
+//   }
+// }

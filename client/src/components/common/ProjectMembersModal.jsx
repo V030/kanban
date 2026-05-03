@@ -75,6 +75,7 @@ export default function ProjectMembersModal({
 
       await inviteMemberToProject({
         projectId: project.id,
+        email: email.trim(),   // ✅ include email here
       });
 
       setEmail("");
@@ -82,12 +83,13 @@ export default function ProjectMembersModal({
         await onAdded();
       }
       onClose();
-    } catch(err) {
+    } catch (err) {
       setInviteError(err?.message || "Failed to send an invite.");
     } finally {
       setInviteLoading(false);
     }
   };
+
   
   if (!isOpen) return null;
 
@@ -130,7 +132,7 @@ export default function ProjectMembersModal({
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-              <small>We'll send a friend invite. They can be added to the project after they accept.</small>
+              <small>We'll send someone an invitation to this project.</small>
             </div>
 
             <div className="modal-subsection">

@@ -125,3 +125,121 @@ export async function updateTaskStatus(taskId, columnStatus) {
     body: JSON.stringify({ categoryId: columnStatus }),
   });
 }
+
+export async function assignTaskToOthers(taskId, memberId) {
+  if (!taskId) throw new Error("task id is required");
+  if (!memberId) throw new Error("member id is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/assign-task/${memberId}/${taskId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export async function unassignTaskFromMember(taskId, memberId) {
+  if (!taskId) throw new Error("task id is required");
+  if (!memberId) throw new Error("member id is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/assign-task/${memberId}/${taskId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function unassignTask(taskId) {
+  if (!taskId) throw new Error("task id is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/unassign-task/${taskId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function createSubtask(subtaskData) {
+  if (!subtaskData) throw new Error("subtask data is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${subtaskData.taskId}/subtasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" }, 
+    body: JSON.stringify({subtaskData}),
+  });
+}
+
+
+export async function updateSubtask(taskId, subtaskId, payload) {
+  if (!taskId) throw new Error("task id is required");
+  if (!subtaskId) throw new Error("subtask id is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/subtasks/${subtaskId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+export async function deleteSubtask(taskId, subtaskId) {
+  if (!taskId) throw new Error("task id is required");
+  if (!subtaskId) throw new Error("subtask id is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/subtasks/${subtaskId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getTaskComments(taskId) {
+  if (!taskId) throw new Error("task id is required");
+
+  return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/comments`, {
+    method: "GET",
+  });
+}
+
+export async function createTaskComment(taskId, userId, comment) {
+  if (!taskId) throw new Error("task id is required");
+  if (!userId) throw new Error("user id is required");
+  if (!comment) throw new Error("comment is required");
+
+  return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/comments/${userId}`, {
+    method: "POST",
+    body: JSON.stringify({ comment }),
+  });
+}
+
+export async function createTaskCommentReply(taskId, commentId, userId, commentReply) {
+  if (!taskId) throw new Error("task id is required");
+  if (!commentId) throw new Error("comment id is required");
+  if (!userId) throw new Error("user id is required");
+  if (!commentReply) throw new Error("comment reply is required");
+
+  return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/comments/${commentId}/${userId}`, {
+    method: "POST",
+    body: JSON.stringify({ comment_reply: commentReply }),
+  });
+}
+
+export async function getProjectTags(projectId) {
+  if (!projectId) throw new Error("projectId is required");
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/tags`, { method: "GET" });
+}
+
+export async function getTaskTags(taskId) {
+  if (!taskId) throw new Error("taskId is required");
+  return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/tags`, { method: "GET" });
+}
+
+export async function createTaskTag(taskId, projectId, tagName) {
+  if (!taskId) throw new Error("taskId is required");
+  if (!projectId) throw new Error("projectId is required");
+  if (!tagName) throw new Error("tagName is required");
+
+  return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/tags`, {
+    method: "POST",
+    body: JSON.stringify({ tagName, projectId }),
+  });
+}
+
+export async function deleteTaskTag(taskId, tagId) {
+  if (!taskId) throw new Error("taskId is required");
+  if (!tagId) throw new Error("tagId is required");
+
+  return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/tags/${tagId}`, {
+    method: "DELETE",
+  });
+}
