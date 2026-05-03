@@ -17,6 +17,7 @@ import {
 	updateProjectSettings,
 	takeProjectTask,
 	updateTaskStatus,
+	updateTaskPriority,
 	assignTaskToOthers,
 	unassignTaskFromMember,
 	unassignTaskFromSelf,
@@ -70,6 +71,7 @@ router.get("/project-settings/:projectId", authenticateToken, getProjectSettings
 router.patch("/project-settings", authenticateToken, updateProjectSettings);
 router.post("/project/take-task/:taskId/", authenticateToken, takeProjectTask);
 router.patch("/project/tasks/:taskId/status", authenticateToken, updateTaskStatus);
+router.patch("/project/tasks/:taskId/priority", authenticateToken, updateTaskPriority);
 router.post("/project/tasks/assign-task/:memberId/:taskId/", authenticateToken, assignTaskToOthers);
 router.delete("/project/tasks/assign-task/:memberId/:taskId/", authenticateToken, unassignTaskFromMember);
 router.delete("/project/tasks/unassign-task/:taskId/", authenticateToken, unassignTaskFromSelf);

@@ -13,6 +13,7 @@ import { createProject as createProjectModel,
          updateProjectSettings as updateProjectSettingsModel,
          takeProjectTask as takeProjectTaskModel,
          updateTaskStatus as updateTaskStatusModel,
+         updateTaskPriority as updateTaskPriorityModel,
          assignTaskToOthers as assignTaskToOthersModel,
          unassignTaskFromMember as unassignTaskFromMemberModel,
          unassignTaskFromSelf as unassignTaskFromSelfModel,
@@ -57,7 +58,24 @@ export async function createProject(req, res) {
     });
   } catch (error) {
     console.error("Project creation error:", error);
-    return res.status(500).json({ message: "Unable to create project" });
+
+    if (error?.code === "INVALID_PROJECT" || error?.code === "INVALID_NAME" || error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "23505") {
+      return res.status(409).json({ message: error.detail || error.message || "Project already exists" });
+    }
+
+    if (error?.code === "23502") {
+      return res.status(400).json({ message: error.detail || error.message || "Missing required project data" });
+    }
+
+    if (error?.code === "23503") {
+      return res.status(400).json({ message: error.detail || error.message || "Invalid project reference" });
+    }
+
+    return res.status(500).json({ message: error.message || "Unable to create project" });
   }
 }
 
@@ -445,6 +463,39 @@ export async function updateTaskStatus(req, res) {
 
     console.error("Update task status error:", error);
     return res.status(500).json({ message: "Unable to move task" });
+  }
+}
+
+export async function updateTaskPriority(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+  const { priority } = req.body || {};
+
+  if (!taskId) {
+    return res.status(400).json({ message: "taskId parameter is required" });
+  }
+
+  if (priority === undefined || priority === null || String(priority).trim() === "") {
+    return res.status(400).json({ message: "priority is required" });
+  }
+
+  try {
+    const task = await updateTaskPriorityModel({ taskId, priority });
+    return res.status(200).json({ message: "Task priority updated successfully", task });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_PRIORITY") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    console.error("Update task priority error:", error);
+    return res.status(500).json({ message: "Unable to update task priority" });
   }
 }
 

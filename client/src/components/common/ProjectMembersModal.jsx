@@ -75,7 +75,7 @@ export default function ProjectMembersModal({
 
       await inviteMemberToProject({
         projectId: project.id,
-        email: email.trim(),   // ✅ include email here
+        email: email.trim(), 
       });
 
       setEmail("");

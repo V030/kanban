@@ -71,7 +71,17 @@ function capitalizeFirst(value) {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
-export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, getProjectTags, getTaskTags, createTaskTag, deleteTaskTag }) {
+const TASK_PRIORITY_OPTIONS = ["unset", "low", "medium", "high", "urgent"];
+
+function normalizeTaskPriority(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "critical") return "urgent";
+  if (normalized === "unset") return "unset";
+  if (TASK_PRIORITY_OPTIONS.includes(normalized)) return normalized;
+  return "unset";
+}
+
+export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskPriority }) {
   const taskData = task || {};
   const currentUser = useMemo(() => getCurrentUser(), []);
   const [localSubtasks, setLocalSubtasks] = useState([]);
@@ -93,6 +103,9 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const [tagSubmitting, setTagSubmitting] = useState(false);
   const [tagError, setTagError] = useState("");
   const [deletingTagId, setDeletingTagId] = useState(null);
+  const [taskPriority, setTaskPriority] = useState(normalizeTaskPriority(taskData?.priority));
+  const [prioritySubmitting, setPrioritySubmitting] = useState(false);
+  const [priorityError, setPriorityError] = useState("");
   const [showAssigneesModal, setShowAssigneesModal] = useState(false);
   const assignees = useMemo(() => (Array.isArray(taskData.assignees) ? taskData.assignees : []), [taskData.assignees]);
   const [localAssignedIds, setLocalAssignedIds] = useState([]);
@@ -132,6 +145,8 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     setNewComment("");
     setReplyInputs({});
     setActiveReplyId("");
+    setPriorityError("");
+    setTaskPriority(normalizeTaskPriority(task?.priority));
     loadComments();
     // initialize tags from task payload
     setTags(Array.isArray(task?.tags) ? task.tags : []);
@@ -276,6 +291,28 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       setTagError(err?.message || "Unable to add tag");
     } finally {
       setTagSubmitting(false);
+    }
+  };
+
+  const handleUpdateTaskPriority = async (nextPriority) => {
+    if (!task?.id || !nextPriority) return;
+
+    const normalized = normalizeTaskPriority(nextPriority);
+    setTaskPriority(normalized);
+    setPriorityError("");
+
+    if (!updateTaskPriority) return;
+
+    setPrioritySubmitting(true);
+    try {
+      const data = await updateTaskPriority(task.id, normalized);
+      const saved = normalizeTaskPriority(data?.task?.priority || normalized);
+      setTaskPriority(saved);
+    } catch (err) {
+      setPriorityError(err?.message || "Unable to update task priority.");
+      setTaskPriority(normalizeTaskPriority(task?.priority));
+    } finally {
+      setPrioritySubmitting(false);
     }
   };
 
@@ -515,6 +552,26 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 Manage Tags
               </button>
             </div>
+
+            <div className="tdm-priority-area">
+              <label htmlFor={`task-priority-${taskData.id || "unknown"}`} className="tdm-priority-label">
+                Priority:
+              </label>
+              <select
+                id={`task-priority-${taskData.id || "unknown"}`}
+                className="tdm-priority-select"
+                value={taskPriority}
+                onChange={(event) => handleUpdateTaskPriority(event.target.value)}
+                disabled={prioritySubmitting}
+              >
+                {TASK_PRIORITY_OPTIONS.map((priorityOption) => (
+                  <option key={priorityOption} value={priorityOption}>
+                    {capitalizeFirst(priorityOption)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {priorityError && <p className="tdm-priority-error">{priorityError}</p>}
           </article>
 
           <article className="tdm-section-card">

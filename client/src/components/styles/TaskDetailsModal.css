@@ -456,6 +456,37 @@
   letter-spacing: 0.02em;
 }
 
+.tdm-priority-area {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tdm-priority-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.tdm-priority-select {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: #f9fcff;
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 7px 10px;
+  min-width: 130px;
+}
+
+.tdm-priority-error {
+  margin-top: 6px;
+  color: var(--color-danger, #c0392b);
+  font-size: 0.82rem;
+}
+
 .tdm-tag-list {
   display: flex;
   gap: 6px;

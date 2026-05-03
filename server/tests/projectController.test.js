@@ -132,7 +132,29 @@ describe("projectController.createProject", () => {
     await createProject(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ message: "Unable to create project" });
+    expect(res.json).toHaveBeenCalledWith({ message: "DB down" });
+    expect(consoleSpy).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  it("returns 409 for postgres unique violations", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    createProjectModelMock.mockRejectedValue({
+      code: "23505",
+      detail: "Key (name)=(Alpha) already exists.",
+    });
+
+    const req = {
+      body: { name: "Alpha" },
+      user: { userId: "user-1" },
+    };
+    const res = createMockRes();
+
+    await createProject(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({ message: "Key (name)=(Alpha) already exists." });
     expect(consoleSpy).toHaveBeenCalled();
 
     consoleSpy.mockRestore();

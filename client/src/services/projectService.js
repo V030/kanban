@@ -126,6 +126,16 @@ export async function updateTaskStatus(taskId, columnStatus) {
   });
 }
 
+export async function updateTaskPriority(taskId, priority) {
+  if (!taskId) throw new Error("taskId is required");
+  if (!priority) throw new Error("priority is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/priority`, {
+    method: "PATCH",
+    body: JSON.stringify({ priority }),
+  });
+}
+
 export async function assignTaskToOthers(taskId, memberId) {
   if (!taskId) throw new Error("task id is required");
   if (!memberId) throw new Error("member id is required");

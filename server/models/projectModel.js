@@ -326,9 +326,10 @@ export async function createProject(projectData) {
         allow_member_edit_task,
         allow_member_delete_task,
         allow_member_add_board,
-        allow_member_add_member
+        allow_member_add_member,
+        allow_assign_task_to_member
       )
-      VALUES ($1, true, true, true, true, true, true)
+      VALUES ($1, true, true, true, true, true, true, false)
       `,
       [project.id]
     );
@@ -355,14 +356,15 @@ export async function createProject(projectData) {
 
     const categoryResult = await client.query(
       `
-      INSERT INTO tasks_categories (project_id, name, "position")
+      INSERT INTO tasks_categories (board_id, project_id, name, "position")
       VALUES
-        ($1, 'todo', 1),
-        ($1, 'in_progress', 2),
-        ($1, 'done', 3)
+        ($1, $2, 'todo', 1),
+        ($1, $2, 'in_progress', 2),
+        ($1, $2, 'to_review', 3),
+        ($1, $2, 'done', 4)
       RETURNING id, project_id, name, "position"
       `,
-      [project.id]
+      [board.id, project.id]
     );
 
     await client.query("COMMIT");
@@ -1125,6 +1127,25 @@ export async function createTaskCategory(input) {
     throw error;
   }
 
+  const boardResult = await pool.query(
+    `
+    SELECT id
+    FROM board
+    WHERE project_id = $1::uuid
+    ORDER BY created_at ASC
+    LIMIT 1
+    `,
+    [projectId]
+  );
+
+  const board = boardResult.rows[0];
+
+  if (!board) {
+    const error = new Error("Board not found for this project");
+    error.code = "BOARD_NOT_FOUND";
+    throw error;
+  }
+
   // determine position if not provided
   if (position === null) {
     const posRes = await pool.query(
@@ -1136,11 +1157,11 @@ export async function createTaskCategory(input) {
 
   const insertResult = await pool.query(
     `
-    INSERT INTO tasks_categories (project_id, name, "position")
-    VALUES ($1::uuid, $2, $3)
+    INSERT INTO tasks_categories (board_id, project_id, name, "position")
+    VALUES ($1::uuid, $2::uuid, $3, $4)
     RETURNING id, project_id, name, "position"
     `,
-    [projectId, name, position]
+    [board.id, projectId, name, position]
   );
 
   const row = insertResult.rows[0];
@@ -1362,6 +1383,55 @@ export async function deleteTaskTag(tagId) {
   }
 
   return { id: row.id, taskId: row.task_id, tagName: row.tag_name, projectId: row.project_id };
+}
+
+export async function updateTaskPriority({ taskId, priority }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedPriority = String(priority || "").trim().toLowerCase();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedPriority) {
+    const error = new Error("priority is required");
+    error.code = "INVALID_PRIORITY";
+    throw error;
+  }
+
+  const allowedPriorities = new Set(["unset", "low", "medium", "high", "urgent", "critical"]);
+  if (!allowedPriorities.has(normalizedPriority)) {
+    const error = new Error("priority must be one of: unset, low, medium, high, or urgent");
+    error.code = "INVALID_PRIORITY";
+    throw error;
+  }
+
+  // Database enum may still use "critical"; map "urgent" to keep API/UI language consistent.
+  const dbPriority = normalizedPriority === "urgent" ? "critical" : normalizedPriority;
+
+  const result = await pool.query(
+    `
+    UPDATE tasks
+    SET priority = $2
+    WHERE id = $1
+    RETURNING id, priority
+    `,
+    [normalizedTaskId, dbPriority]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    const error = new Error("Task not found");
+    error.code = "TASK_NOT_FOUND";
+    throw error;
+  }
+
+  return {
+    id: row.id,
+    priority: row.priority === "critical" ? "urgent" : row.priority,
+  };
 }
 
 export async function updateTaskStatus({ taskId, userId, categoryId }) {

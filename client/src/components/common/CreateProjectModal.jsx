@@ -26,7 +26,7 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated }) {
         name: projectData.name.trim(),
         description: projectData.description.trim(),
       });
-      // Reset form and close modal after successful creation
+  
       setProjectData({ name: "", description: "" });
 
       if (onCreated) {

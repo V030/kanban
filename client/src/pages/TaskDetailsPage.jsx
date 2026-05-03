@@ -8,6 +8,7 @@ import {
   getTaskComments,
   createTaskComment,
   createTaskCommentReply,
+  updateTaskPriority,
   assignTaskToOthers,
   unassignTaskFromMember,
   getProjectTags,
@@ -146,6 +147,7 @@ export default function TaskDetailsPage() {
         getTaskTags={getTaskTags}
         createTaskTag={createTaskTag}
         deleteTaskTag={deleteTaskTag}
+        updateTaskPriority={updateTaskPriority}
         onClose={handleClose}
       />
     </div>

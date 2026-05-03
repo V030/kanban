@@ -28,6 +28,16 @@ function getDisplayName(user) {
 	return fullName || user.email || "Team member";
 }
 
+function getInitials(user) {
+	if (!user) return "?";
+	const firstName = user.firstName || user.first_name || "";
+	const lastName = user.lastName || user.last_name || "";
+	const name = `${firstName} ${lastName}`.trim() || user.email || "";
+	const parts = name.split(/\s+/).filter(Boolean);
+	const initials = parts.slice(0, 2).map((part) => part.charAt(0)).join("");
+	return (initials || "?").toUpperCase();
+}
+
 const demoColumns = [
 	{
 		id: "todo",
@@ -48,6 +58,11 @@ const demoColumns = [
 		tasks: [
 			{ id: "p1", title: "Build task card UI", description: "Component-level implementation." },
 		],
+	},
+	{
+		id: "to_review",
+		title: "To Review",
+		tasks: [],
 	},
 	{
 		id: "done",
@@ -402,46 +417,72 @@ function KanbanPage() {
 						const isAssignedToMe = isTaskAssignedToMe(task);
 						const showTaskAction = canTakeTask && (isUnassigned || isAssignedToMe);
 						const actionLabel = isAssignedToMe ? "Unassign" : "Take Task";
-
-						
-							const creatorName = `${task.creator?.firstName || ""} ${task.creator?.lastName || ""}`.trim();
-						
+						const creatorName = `${task.creator?.firstName || task.createdBy?.firstName || task.creator?.first_name || task.createdBy?.first_name || ""} ${task.creator?.lastName || task.createdBy?.lastName || task.creator?.last_name || task.createdBy?.last_name || ""}`.trim();
+						const assignedMembers = Array.isArray(task.assignees) && task.assignees.length > 0 ? task.assignees : assignee ? [assignee] : [];
 
 						return (
 							<>
-								<h4 className="kb-task-title">{task.title}</h4>
-								{task.description && <p className="kb-task-desc">{task.description} </p>}
-									<p className="kb-task-meta">Created by: {creatorName || "Project member"}</p>
-								<div className="kb-task-assignee-row">
-									<span className="kb-task-assignee-label">Assigned:</span>
-									{task.assignees && task.assignees.length > 0 ? (
-										task.assignees.map((a, idx) => (
-											<span key={a.id ?? idx} className="kb-task-assignee-pill">{getDisplayName(a)}</span>
-										))
-									) : assignee ? (
-										<span className="kb-task-assignee-pill">{getDisplayName(assignee)}</span>
-									) : (
-										<span className="kb-task-unassigned">Unassigned</span>
+								<div className="kb-task-card-inner">
+									<div className="kb-task-card-topline">
+										{(() => {
+											const pr = String(task?.priority || "").toLowerCase();
+												const pillClass = pr === "critical" ? "urgent" : (pr || "unset");
+												const label = pillClass === "unset" ? "Unset" : pillClass.charAt(0).toUpperCase() + pillClass.slice(1);
+											return (
+												<span className="kb-priority-line">
+													<span className="kb-priority-prefix">Priority •</span>{" "}
+													<span className={`kb-priority-pill kb-priority-${pillClass}`}>{label}</span>
+												</span>
+											);
+										})()}
+									</div>
+
+									<h4 className="kb-task-title">{task.title}</h4>
+									{task.description && <p className="kb-task-desc">{task.description}</p>}
+										
+									{creatorName && (
+										<p className="kb-task-meta">
+											Created by: <strong className="kb-task-meta-name">{creatorName}</strong>
+										</p>
 									)}
+
+									<div className="kb-task-divider" />
+
+									<div className="kb-task-footer-row">
+										<div className="kb-task-assignee-block">
+											<span className="kb-task-assignee-label">Assigned:</span>
+											<div className="kb-task-avatar-row">
+												{assignedMembers.length > 0 ? (
+													assignedMembers.slice(0, 3).map((member, idx) => (
+														<span key={member?.id ?? idx} className="kb-task-avatar" title={getDisplayName(member)}>
+															{getInitials(member)}
+														</span>
+													))
+												) : (
+													<span className="kb-task-unassigned">None</span>
+												)}
+											</div>
+										</div>
+
+										{showTaskAction && (
+											<button
+												type="button"
+												className={`kb-task-action${isAssignedToMe ? " kb-task-action--unassign" : " kb-task-action--take"}`}
+												onClick={(event) => {
+													event.stopPropagation();
+													if (isAssignedToMe) {
+														handleUnassignTask(task);
+														return;
+													}
+
+													handleTakeTask(task);
+												}}
+											>
+												{actionLabel}
+											</button>
+										)}
+									</div>
 								</div>
-
-								{showTaskAction && (
-									<button
-										type="button"
-										className={`kb-task-action${isAssignedToMe ? " kb-task-action--unassign" : ""}`}
-										onClick={(event) => {
-											event.stopPropagation();
-											if (isAssignedToMe) {
-												handleUnassignTask(task);
-												return;
-											}
-
-											handleTakeTask(task);
-										}}
-									>
-										{actionLabel}
-									</button>
-								)}
 
 								{isUnassigned && !showTaskAction && projectRole === "member" && (
 									<p className="kb-task-helper">Take Task is hidden in strict mode.</p>

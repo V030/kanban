@@ -34,6 +34,30 @@ export default function KanbanBoard({
     return dragImage;
   };
 
+  const sortTasks = (tasksInput) => {
+    const tasks = Array.isArray(tasksInput) ? [...tasksInput] : [];
+    const priorityRank = (p) => {
+      const n = String(p || "").toLowerCase();
+      if (n === "critical" || n === "urgent") return 4;
+      if (n === "high") return 3;
+      if (n === "medium") return 2;
+      if (n === "low") return 1;
+      return 0;
+    };
+
+    tasks.sort((a, b) => {
+      const pa = priorityRank(a?.priority);
+      const pb = priorityRank(b?.priority);
+      if (pa !== pb) return pb - pa; // higher priority first
+
+      const da = new Date(a?.createdAt || a?.created_at || 0).getTime() || 0;
+      const db = new Date(b?.createdAt || b?.created_at || 0).getTime() || 0;
+      return db - da; // newest first
+    });
+
+    return tasks;
+  };
+
   return (
     <div className="kb-grid">
       {columns.map((column) => (
@@ -52,7 +76,7 @@ export default function KanbanBoard({
               <h3 className="kb-title">{formatCategoryLabel(column.title)}</h3>
               <span className="kb-count">{(column.tasks || []).length}</span>
             </div>
-            {showAddTaskButton && (
+            {showAddTaskButton && (column.title === "todo" || column.title === "in_progress") && (
               <button
                 type="button"
                 className="kb-add"
@@ -69,7 +93,7 @@ export default function KanbanBoard({
               <p className="kb-empty">No tasks yet.</p>
             )}
 
-            {(column.tasks || []).map((task) => {
+            {(sortTasks(column.tasks) || []).map((task) => {
               const canDrag = isTaskAssignedToMe ? isTaskAssignedToMe(task) : true;
 
               return (
