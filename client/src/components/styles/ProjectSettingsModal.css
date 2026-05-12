@@ -199,6 +199,41 @@
   line-height: 1.5;
 }
 
+.ps-role-note {
+  margin: 0 0 10px;
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.ps-member-note {
+  margin: 12px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.ps-delete-project-btn {
+  border: 1px solid #f0c7cc;
+  background: #fff2f3;
+  color: #a61b2b;
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ps-delete-project-btn:hover:not(:disabled) {
+  background: #ffe8ea;
+  border-color: #e8a9b1;
+}
+
+.ps-delete-project-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .ps-footer {
   display: flex;
   justify-content: space-between;

@@ -9,6 +9,8 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
   const [loading, setLoading] = useState(false);
   const [friends, setFriends] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [friendSearch, setFriendSearch] = useState("");
+  const [pendingFriendId, setPendingFriendId] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -28,6 +30,15 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
   }
 
   if (!isOpen) return null;
+
+  const normalizedSearch = friendSearch.trim().toLowerCase();
+  const filteredFriends = normalizedSearch
+    ? friends.filter((f) => {
+        const fullName = `${f.firstName || ""} ${f.lastName || ""}`.trim().toLowerCase();
+        const emailValue = String(f.email || "").toLowerCase();
+        return fullName.includes(normalizedSearch) || emailValue.includes(normalizedSearch);
+      })
+    : friends;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,6 +74,7 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
 
   const handleSelectFriend = async (friend, project) => {
     setLoading(true);
+    setPendingFriendId(String(friend));
     setError("");
 
     try {
@@ -74,6 +86,7 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
       setError(err?.message || "Failed to send an invite.");
     } finally {
       setLoading(false);
+      setPendingFriendId("");
     }
   };
 
@@ -103,11 +116,25 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
 
             <div className="modal-subsection">
               <strong>Your Friends</strong>
+              <div className="form-group" style={{ marginTop: 10 }}>
+                <label htmlFor="friendSearch">Search</label>
+                <input
+                  id="friendSearch"
+                  name="friendSearch"
+                  type="text"
+                  placeholder="Search by name or email"
+                  value={friendSearch}
+                  onChange={(e) => setFriendSearch(e.target.value)}
+                />
+              </div>
               {friendsLoading && <p>Loading friends...</p>}
               {!friendsLoading && friends.length === 0 && <p className="modal-muted">You have no friends yet.</p>}
-              {!friendsLoading && friends.length > 0 && (
+              {!friendsLoading && friends.length > 0 && filteredFriends.length === 0 && (
+                <p className="modal-muted">No matches found.</p>
+              )}
+              {!friendsLoading && filteredFriends.length > 0 && (
                 <div className="friends-list">
-                  {friends.map((f) => (
+                  {filteredFriends.map((f) => (
                     <div key={f.id} className="friend-item">
                       <div className="friend-item-main">
                         <div className="friend-initials">{((f.firstName||'').charAt(0) + (f.lastName||'').charAt(0)).toUpperCase()}</div>
@@ -117,7 +144,14 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
                         </div>
                       </div>
                       <div className="friend-item-action">
-                        <button type="button" className="friend-add-btn" onClick={() => handleSelectFriend(f.id, project.id)}>Add</button>
+                        <button
+                          type="button"
+                          className="friend-add-btn"
+                          onClick={() => handleSelectFriend(f.id, project.id)}
+                          disabled={pendingFriendId === String(f.id)}
+                        >
+                          {pendingFriendId === String(f.id) ? "Sending..." : "Add"}
+                        </button>
                       </div>
                     </div>
                   ))}

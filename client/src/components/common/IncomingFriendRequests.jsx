@@ -6,10 +6,17 @@ import {
 } from "../../services/friendService";
 
 
-function IncomingFriendRequests({ requests = [] }) {
-  const [myFriendRequests, setMyFriendRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+function IncomingFriendRequests({
+  requests,
+  onRequestsChange,
+  onFriendOptimisticAdd,
+  onFriendRollback,
+  onSync,
+}) {
+  const [myFriendRequests, setMyFriendRequests] = useState(Array.isArray(requests) ? requests : []);
+  const [loading, setLoading] = useState(!Array.isArray(requests));
   const [error, setError] = useState("");
+  const [pendingIds, setPendingIds] = useState({});
 
   const loadMyFriendRequests = async () => {
     setLoading(true);
@@ -26,26 +33,77 @@ function IncomingFriendRequests({ requests = [] }) {
   }
 
   useEffect(() => {
-    loadMyFriendRequests();
+    if (!Array.isArray(requests)) {
+      loadMyFriendRequests();
+    }
   }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(requests)) return;
+    setMyFriendRequests(requests);
+    setLoading(false);
+  }, [requests]);
 
   const handleAccept = async (requestId) => {
     setError("");
+    const previousRequests = Array.isArray(myFriendRequests) ? [...myFriendRequests] : [];
+    const requestItem = previousRequests.find((req) => String(req?.id) === String(requestId));
+    const nextRequests = previousRequests.filter((req) => String(req?.id) !== String(requestId));
+    const tempFriendId = `temp-friend-${requestId}`;
+    const optimisticFriend = requestItem
+      ? {
+          id: tempFriendId,
+          initials: `${(requestItem.first_name || "").charAt(0)}${(requestItem.last_name || "").charAt(0)}`.toUpperCase(),
+          name: `${requestItem.first_name || ""} ${requestItem.last_name || ""}`.trim(),
+          email: requestItem.email,
+          isPending: true,
+        }
+      : null;
     try {
+      setMyFriendRequests(nextRequests);
+      onRequestsChange?.(nextRequests);
+      if (optimisticFriend) {
+        onFriendOptimisticAdd?.(optimisticFriend);
+      }
+      setPendingIds((prev) => ({ ...prev, [String(requestId)]: true }));
+
       await acceptFriendRequest(requestId);
-      await loadMyFriendRequests();
+      await onSync?.();
     } catch (err) {
+      setMyFriendRequests(previousRequests);
+      onRequestsChange?.(previousRequests);
+      onFriendRollback?.(tempFriendId);
       setError(err.message || "Failed to accept friend request.");
+    } finally {
+      setPendingIds((prev) => {
+        const next = { ...prev };
+        delete next[String(requestId)];
+        return next;
+      });
     }
   };
 
   const handleDecline = async (requestId) => {
     setError("");
+    const previousRequests = Array.isArray(myFriendRequests) ? [...myFriendRequests] : [];
+    const nextRequests = previousRequests.filter((req) => String(req?.id) !== String(requestId));
     try {
+      setMyFriendRequests(nextRequests);
+      onRequestsChange?.(nextRequests);
+      setPendingIds((prev) => ({ ...prev, [String(requestId)]: true }));
+
       await declineFriendRequest(requestId);
-      await loadMyFriendRequests();
+      await onSync?.();
     } catch (err) {
+      setMyFriendRequests(previousRequests);
+      onRequestsChange?.(previousRequests);
       setError(err.message || "Failed to decline friend request.");
+    } finally {
+      setPendingIds((prev) => {
+        const next = { ...prev };
+        delete next[String(requestId)];
+        return next;
+      });
     }
   };
 
@@ -64,12 +122,27 @@ function IncomingFriendRequests({ requests = [] }) {
             <div className="friends-meta">
                 <p className="friends-name">{friendRequests.first_name} {friendRequests.last_name}</p>
                 <p className="friends-email">{friendRequests.email}</p>
+                {friendRequests.isPending && <p className="friends-pending">Pending...</p>}
             </div>
           </div>
 
           <div className="request-actions">
-            <button type="button" className="request-btn accept-btn" onClick={() => handleAccept(friendRequests.id)}>Accept</button>
-            <button type="button" className="request-btn decline-btn" onClick={() => handleDecline(friendRequests.id)}>Decline</button>
+            <button
+              type="button"
+              className="request-btn accept-btn"
+              onClick={() => handleAccept(friendRequests.id)}
+              disabled={pendingIds[String(friendRequests.id)]}
+            >
+              {pendingIds[String(friendRequests.id)] ? "Updating..." : "Accept"}
+            </button>
+            <button
+              type="button"
+              className="request-btn decline-btn"
+              onClick={() => handleDecline(friendRequests.id)}
+              disabled={pendingIds[String(friendRequests.id)]}
+            >
+              {pendingIds[String(friendRequests.id)] ? "Updating..." : "Decline"}
+            </button>
           </div>
         </div>
       ))}

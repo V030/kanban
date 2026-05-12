@@ -2,32 +2,56 @@ import React, { useState } from "react";
 import { createProject } from "../../services/projectService";
 import "./CreateProjectModal.css";
 
-export default function CreateProjectModal({ isOpen, onClose, onCreated }) {
+export default function CreateProjectModal({
+  isOpen,
+  onClose,
+  onCreated,
+  onOptimisticCreate,
+  onCreateResolved,
+  onCreateFailed,
+}) {
   const [projectData, setProjectData] = useState({
     name: "",
     description: "",
   });
 
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!projectData.name.trim()) {
+    const trimmedName = projectData.name.trim();
+    const trimmedDescription = projectData.description.trim();
+
+    if (!trimmedName) {
       setError("Project name is required");
       return;
     }
 
-    console.log("Project Data:", projectData);
+    const tempId = `temp-project-${Date.now()}`;
+    const optimisticProject = {
+      id: tempId,
+      name: trimmedName,
+      description: trimmedDescription,
+      created_at: new Date().toISOString(),
+      isPending: true,
+    };
+
+    onOptimisticCreate?.(optimisticProject);
+    setSubmitting(true);
 
     try {
-      await createProject({
-        name: projectData.name.trim(),
-        description: projectData.description.trim(),
+      const data = await createProject({
+        name: trimmedName,
+        description: trimmedDescription,
       });
+      const createdProject = data?.project || data?.createdProject;
   
       setProjectData({ name: "", description: "" });
+
+      onCreateResolved?.(tempId, createdProject);
 
       if (onCreated) {
         await onCreated();
@@ -36,7 +60,10 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated }) {
       onClose();
     } catch (err) {
       console.error(err);
+      onCreateFailed?.(tempId, err);
       setError(err.message || "Project creation failed");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -98,8 +125,8 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated }) {
             <button type="button" className="cancel-btn" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="submit-btn">
-              Create Project
+            <button type="submit" className="submit-btn" disabled={submitting}>
+              {submitting ? "Creating..." : "Create Project"}
             </button>
           </div>
         </form>

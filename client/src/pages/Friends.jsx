@@ -72,6 +72,45 @@ function Friends() {
     await loadIncomingFriendRequests();
   };
 
+  const handleIncomingRequestsChange = (nextRequests) => {
+    setMyFriendRequests(Array.isArray(nextRequests) ? nextRequests : []);
+  };
+
+  const handleSentRequestsChange = (nextRequests) => {
+    setSentFriendRequests(Array.isArray(nextRequests) ? nextRequests : []);
+  };
+
+  const handleOptimisticFriendAdd = (friend) => {
+    if (!friend) return;
+    setFriends((prev) => [friend, ...(prev || [])]);
+  };
+
+  const handleFriendRollback = (tempId) => {
+    if (!tempId) return;
+    setFriends((prev) => (prev || []).filter((item) => String(item?.id) !== String(tempId)));
+  };
+
+  const handleOptimisticSentCreate = (request) => {
+    if (!request) return;
+    setSentFriendRequests((prev) => [request, ...(prev || [])]);
+  };
+
+  const handleSentCreateResolved = (tempId, createdRequest) => {
+    if (!tempId) return;
+    setSentFriendRequests((prev) =>
+      (prev || []).map((item) => {
+        if (String(item?.id) !== String(tempId)) return item;
+        if (!createdRequest) return { ...item, isPending: false };
+        return { ...item, ...createdRequest, isPending: false };
+      })
+    );
+  };
+
+  const handleSentCreateFailed = (tempId) => {
+    if (!tempId) return;
+    setSentFriendRequests((prev) => (prev || []).filter((item) => String(item?.id) !== String(tempId)));
+  };
+
   return (
     <section className="page-shell friends-page">
       <header className="page-header">
@@ -115,12 +154,22 @@ function Friends() {
         <div className="requests-grid">
           <section>
             <h2 className="request-section-title">Incoming Requests ({myFriendRequests.length})</h2>
-            <IncomingFriendRequests requests={myFriendRequests} />
+            <IncomingFriendRequests
+              requests={myFriendRequests}
+              onRequestsChange={handleIncomingRequestsChange}
+              onFriendOptimisticAdd={handleOptimisticFriendAdd}
+              onFriendRollback={handleFriendRollback}
+              onSync={handleFriendRequestCreated}
+            />
           </section>
 
           <section>
             <h2 className="request-section-title">Sent Requests ({sentFriendRequests.length})</h2>
-            <SentFriendRequests requests={sentFriendRequests} />
+            <SentFriendRequests
+              requests={sentFriendRequests}
+              onRequestsChange={handleSentRequestsChange}
+              onSync={handleFriendRequestCreated}
+            />
           </section>
         </div>
       )}
@@ -129,6 +178,9 @@ function Friends() {
         isOpen={isAddFriendOpen}
         onClose={() => setIsAddFriendOpen(false)}
         onCreated={handleFriendRequestCreated}
+        onOptimisticCreate={handleOptimisticSentCreate}
+        onCreateResolved={handleSentCreateResolved}
+        onCreateFailed={handleSentCreateFailed}
       />
     </section>
   );

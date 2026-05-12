@@ -58,6 +58,33 @@
 
 .pm-info {
   min-width: 0;
+  flex: 1;
+}
+
+.pm-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  background: linear-gradient(180deg, #eef7ff 0%, #e6f0fa 100%);
+  border: 1px solid #d7eafc;
+  flex: 0 0 36px;
+}
+
+.pm-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pm-initials {
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
 
 .pm-name {
@@ -84,6 +111,14 @@
   white-space: nowrap;
 }
 
+.pm-actions-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .pm-role {
   border: 1px solid #d2dce8;
   border-radius: 999px;
@@ -91,6 +126,7 @@
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: capitalize;
+  white-space: nowrap;
 }
 
 .pm-role.owner {
@@ -111,6 +147,61 @@
   border-color: #d2dce8;
 }
 
+.pm-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.pm-action-btn {
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.pm-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pm-promote-btn {
+  color: #2563eb;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.pm-promote-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #60a5fa;
+}
+
+.pm-demote-btn {
+  color: #9333ea;
+  border-color: #d8b4fe;
+  background: #faf5ff;
+}
+
+.pm-demote-btn:hover:not(:disabled) {
+  background: #f3e8ff;
+  border-color: #c084fc;
+}
+
+.pm-remove-btn {
+  color: #b91c1c;
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.pm-remove-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #f87171;
+}
+
 .pm-empty {
   margin: 0;
   color: var(--color-text-tertiary);
@@ -128,4 +219,10 @@
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .pm-actions-container {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
+

@@ -8,9 +8,16 @@ export default function AddTaskModal({
   initialCategoryId = "",
   categories = [],
 }) {
+  const priorityOptions = ["unset", "low", "medium", "high", "urgent"];
+  const formatLabel = (value) =>
+    String(value || "")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
   const [taskData, setTaskData] = useState({
     title: "",
     description: "",
+    priority: "unset",
+    targetDate: "",
     categoryId: categories.length ? categories[0].id : "",
   });
 
@@ -41,12 +48,20 @@ export default function AddTaskModal({
     const payload = {
       title: taskData.title.trim(),
       description: taskData.description.trim(),
+      priority: taskData.priority || "unset",
+      targetDate: taskData.targetDate || null,
       categoryId: taskData.categoryId || null,
     };
 
     try {
       if (onCreate) await onCreate(payload);
-      setTaskData({ title: "", description: "", categoryId: categories.length ? categories[0].id : "" });
+      setTaskData({
+        title: "",
+        description: "",
+        priority: "unset",
+        targetDate: "",
+        categoryId: categories.length ? categories[0].id : "",
+      });
       onClose();
     } catch (err) {
       console.error(err);
@@ -105,10 +120,38 @@ export default function AddTaskModal({
                 <option value="">Uncategorized</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name || c.title}
+                    {formatLabel(c.name || c.title)}
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="taskPriority">Priority</label>
+              <select
+                id="taskPriority"
+                name="priority"
+                className={`priority-select priority-${taskData.priority || "unset"}`}
+                value={taskData.priority}
+                onChange={handleChange}
+              >
+                {priorityOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {formatLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="taskTargetDate">Target Date</label>
+              <input
+                id="taskTargetDate"
+                name="targetDate"
+                type="date"
+                value={taskData.targetDate}
+                onChange={handleChange}
+              />
             </div>
           </div>
 

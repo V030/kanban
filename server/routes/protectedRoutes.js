@@ -1,6 +1,7 @@
 import express from "express";
 import { pool } from "../config/db.js";
 import { authenticateToken, authorizeRole } from "../middleware/authMiddleware.js";
+import { changePasswordController, updateProfileController } from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -8,7 +9,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.userId;
 
-        const query = "SELECT id, first_name, last_name, email, role, created_at FROM users where id = $1";
+        const query = "SELECT id, first_name, last_name, email, role, created_at, profile_image_base64 FROM users where id = $1";
         const result = await pool.query(query, [userId]);
 
         if (result.rows.length === 0) {
@@ -27,7 +28,8 @@ router.get("/profile", authenticateToken, async (req, res) => {
                 lastName: user.last_name,
                 email: user.email,
                 role: user.role,
-                createdAt: user.created_at
+                createdAt: user.created_at,
+                profileImageBase64: user.profile_image_base64,
             }
         });
     } catch (error) {
@@ -35,5 +37,9 @@ router.get("/profile", authenticateToken, async (req, res) => {
         res.status(500).json({ message: "Server error" });
     }
 });
+
+router.post("/change-password", authenticateToken, changePasswordController);
+
+router.put("/profile", authenticateToken, updateProfileController);
 
 export default router;

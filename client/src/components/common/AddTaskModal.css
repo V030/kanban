@@ -13,3 +13,17 @@
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
 }
+
+.priority-select {
+  font-weight: 700;
+}
+
+.priority-unset { color: #a8b3c2; }
+.priority-low { color: #16a34a; }
+.priority-medium { color: #eab308; }
+.priority-high { color: #f97316; }
+.priority-urgent { color: #dc2626; }
+
+.priority-select option {
+  color: initial;
+}

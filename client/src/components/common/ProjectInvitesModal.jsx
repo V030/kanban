@@ -10,7 +10,7 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [actionLoadingId, setActionLoadingId] = useState("");
+  const [pendingInviteIds, setPendingInviteIds] = useState({});
 
   useEffect(() => {
     if (!isOpen) return;
@@ -34,29 +34,43 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
 
   async function handleAccept(requestId) {
     setError("");
-    setActionLoadingId(requestId);
+    const previousInvites = Array.isArray(invites) ? [...invites] : [];
+    setInvites((prev) => (prev || []).filter((inv) => String(inv.id) !== String(requestId)));
+    setPendingInviteIds((prev) => ({ ...prev, [String(requestId)]: "accept" }));
 
     try {
       await acceptProjectInvitation(requestId);
       await loadInvites();
     } catch (err) {
+      setInvites(previousInvites);
       setError(err?.message || "Failed to accept invitation");
     } finally {
-      setActionLoadingId("");
+      setPendingInviteIds((prev) => {
+        const next = { ...prev };
+        delete next[String(requestId)];
+        return next;
+      });
     }
   }
 
   async function handleDecline(requestId) {
     setError("");
-    setActionLoadingId(requestId);
+    const previousInvites = Array.isArray(invites) ? [...invites] : [];
+    setInvites((prev) => (prev || []).filter((inv) => String(inv.id) !== String(requestId)));
+    setPendingInviteIds((prev) => ({ ...prev, [String(requestId)]: "decline" }));
 
     try {
       await declineProjectInvitation(requestId);
       await loadInvites();
     } catch (err) {
+      setInvites(previousInvites);
       setError(err?.message || "Failed to decline invitation");
     } finally {
-      setActionLoadingId("");
+      setPendingInviteIds((prev) => {
+        const next = { ...prev };
+        delete next[String(requestId)];
+        return next;
+      });
     }
   }
 
@@ -79,37 +93,43 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
 
           {!loading && !error && invites.length > 0 && (
           <div className="invite-list">
-            {invites.map((inv) => (
-              <div key={inv.id} className="invite-row">
-                <div className="invite-main">
-                  <div className="friend-initials large">{`${(inv.senderFirstName || "").charAt(0)}${(inv.senderLastName || "").charAt(0)}`.toUpperCase()}</div>
-                  <div>
-                    <div className="invite-project-name">{inv.projectName}</div>
-                    <div className="invite-sender">Invited by {`${inv.senderFirstName || ""} ${inv.senderLastName || ""}`.trim() || inv.senderEmail}</div>
+            {invites.map((inv) => {
+              const pendingAction = pendingInviteIds[String(inv.id)];
+              const isPending = Boolean(pendingAction);
+              const pendingLabel = pendingAction === "decline" ? "Declining..." : "Accepting...";
+
+              return (
+                <div key={inv.id} className="invite-row">
+                  <div className="invite-main">
+                    <div className="friend-initials large">{`${(inv.senderFirstName || "").charAt(0)}${(inv.senderLastName || "").charAt(0)}`.toUpperCase()}</div>
+                    <div>
+                      <div className="invite-project-name">{inv.projectName}</div>
+                      <div className="invite-sender">Invited by {`${inv.senderFirstName || ""} ${inv.senderLastName || ""}`.trim() || inv.senderEmail}</div>
+                    </div>
+                  </div>
+
+                  <div className="invite-actions">
+                    <div className="invite-date">{new Date(inv.requestedAt).toLocaleString()}</div>
+                    <button
+                      className="accept-btn"
+                      type="button"
+                      onClick={() => handleAccept(inv.id)}
+                      disabled={isPending}
+                    >
+                      {isPending && pendingAction === "accept" ? pendingLabel : "Accept"}
+                    </button>
+                    <button
+                      className="decline-btn"
+                      type="button"
+                      onClick={() => handleDecline(inv.id)}
+                      disabled={isPending}
+                    >
+                      {isPending && pendingAction === "decline" ? pendingLabel : "Decline"}
+                    </button>
                   </div>
                 </div>
-
-                <div className="invite-actions">
-                  <div className="invite-date">{new Date(inv.requestedAt).toLocaleString()}</div>
-                  <button
-                    className="accept-btn"
-                    type="button"
-                    onClick={() => handleAccept(inv.id)}
-                    disabled={actionLoadingId === inv.id}
-                  >
-                    {actionLoadingId === inv.id ? "Working..." : "Accept"}
-                  </button>
-                  <button
-                    className="decline-btn"
-                    type="button"
-                    onClick={() => handleDecline(inv.id)}
-                    disabled={actionLoadingId === inv.id}
-                  >
-                    {actionLoadingId === inv.id ? "Working..." : "Decline"}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           )}
         </div>

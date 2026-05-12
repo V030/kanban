@@ -19,7 +19,7 @@ export default function KanbanBoard({
 
     const rect = sourceElement.getBoundingClientRect();
     const dragImage = sourceElement.cloneNode(true);
-    dragImage.classList.add("kb-task-card--drag-image");
+    dragImage.classList.add("tf-task-card--drag-image");
     dragImage.style.width = `${Math.ceil(rect.width)}px`;
     dragImage.style.height = `${Math.ceil(rect.height)}px`;
     dragImage.style.position = "fixed";
@@ -59,11 +59,11 @@ export default function KanbanBoard({
   };
 
   return (
-    <div className="kb-grid">
+    <div className="tf-board">
       {columns.map((column) => (
         <section 
           key={column.id} 
-          className="kb-column"
+          className="tf-column"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             const taskId = e.dataTransfer.getData("taskId");
@@ -71,15 +71,15 @@ export default function KanbanBoard({
           }}
         >
           
-          <header className="kb-column-header">
-            <div className="kb-title-wrap">
-              <h3 className="kb-title">{formatCategoryLabel(column.title)}</h3>
-              <span className="kb-count">{(column.tasks || []).length}</span>
+          <header className="tf-column-header">
+            <div className="tf-column-title-wrap">
+              <h3 className="tf-column-title">{formatCategoryLabel(column.title)}</h3>
+              <span className="tf-column-count">{(column.tasks || []).length}</span>
             </div>
             {showAddTaskButton && (column.title === "todo" || column.title === "in_progress") && (
               <button
                 type="button"
-                className="kb-add"
+                className="tf-column-add-btn"
                 onClick={() => onAddTask?.(column)}
                 aria-label={`Add task to ${formatCategoryLabel(column.title)}`}
               >
@@ -88,9 +88,9 @@ export default function KanbanBoard({
             )}
           </header>
 
-          <div className="kb-task-list">
+          <div className="tf-tasks-list">
             {(column.tasks || []).length === 0 && (
-              <p className="kb-empty">No tasks yet.</p>
+              <p className="tf-empty-message">No tasks yet.</p>
             )}
 
             {(sortTasks(column.tasks) || []).map((task) => {
@@ -99,7 +99,7 @@ export default function KanbanBoard({
               return (
                 <article
                   key={task.id}
-                  className={`kb-task-card ${canDrag ? "" : "kb-task-card--locked"}`}
+                  className={`tf-task-card ${canDrag ? "" : "tf-task-card--locked"}`}
                   draggable={canDrag}
                   onClick={() => onTaskClick?.(task, column)}
                   onKeyDown={(event) => {
@@ -113,7 +113,7 @@ export default function KanbanBoard({
                     if (!canDrag) return;
                     e.dataTransfer.setData("taskId", String(task.id));
                     if (e.currentTarget && e.currentTarget.classList) {
-                      e.currentTarget.classList.add("kb-task-card--dragging");
+                      e.currentTarget.classList.add("tf-task-card--dragging");
                     }
 
                     const dragImage = createDragImage(e.currentTarget);
@@ -124,7 +124,7 @@ export default function KanbanBoard({
                   }}
                   onDragEnd={(e) => {
                     if (e.currentTarget && e.currentTarget.classList) {
-                      e.currentTarget.classList.remove("kb-task-card--dragging");
+                      e.currentTarget.classList.remove("tf-task-card--dragging");
                     }
 
                     if (e.currentTarget?._kbDragImage) {
@@ -135,8 +135,8 @@ export default function KanbanBoard({
                 >
                   {renderTask ? renderTask(task, column) : (
                     <>
-                      <h4 className="kb-task-title">{task.title}</h4>
-                      {task.description && <p className="kb-task-desc">{task.description}</p>}
+                      <h4 className="tf-task-title">{task.title}</h4>
+                      {task.description && <p className="tf-task-desc">{task.description}</p>}
                     </>
                   )}
                 </article>

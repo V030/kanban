@@ -7,13 +7,24 @@ import { createProject as createProjectModel,
          acceptProjectInvitation as acceptProjectInvitationModel,
          declineProjectInvitation as declineProjectInvitationModel,
          getTaskCategories as getTaskCategoriesModel,
+         getTaskById as getTaskByIdModel,
          createTaskCategory as createTaskCategoryModel,
          createTask as createTaskModel,
          getProjectSettings as getProjectSettingsModel,
          updateProjectSettings as updateProjectSettingsModel,
+         updateProjectName as updateProjectNameModel,
+         updateProjectDescription as updateProjectDescriptionModel,
          takeProjectTask as takeProjectTaskModel,
+         getMyTasks as getMyTasksModel,
          updateTaskStatus as updateTaskStatusModel,
+         createReview as createReviewModel,
+         getReviewsByTask as getReviewsByTaskModel,
+         approveTaskReview as approveTaskReviewModel,
+         rejectTaskReview as rejectTaskReviewModel,
          updateTaskPriority as updateTaskPriorityModel,
+         updateTaskTargetDate as updateTaskTargetDateModel,
+         updateTaskName as updateTaskNameModel,
+         updateTaskDescription as updateTaskDescriptionModel,
          assignTaskToOthers as assignTaskToOthersModel,
          unassignTaskFromMember as unassignTaskFromMemberModel,
          unassignTaskFromSelf as unassignTaskFromSelfModel,
@@ -25,7 +36,15 @@ import { createProject as createProjectModel,
          getTaskTags as getTaskTagsModel,
          createTaskTag as createTaskTagModel,
          deleteTaskTag as deleteTaskTagModel,
- } from "../models/projectModel.js";
+         deleteTask as deleteTaskModel,
+         deleteProject as deleteProjectModel,
+         removeMemberFromProject as removeMemberFromProjectModel,
+         updateMemberRole as updateMemberRoleModel,
+         } from "../models/projectModel.js";
+
+import { getProjectMetrics as getProjectMetricsController } from "./metricsController.js";
+
+export { getProjectMetricsController as getProjectMetrics };
 
 export async function createProject(req, res) {
   const projectName = (req.body?.project_name || req.body?.name || "").trim();
@@ -287,6 +306,60 @@ export async function getTaskCategories(req, res) {
   }
 }
 
+export async function getTaskById(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+
+  if (!taskId) {
+    return res.status(400).json({ message: "taskId parameter is required" });
+  }
+
+  try {
+    const task = await getTaskByIdModel({ taskId, requesterId: req.user.userId });
+
+    const isOwner = String(task.projectOwner || "") === String(req.user.userId);
+    const canAccessProject = isOwner || !!task.requesterRole;
+
+    if (!canAccessProject) {
+      return res.status(403).json({ message: "Forbidden: you are not a member of this project" });
+    }
+
+    return res.status(200).json({ task });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    console.error("Get task by id error:", error);
+    return res.status(500).json({ message: "Unable to fetch task" });
+  }
+}
+
+export async function getMyTasks(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  try {
+    const tasks = await getMyTasksModel({ requesterId: req.user.userId });
+    return res.status(200).json({ tasks });
+  } catch (error) {
+    if (error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    console.error("Get my tasks error:", error);
+    return res.status(500).json({ message: "Unable to fetch my tasks" });
+  }
+}
+
 export async function createTaskCategory(req, res) {
   if (!req.user?.userId) {
     return res.status(401).json({ message: "Authentication required" });
@@ -324,7 +397,7 @@ export async function createTaskCategory(req, res) {
     // }
 
     // Call model to create category (model should return the created row)
-    const created = await createTaskCategoryModel({ projectId, name });
+    const created = await createTaskCategoryModel({ projectId, name, requesterId: req.user.userId });
     return res.status(201).json({ category: created });
     console.log(projectId, name);
   } catch (error) {
@@ -362,6 +435,7 @@ export async function createNewTask(req, res) {
     taskName: req.body.taskName || req.body.title,
     taskDescription: req.body.taskDescription || req.body.description,
     priority: req.body.priority,
+    targetDate: req.body.targetDate ?? req.body.target_date ?? null,
     createdBy: req.user.userId,
   };
 
@@ -373,7 +447,8 @@ export async function createNewTask(req, res) {
       error?.code === "INVALID_PROJECT" ||
       error?.code === "INVALID_CATEGORY" ||
       error?.code === "INVALID_TASK_TITLE" ||
-      error?.code === "INVALID_USER"
+      error?.code === "INVALID_USER" ||
+      error?.code === "INVALID_TARGET_DATE"
     ) {
       return res.status(400).json({ message: error.message });
     }
@@ -466,6 +541,70 @@ export async function updateTaskStatus(req, res) {
   }
 }
 
+export async function getTaskReviews(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+
+  const { taskId } = req.params;
+  if (!taskId) return res.status(400).json({ message: "taskId parameter is required" });
+
+  try {
+    const reviews = await getReviewsByTaskModel(taskId);
+    return res.status(200).json({ reviews });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK") return res.status(400).json({ message: error.message });
+    console.error("Get task reviews error:", error);
+    return res.status(500).json({ message: "Unable to fetch reviews" });
+  }
+}
+
+export async function approveTaskReview(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+  const { taskId } = req.params;
+  if (!taskId) return res.status(400).json({ message: "taskId parameter is required" });
+
+  try {
+    const updated = await approveTaskReviewModel({ taskId, reviewerId: req.user.userId });
+    return res.status(200).json({ message: "Task approved and moved to Done", task: updated });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER" || error?.code === "CATEGORY_NOT_FOUND") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_NOT_FOUND") return res.status(404).json({ message: error.message });
+
+    console.error("Approve task review error:", error);
+    return res.status(500).json({ message: "Unable to approve review" });
+  }
+}
+
+export async function rejectTaskReview(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+  const { taskId } = req.params;
+  const { reason } = req.body || {};
+
+  if (!taskId) return res.status(400).json({ message: "taskId parameter is required" });
+  if (!reason || String(reason).trim() === "") return res.status(400).json({ message: "Rejection reason is required" });
+
+  try {
+    const updated = await rejectTaskReviewModel({ taskId, reviewerId: req.user.userId, comment: reason });
+    return res.status(200).json({ message: "Task rejected and moved to TODO", task: updated });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER" || error?.code === "INVALID_COMMENT" || error?.code === "CATEGORY_NOT_FOUND") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "TASK_NOT_FOUND") return res.status(404).json({ message: error.message });
+
+    console.error("Reject task review error:", error);
+    return res.status(500).json({ message: "Unable to reject review" });
+  }
+}
+
 export async function updateTaskPriority(req, res) {
   if (!req.user?.userId) {
     return res.status(401).json({ message: "Authentication required" });
@@ -483,7 +622,7 @@ export async function updateTaskPriority(req, res) {
   }
 
   try {
-    const task = await updateTaskPriorityModel({ taskId, priority });
+    const task = await updateTaskPriorityModel({ taskId, requesterId: req.user.userId, priority });
     return res.status(200).json({ message: "Task priority updated successfully", task });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_PRIORITY") {
@@ -496,6 +635,126 @@ export async function updateTaskPriority(req, res) {
 
     console.error("Update task priority error:", error);
     return res.status(500).json({ message: "Unable to update task priority" });
+  }
+}
+
+export async function updateTaskTargetDate(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+  const { targetDate } = req.body || {};
+
+  if (!taskId) {
+    return res.status(400).json({ message: "taskId parameter is required" });
+  }
+
+  if (targetDate !== null && targetDate !== undefined) {
+    const parsed = new Date(targetDate);
+    if (Number.isNaN(parsed.getTime())) {
+      return res.status(400).json({ message: "targetDate must be a valid date" });
+    }
+  }
+
+  try {
+    const task = await updateTaskTargetDateModel({ taskId, targetDate: targetDate ?? null });
+    return res.status(200).json({ message: "Target date updated successfully", task });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    console.error("Update target date error:", error);
+    return res.status(500).json({ message: "Unable to update target date" });
+  }
+}
+
+export async function updateTaskName(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+  const { name } = req.body || {};
+
+  if (!taskId) {
+    return res.status(400).json({ message: "taskId parameter is required" });
+  }
+
+  const trimmed = String(name || "").trim();
+  if (!trimmed) {
+    return res.status(400).json({ message: "name is required" });
+  }
+
+  try {
+    const task = await updateTaskNameModel({
+      taskId,
+      requesterId: req.user.userId,
+      name: trimmed,
+    });
+    return res.status(200).json({ message: "Task name updated successfully", task });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_NAME" || error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    console.error("Update task name error:", error);
+    return res.status(500).json({ message: "Unable to update task name" });
+  }
+}
+
+export async function updateTaskDescription(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { taskId } = req.params;
+  const { description } = req.body || {};
+
+  if (!taskId) {
+    return res.status(400).json({ message: "taskId parameter is required" });
+  }
+
+  const trimmed = String(description || "").trim();
+  if (!trimmed) {
+    return res.status(400).json({ message: "description is required" });
+  }
+
+  try {
+    const task = await updateTaskDescriptionModel({
+      taskId,
+      requesterId: req.user.userId,
+      description: trimmed,
+    });
+    return res.status(200).json({ message: "Task description updated successfully", task });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_DESCRIPTION" || error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    console.error("Update task description error:", error);
+    return res.status(500).json({ message: "Unable to update task description" });
   }
 }
 
@@ -532,6 +791,90 @@ export async function updateProjectSettings(req, res) {
     if (error?.code === "INVALID_PROJECT") return res.status(400).json({ message: error.message });
     if (error?.code === "INVALID_SETTINGS") return res.status(400).json({ message: error.message });
     return res.status(500).json({ message: "Unable to update project settings" });
+  }
+}
+
+export async function updateProjectName(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { projectId } = req.params;
+  const { name } = req.body || {};
+
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  const trimmed = String(name || "").trim();
+  if (!trimmed) {
+    return res.status(400).json({ message: "name is required" });
+  }
+
+  try {
+    const project = await updateProjectNameModel({
+      projectId,
+      requesterId: req.user.userId,
+      name: trimmed,
+    });
+    return res.status(200).json({ message: "Project name updated successfully", project });
+  } catch (error) {
+    if (error?.code === "INVALID_PROJECT" || error?.code === "INVALID_NAME" || error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    console.error("Update project name error:", error);
+    return res.status(500).json({ message: "Unable to update project name" });
+  }
+}
+
+export async function updateProjectDescription(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { projectId } = req.params;
+  const { description } = req.body || {};
+
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  const trimmed = String(description || "").trim();
+  if (!trimmed) {
+    return res.status(400).json({ message: "description is required" });
+  }
+
+  try {
+    const project = await updateProjectDescriptionModel({
+      projectId,
+      requesterId: req.user.userId,
+      description: trimmed,
+    });
+    return res.status(200).json({ message: "Project description updated successfully", project });
+  } catch (error) {
+    if (error?.code === "INVALID_PROJECT" || error?.code === "INVALID_DESCRIPTION" || error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    console.error("Update project description error:", error);
+    return res.status(500).json({ message: "Unable to update project description" });
   }
 }
 
@@ -804,7 +1147,7 @@ export async function createTaskTag(req, res) {
   if (!projectId) return res.status(400).json({ message: "projectId is required" });
 
   try {
-    const created = await createTaskTagModel({ taskId, tagName, projectId });
+    const created = await createTaskTagModel({ taskId, tagName, projectId, requesterId: req.user.userId });
     return res.status(201).json({ tag: created });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_PROJECT" || error?.code === "INVALID_TAG") {
@@ -830,7 +1173,7 @@ export async function deleteTaskTag(req, res) {
   if (!tagId) return res.status(400).json({ message: "Tag ID is required" });
 
   try {
-    const deleted = await deleteTaskTagModel(tagId);
+    const deleted = await deleteTaskTagModel({ tagId, requesterId: req.user.userId });
     if (String(deleted.taskId) !== String(taskId)) {
       return res.status(400).json({ message: "Tag does not belong to the specified task" });
     }
@@ -840,6 +1183,33 @@ export async function deleteTaskTag(req, res) {
     if (error?.code === "INVALID_TAG" || error?.code === "TAG_NOT_FOUND") return res.status(404).json({ message: error.message });
     console.error("Delete task tag error:", error);
     return res.status(500).json({ message: error?.message || "Unable to delete tag" });
+  }
+}
+
+export async function deleteTask(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+
+  const { taskId } = req.params;
+  if (!taskId) return res.status(400).json({ message: "Task ID is required" });
+
+  try {
+    const deleted = await deleteTaskModel({ taskId, requesterId: req.user.userId });
+    return res.status(200).json({ message: "Task removed successfully", task: deleted });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    console.error("Delete task error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to delete task" });
   }
 }
 
@@ -936,5 +1306,142 @@ export async function unassignTaskFromSelf(req, res) {
     }
 
     return res.status(500).json({ message: "Unable to unassign task" });
+  }
+}
+
+export async function deleteProject(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { projectId } = req.params;
+
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  try {
+    console.log(`[deleteProject] Starting deletion for projectId=${projectId}, userId=${req.user.userId}`);
+    const result = await deleteProjectModel({
+      projectId,
+      requesterId: req.user.userId,
+    });
+
+    console.log(`[deleteProject] Successfully deleted project: ${projectId}`);
+    return res.status(200).json({ message: "Project deleted successfully", projectId: result.id });
+  } catch (error) {
+    console.error(`[deleteProject] Error details:`, {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack,
+      full: error
+    });
+
+    if (error?.code === "INVALID_PROJECT") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    if (error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    console.error("Delete project error:", error);
+    return res.status(500).json({ message: "Unable to delete project" });
+  }
+}
+
+export async function removeMemberFromProject(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { projectId, memberId } = req.params;
+
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  if (!memberId) {
+    return res.status(400).json({ message: "Member ID is required" });
+  }
+
+  try {
+    const result = await removeMemberFromProjectModel({
+      projectId,
+      memberId,
+      requesterId: req.user.userId,
+    });
+
+    return res.status(200).json({ message: "Member removed successfully", ...result });
+  } catch (error) {
+    if (error?.code === "INVALID_PROJECT" || error?.code === "INVALID_MEMBER") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "MEMBER_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_FORBIDDEN" || error?.code === "CANNOT_REMOVE_OWNER" || error?.code === "CANNOT_REMOVE_SELF") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    console.error("Remove member error:", error);
+    return res.status(500).json({ message: "Unable to remove member" });
+  }
+}
+
+export async function updateMemberRole(req, res) {
+  if (!req.user?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const { projectId, memberId } = req.params;
+  const { role } = req.body || {};
+
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  if (!memberId) {
+    return res.status(400).json({ message: "Member ID is required" });
+  }
+
+  if (!role) {
+    return res.status(400).json({ message: "Role is required" });
+  }
+
+  try {
+    const result = await updateMemberRoleModel({
+      projectId,
+      memberId,
+      newRole: role,
+      requesterId: req.user.userId,
+    });
+
+    return res.status(200).json({ message: "Member role updated successfully", ...result });
+  } catch (error) {
+    if (error?.code === "INVALID_PROJECT" || error?.code === "INVALID_MEMBER" || error?.code === "INVALID_ROLE") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "MEMBER_NOT_FOUND") {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "PROJECT_FORBIDDEN" || error?.code === "CANNOT_CHANGE_OWNER") {
+      return res.status(403).json({ message: error.message });
+    }
+
+    console.error("Update member role error:", error);
+    return res.status(500).json({ message: "Unable to update member role" });
   }
 }

@@ -1,4 +1,5 @@
 import { pool } from "../config/db.js";
+import { getProjectPermissionContext, getTaskPermissionContext } from "../utils/projectPermissions.js";
 
 export async function createSubtask({ taskId, title, createdBy, status }) {
   const client = await pool.connect();
@@ -36,6 +37,250 @@ export async function createSubtask({ taskId, title, createdBy, status }) {
   } finally {
     client.release();
   }
+}
+
+export async function getTaskById({ taskId, requesterId }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      t.id,
+      t.board_id,
+      t.category_id,
+      t.title,
+      t.description,
+      t.priority,
+      t.created_by,
+      t.created_at,
+      t.target_date,
+      t.is_past_due,
+      t.position,
+      p.id AS project_id,
+      p.name AS project_name,
+      p.owner AS project_owner,
+      COALESCE(ps.allow_assign_task_to_member, false) AS allow_assign_task_to_member,
+      COALESCE(pm_req.role, CASE WHEN p.owner = $2::uuid THEN 'owner' END) AS requester_role,
+      json_build_object(
+        'id', u.id,
+        'firstName', u.first_name,
+        'lastName', u.last_name,
+        'email', u.email
+      ) AS creator,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', au.id,
+              'firstName', au.first_name,
+              'lastName', au.last_name,
+              'email', au.email,
+              'profileImageBase64', au.profile_image_base64
+            ) ORDER BY au.first_name ASC, au.last_name ASC
+          )
+          FROM task_assignees ta
+          JOIN users au ON ta.user_id = au.id
+          WHERE ta.task_id = t.id
+        ), '[]'::json
+      ) AS assignees,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', st.id,
+              'title', st.title,
+              'createdBy', json_build_object(
+                'id', cu.id,
+                'firstName', cu.first_name,
+                'lastName', cu.last_name,
+                'email', cu.email
+              ),
+              'status', st.status,
+              'createdAt', st.created_at
+            ) ORDER BY st.created_at ASC
+          )
+          FROM subtasks st
+          LEFT JOIN users cu ON st.created_by = cu.id
+          WHERE st.task_id = t.id
+        ), '[]'::json
+      ) AS subtasks,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', tt.id,
+              'tagName', tt.tag_name,
+              'taskId', tt.task_id,
+              'projectId', tt.project_id
+            ) ORDER BY tt.tag_name ASC
+          )
+          FROM task_tags tt
+          WHERE tt.task_id = t.id
+        ), '[]'::json
+      ) AS tags
+    FROM tasks t
+    JOIN board b ON t.board_id = b.id
+    JOIN projects p ON b.project_id = p.id
+    LEFT JOIN project_settings ps ON ps.project_id = p.id
+    LEFT JOIN project_members pm_req ON pm_req.project_id = p.id AND pm_req.user_id = $2::uuid
+    LEFT JOIN users u ON t.created_by = u.id
+    WHERE t.id = $1::int
+    LIMIT 1
+    `,
+    [normalizedTaskId, normalizedRequesterId]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    const error = new Error("Task not found");
+    error.code = "TASK_NOT_FOUND";
+    throw error;
+  }
+
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    categoryId: row.category_id,
+    title: row.title,
+    description: row.description,
+    priority: row.priority === "critical" ? "urgent" : row.priority,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    targetDate: row.target_date,
+    isPastDue: row.is_past_due,
+    position: row.position,
+    projectId: row.project_id,
+    projectName: row.project_name,
+    projectOwner: row.project_owner,
+    requesterRole: row.requester_role,
+    allowAssignTaskToOthers: row.allow_assign_task_to_member,
+    project: {
+      id: row.project_id,
+      name: row.project_name,
+      owner: row.project_owner,
+    },
+    creator: row.creator,
+    assignees: row.assignees || [],
+    subtasks: row.subtasks || [],
+    tags: row.tags || [],
+  };
+}
+
+export async function getMyTasks({ requesterId }) {
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      t.id,
+      t.board_id,
+      t.category_id,
+      t.title,
+      t.description,
+      t.priority,
+      t.created_by,
+      t.created_at,
+      t.target_date,
+      t.is_past_due,
+      t.position,
+      (
+        SELECT COUNT(*) FROM task_comments tc2 WHERE tc2.task_id = t.id
+      ) AS comment_count,
+      (
+        SELECT COUNT(*) FROM task_assignees ta2 WHERE ta2.task_id = t.id
+      ) AS assignee_count,
+      tc.name AS status_name,
+      tc."position" AS status_position,
+      p.id AS project_id,
+      p.name AS project_name,
+      p.owner AS project_owner,
+      COALESCE(pm_req.role, CASE WHEN p.owner = $1::uuid THEN 'owner' END) AS requester_role,
+      json_build_object(
+        'id', u.id,
+        'firstName', u.first_name,
+        'lastName', u.last_name,
+        'email', u.email
+      ) AS creator,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', au.id,
+              'firstName', au.first_name,
+              'lastName', au.last_name,
+              'email', au.email
+            ) ORDER BY au.first_name ASC, au.last_name ASC
+          )
+          FROM task_assignees ta
+          JOIN users au ON ta.user_id = au.id
+          WHERE ta.task_id = t.id
+        ), '[]'::json
+      ) AS assignees
+    FROM task_assignees my_assignee
+    JOIN tasks t ON t.id = my_assignee.task_id
+    JOIN tasks_categories tc ON tc.id = t.category_id
+    JOIN board b ON b.id = t.board_id
+    JOIN projects p ON p.id = b.project_id
+    LEFT JOIN project_members pm_req ON pm_req.project_id = p.id AND pm_req.user_id = $1::uuid
+    LEFT JOIN users u ON t.created_by = u.id
+    WHERE my_assignee.user_id = $1::uuid
+    ORDER BY p.name ASC, tc."position" ASC, tc.name ASC, t."position" ASC, t.created_at ASC, t.id ASC
+    `,
+    [normalizedRequesterId]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    boardId: row.board_id,
+    categoryId: row.category_id,
+    title: row.title,
+    description: row.description,
+    priority: row.priority === "critical" ? "urgent" : row.priority,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    targetDate: row.target_date,
+    isPastDue: row.is_past_due,
+    position: row.position,
+    status: {
+      id: row.category_id,
+      name: row.status_name,
+      position: row.status_position,
+    },
+    statusName: row.status_name,
+    statusKey: String(row.status_name || "todo").toLowerCase().replace(/\s+/g, "_"),
+    projectId: row.project_id,
+    projectName: row.project_name,
+    projectOwner: row.project_owner,
+    requesterRole: row.requester_role,
+    project: {
+      id: row.project_id,
+      name: row.project_name,
+      owner: row.project_owner,
+    },
+    creator: row.creator,
+    assignees: row.assignees || [],
+    commentCount: Number(row.comment_count || 0),
+    assigneeCount: Number(row.assignee_count || (Array.isArray(row.assignees) ? row.assignees.length : 0)),
+  }));
 }
 
 export async function createTaskComment({ taskId, userId, comment }) {
@@ -149,7 +394,8 @@ export async function getTaskComments(taskId) {
         'id', u.id,
         'firstName', u.first_name,
         'lastName', u.last_name,
-        'role', pm.role
+        'role', pm.role,
+        'profileImageBase64', u.profile_image_base64
       ) AS "user",
       COALESCE(
         (
@@ -162,7 +408,8 @@ export async function getTaskComments(taskId) {
                 'id', ru.id,
                 'firstName', ru.first_name,
                 'lastName', ru.last_name,
-                'role', pmr.role
+                'role', pmr.role,
+                'profileImageBase64', ru.profile_image_base64
               )
             )
             ORDER BY tcr.created_at ASC
@@ -196,6 +443,201 @@ export async function getTaskComments(taskId) {
   }));
 }
 
+export async function createReview({ taskId, reviewerId, action, comment }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedReviewerId = (reviewerId || "").trim();
+  const normalizedAction = String(action || "").toLowerCase();
+  const normalizedComment = (comment || null);
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedReviewerId) {
+    const error = new Error("reviewerId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!["approved", "rejected"].includes(normalizedAction)) {
+    const error = new Error("action must be 'approved' or 'rejected'");
+    error.code = "INVALID_ACTION";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    INSERT INTO reviews (task_id, reviewer_id, action, comment)
+    VALUES ($1::int, $2::uuid, $3, $4)
+    RETURNING id, task_id, reviewer_id, action, comment, created_at
+    `,
+    [normalizedTaskId, normalizedReviewerId, normalizedAction, normalizedComment]
+  );
+
+  return result.rows[0];
+}
+
+export async function getReviewsByTask(taskId) {
+  const normalizedTaskId = Number(taskId);
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      r.id,
+      r.task_id,
+      r.reviewer_id,
+      r.action,
+      r.comment,
+      r.created_at,
+      u.first_name,
+      u.last_name,
+      pm.role AS reviewer_role
+    FROM reviews r
+    JOIN users u ON u.id = r.reviewer_id
+    LEFT JOIN tasks t ON t.id = r.task_id
+    LEFT JOIN tasks_categories tc ON tc.id = t.category_id
+    LEFT JOIN project_members pm ON pm.user_id = u.id AND pm.project_id = tc.project_id
+    WHERE r.task_id = $1::int
+    ORDER BY r.created_at DESC
+    `,
+    [normalizedTaskId]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    taskId: row.task_id,
+    reviewerId: row.reviewer_id,
+    reviewerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+    reviewerRole: row.reviewer_role,
+    action: row.action,
+    comment: row.comment,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function approveTaskReview({ taskId, reviewerId }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedReviewerId = (reviewerId || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedReviewerId) {
+    const error = new Error("reviewerId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedReviewerId });
+  const canReview = access.isOwner || access.isAdmin || access.isManager || (access.settings && access.settings.allow_member_review === true);
+  if (!canReview) {
+    const error = new Error("Forbidden: you don't have permission to approve reviews for this task");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
+  // find done category id for this project
+  const catRes = await pool.query(
+    `SELECT id FROM tasks_categories WHERE project_id = $1::uuid AND LOWER(name) IN ('done', 'done') LIMIT 1`,
+    [access.projectId]
+  );
+
+  if (catRes.rows.length === 0) {
+    const error = new Error("Done category not found");
+    error.code = "CATEGORY_NOT_FOUND";
+    throw error;
+  }
+
+  const doneCategoryId = Number(catRes.rows[0].id);
+
+  const updateRes = await pool.query(
+    `UPDATE tasks SET category_id = $1 WHERE id = $2::int RETURNING id, board_id, category_id, title, description, priority, created_by, created_at, position`,
+    [doneCategoryId, normalizedTaskId]
+  );
+
+  if (updateRes.rows.length === 0) {
+    const error = new Error("Task not found");
+    error.code = "TASK_NOT_FOUND";
+    throw error;
+  }
+
+  await createReview({ taskId: normalizedTaskId, reviewerId: normalizedReviewerId, action: "approved", comment: null });
+
+  return updateRes.rows[0];
+}
+
+export async function rejectTaskReview({ taskId, reviewerId, comment }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedReviewerId = (reviewerId || "").trim();
+  const normalizedComment = String(comment || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedReviewerId) {
+    const error = new Error("reviewerId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!normalizedComment) {
+    const error = new Error("Rejection reason is required");
+    error.code = "INVALID_COMMENT";
+    throw error;
+  }
+
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedReviewerId });
+  const canReview = access.isOwner || access.isAdmin || access.isManager || (access.settings && access.settings.allow_member_review === true);
+  if (!canReview) {
+    const error = new Error("Forbidden: you don't have permission to reject reviews for this task");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
+  // find todo category id for this project
+  const catRes = await pool.query(
+    `SELECT id FROM tasks_categories WHERE project_id = $1::uuid AND LOWER(name) IN ('todo', 'to_do', 'todo') LIMIT 1`,
+    [access.projectId]
+  );
+
+  if (catRes.rows.length === 0) {
+    const error = new Error("Todo category not found");
+    error.code = "CATEGORY_NOT_FOUND";
+    throw error;
+  }
+
+  const todoCategoryId = Number(catRes.rows[0].id);
+
+  const updateRes = await pool.query(
+    `UPDATE tasks SET category_id = $1 WHERE id = $2::int RETURNING id, board_id, category_id, title, description, priority, created_by, created_at, position`,
+    [todoCategoryId, normalizedTaskId]
+  );
+
+  if (updateRes.rows.length === 0) {
+    const error = new Error("Task not found");
+    error.code = "TASK_NOT_FOUND";
+    throw error;
+  }
+
+  await createReview({ taskId: normalizedTaskId, reviewerId: normalizedReviewerId, action: "rejected", comment: normalizedComment });
+
+  return updateRes.rows[0];
+}
+
 
 export async function createTask(taskData) {
   const client = await pool.connect();
@@ -209,6 +651,15 @@ export async function createTask(taskData) {
     const title = (taskData?.taskName || taskData?.title || "").trim();
     const description = (taskData?.taskDescription || taskData?.description || "").trim();
     const createdBy = (taskData?.createdBy || taskData?.created_by || "").trim();
+    const normalizedPriority = String(taskData?.priority || "").trim().toLowerCase();
+    const targetDateRaw = taskData?.targetDate ?? taskData?.target_date ?? null;
+
+    const access = await getProjectPermissionContext({ projectId, requesterId: createdBy });
+    if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_create_task) {
+      const error = new Error("Forbidden: task creation is disabled for members in this project");
+      error.code = "PROJECT_FORBIDDEN";
+      throw error;
+    }
 
     if (!projectId) {
       const error = new Error("projectId is required");
@@ -263,15 +714,32 @@ export async function createTask(taskData) {
     );
 
     const position = Number(positionResult.rows[0]?.max_position || 0) + 1;
-    const priority = "unset";
+    const allowedPriorities = new Set(["unset", "low", "medium", "high", "urgent", "critical"]);
+    let priority = normalizedPriority || "unset";
+    if (!allowedPriorities.has(priority)) {
+      priority = "unset";
+    }
+    const dbPriority = priority === "urgent" ? "critical" : priority;
+
+    const targetDateValue = targetDateRaw ? String(targetDateRaw).trim() : null;
+    if (targetDateValue) {
+      const parsed = new Date(targetDateValue);
+      if (Number.isNaN(parsed.getTime())) {
+        const error = new Error("targetDate must be a valid date");
+        error.code = "INVALID_TARGET_DATE";
+        throw error;
+      }
+    }
 
     const newTaskResult = await client.query(
       `
-      INSERT INTO tasks (board_id, category_id, title, description, priority, created_by, position)
-      VALUES ($1::uuid, $2, $3, $4, $5, $6::uuid, $7)
-      RETURNING id, board_id, category_id, title, description, priority, created_by, position
+      INSERT INTO tasks (board_id, category_id, title, description, priority, target_date, is_past_due, created_by, position)
+      VALUES ($1::uuid, $2, $3, $4, $5, $6::date,
+        CASE WHEN $6::date IS NOT NULL AND CURRENT_DATE > $6::date THEN true ELSE false END,
+        $7::uuid, $8)
+      RETURNING id, board_id, category_id, title, description, priority, target_date, is_past_due, created_by, position
       `,
-      [board.id, categoryId, title, description || null, priority, createdBy, position]
+      [board.id, categoryId, title, description || null, dbPriority, targetDateValue, createdBy, position]
     );
 
     await client.query("COMMIT");
@@ -283,7 +751,9 @@ export async function createTask(taskData) {
       categoryId: row.category_id,
       title: row.title,
       description: row.description,
-      priority: row.priority,
+      priority: row.priority === "critical" ? "urgent" : row.priority,
+      targetDate: row.target_date,
+      isPastDue: row.is_past_due,
       createdBy: row.created_by,
       position: row.position,
     };
@@ -479,6 +949,7 @@ export async function getProjectMembers({ projectId, requesterId }) {
       u.first_name,
       u.last_name,
       u.email,
+      u.profile_image_base64,
       pm.role,
       pm.joined_at
     FROM project_members pm
@@ -503,6 +974,7 @@ export async function getProjectMembers({ projectId, requesterId }) {
     firstName: row.first_name,
     lastName: row.last_name,
     email: row.email,
+    profileImageBase64: row.profile_image_base64,
     role: row.role,
     joinedAt: row.joined_at,
   }));
@@ -543,14 +1015,7 @@ export async function getProjectSettings({ projectId, requesterId }) {
 
   const result = await pool.query(
     `
-    SELECT
-      COALESCE(allow_member_create_task, true) AS allow_member_create_task,
-      COALESCE(allow_member_take_task, true) AS allow_member_take_task,
-      COALESCE(allow_member_edit_task, true) AS allow_member_edit_task,
-      COALESCE(allow_member_delete_task, true) AS allow_member_delete_task,
-      COALESCE(allow_member_add_board, true) AS allow_member_add_board,
-      COALESCE(allow_member_add_member, true) AS allow_member_add_member,
-      COALESCE(allow_assign_task_to_member, false) AS allow_assign_task_to_member
+    SELECT *
     FROM project_settings
     WHERE project_id = $1::uuid
     `,
@@ -565,7 +1030,13 @@ export async function getProjectSettings({ projectId, requesterId }) {
       allow_member_delete_task: true,
       allow_member_add_board: true,
       allow_member_add_member: true,
-      allow_assign_task_to_member: false
+      allow_assign_task_to_member: false,
+      allow_admin_add_member: true,
+      allow_admin_remove_member: true,
+      allow_admin_add_board: true,
+      allow_admin_manage_tasks: true,
+      allow_admin_create_tag: true,
+      allow_member_create_tag: false
     };
   }
 
@@ -595,8 +1066,30 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
     "allow_member_delete_task",
     "allow_member_add_board",
     "allow_member_add_member",
-    "allow_assign_task_to_member"
+    "allow_assign_task_to_member",
+    "allow_admin_add_member",
+    "allow_admin_remove_member",
+    "allow_admin_add_board",
+    "allow_admin_manage_tasks",
+    "allow_admin_create_tag",
+    "allow_member_create_tag"
   ];
+
+  const settingDefaults = {
+    allow_member_create_task: true,
+    allow_member_take_task: true,
+    allow_member_edit_task: true,
+    allow_member_delete_task: true,
+    allow_member_add_board: true,
+    allow_member_add_member: true,
+    allow_assign_task_to_member: false,
+    allow_admin_add_member: true,
+    allow_admin_remove_member: true,
+    allow_admin_add_board: true,
+    allow_admin_manage_tasks: true,
+    allow_admin_create_tag: true,
+    allow_member_create_tag: false,
+  };
 
   if (!allowedKeys.includes(setting)) {
     const error = new Error("No valid settings provided");
@@ -608,6 +1101,15 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
     const error = new Error("value must be boolean");
     error.code = "INVALID_SETTINGS";
     throw error;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(settingDefaults, setting)) {
+    await pool.query(
+      `
+      ALTER TABLE IF EXISTS project_settings
+      ADD COLUMN IF NOT EXISTS ${setting} boolean NOT NULL DEFAULT ${settingDefaults[setting] ? "true" : "false"}
+      `
+    );
   }
 
   const permissionResult = await pool.query(
@@ -642,12 +1144,138 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
       allow_member_delete_task,
       allow_member_add_board,
       allow_member_add_member,
-      allow_assign_task_to_member
+      allow_assign_task_to_member,
+      allow_admin_add_member,
+      allow_admin_remove_member,
+      allow_admin_add_board,
+      allow_admin_manage_tasks,
+      allow_admin_create_tag,
+      allow_member_create_tag
     `,
     [normalizedProjectId, value]
   );
 
   return result.rows[0];
+}
+
+export async function updateProjectName({ projectId, requesterId, name }) {
+  const normalizedProjectId = (projectId || "").trim();
+  const normalizedRequesterId = (requesterId || "").trim();
+  const trimmedName = String(name || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!trimmedName) {
+    const error = new Error("name is required");
+    error.code = "INVALID_NAME";
+    throw error;
+  }
+
+  const projectResult = await pool.query(
+    `
+    SELECT owner
+    FROM projects
+    WHERE id = $1::uuid
+    LIMIT 1
+    `,
+    [normalizedProjectId]
+  );
+
+  if (projectResult.rows.length === 0) {
+    const error = new Error("Project not found");
+    error.code = "PROJECT_NOT_FOUND";
+    throw error;
+  }
+
+  const access = await getProjectPermissionContext({ projectId: normalizedProjectId, requesterId: normalizedRequesterId });
+  if (!access.isOwner && !access.isAdmin) {
+    const error = new Error("Forbidden: only owners and admins can rename the project");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  const updateResult = await pool.query(
+    `
+    UPDATE projects
+    SET name = $2
+    WHERE id = $1::uuid
+    RETURNING id, name
+    `,
+    [normalizedProjectId, trimmedName]
+  );
+
+  const row = updateResult.rows[0];
+  return { id: row.id, name: row.name };
+}
+
+export async function updateProjectDescription({ projectId, requesterId, description }) {
+  const normalizedProjectId = (projectId || "").trim();
+  const normalizedRequesterId = (requesterId || "").trim();
+  const trimmedDesc = String(description || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!trimmedDesc) {
+    const error = new Error("description is required");
+    error.code = "INVALID_DESCRIPTION";
+    throw error;
+  }
+
+  const projectResult = await pool.query(
+    `
+    SELECT owner
+    FROM projects
+    WHERE id = $1::uuid
+    LIMIT 1
+    `,
+    [normalizedProjectId]
+  );
+
+  if (projectResult.rows.length === 0) {
+    const error = new Error("Project not found");
+    error.code = "PROJECT_NOT_FOUND";
+    throw error;
+  }
+
+  const access = await getProjectPermissionContext({ projectId: normalizedProjectId, requesterId: normalizedRequesterId });
+  if (!access.isOwner && !access.isAdmin) {
+    const error = new Error("Forbidden: only owners and admins can edit the description");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  const updateResult = await pool.query(
+    `
+    UPDATE projects
+    SET description = $2
+    WHERE id = $1::uuid
+    RETURNING id, description
+    `,
+    [normalizedProjectId, trimmedDesc]
+  );
+
+  const row = updateResult.rows[0];
+  return { id: row.id, description: row.description };
 }
 
 export async function inviteMemberToProject(inviteData) {
@@ -707,6 +1335,18 @@ export async function inviteMemberToProject(inviteData) {
     throw error;
   }
 
+  const projectAccess = await getProjectPermissionContext({ projectId, requesterId: inviterId });
+  const requesterRole = projectAccess.requesterRole;
+  const canInvite =
+    projectAccess.isOwner ||
+    (projectAccess.isAdmin ? projectAccess.settings.allow_admin_add_member : projectAccess.settings.allow_member_add_member);
+
+  if (!canInvite) {
+    const error = new Error("Forbidden: inviting members is disabled for your role in this project");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
   const insertResult = await pool.query(
     `
     INSERT INTO project_requests (
@@ -726,7 +1366,6 @@ export async function inviteMemberToProject(inviteData) {
     JOIN users u
       ON u.id = $2::uuid
     WHERE p.id = $3::uuid
-      AND p.owner = $1::uuid
       AND u.id <> $1::uuid
       AND NOT EXISTS (
         SELECT 1
@@ -1008,6 +1647,11 @@ export async function getTaskCategories(projectId) {
             'priority', t.priority,
             'createdBy', t.created_by,
             'createdAt', t.created_at,
+            'targetDate', t.target_date,
+            'isPastDue', CASE
+              WHEN t.target_date IS NOT NULL AND CURRENT_DATE > t.target_date THEN true
+              ELSE false
+            END,
             'position', t."position",
             'creator', json_build_object(
               'id', u.id,
@@ -1022,7 +1666,8 @@ export async function getTaskCategories(projectId) {
                     'id', au.id,
                     'firstName', au.first_name,
                     'lastName', au.last_name,
-                    'email', au.email
+                    'email', au.email,
+                    'profileImageBase64', au.profile_image_base64
                   ) ORDER BY au.first_name ASC, au.last_name ASC
                 )
                 FROM task_assignees ta
@@ -1101,18 +1746,29 @@ export async function getTaskCategories(projectId) {
 }
 
 export async function createTaskCategory(input) {
-  // Accept either createTaskCategory({ projectId, name, position })
+  // Accept either createTaskCategory({ projectId, name, position, requesterId })
   // or createTaskCategory(projectIdString)
   let projectId = "";
   let name = "";
   let position = null;
+  let requesterId = "";
 
   if (input && typeof input === "object") {
     projectId = (input.projectId || input.project_id || "").trim();
     name = (input.name || "").trim();
+    requesterId = (input.requesterId || input.requester_id || "").trim();
     position = Number.isFinite(Number(input.position)) ? Number(input.position) : null;
   } else {
     projectId = (input || "").trim();
+  }
+
+  if (requesterId) {
+    const access = await getProjectPermissionContext({ projectId, requesterId });
+    if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_add_board) {
+      const error = new Error("Forbidden: task columns are disabled for members in this project");
+      error.code = "PROJECT_FORBIDDEN";
+      throw error;
+    }
   }
 
   if (!projectId) {
@@ -1212,6 +1868,13 @@ export async function unassignTaskFromMember({ taskId, memberId }) {
 }
 
 export async function takeProjectTask({ taskId, userId }) {
+  const access = await getTaskPermissionContext({ taskId, requesterId: userId });
+  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_take_task) {
+    const error = new Error("Forbidden: taking tasks is disabled for members in this project");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
   const insertTakenTask = await pool.query(
     `
     INSERT INTO task_assignees (task_id, user_id)
@@ -1252,6 +1915,79 @@ export async function unassignTaskFromSelf({ taskId, userId }) {
     taskId: row.task_id,
     userId: row.user_id,
   };
+}
+
+export async function deleteTask({ taskId, requesterId }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_delete_task) {
+    const error = new Error("Forbidden: deleting tasks is disabled for members in this project");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `DELETE FROM task_comments_replies WHERE task_id = $1::int`,
+      [normalizedTaskId]
+    );
+
+    await client.query(
+      `DELETE FROM task_comments WHERE task_id = $1::int`,
+      [normalizedTaskId]
+    );
+
+    await client.query(
+      `DELETE FROM task_assignees WHERE task_id = $1::int`,
+      [normalizedTaskId]
+    );
+
+    await client.query(
+      `DELETE FROM task_tags WHERE task_id = $1::int`,
+      [normalizedTaskId]
+    );
+
+    await client.query(
+      `DELETE FROM subtasks WHERE task_id = $1::int`,
+      [normalizedTaskId]
+    );
+
+    const deleteResult = await client.query(
+      `DELETE FROM tasks WHERE id = $1::int RETURNING id`,
+      [normalizedTaskId]
+    );
+
+    if (deleteResult.rows.length === 0) {
+      const error = new Error("Task not found");
+      error.code = "TASK_NOT_FOUND";
+      throw error;
+    }
+
+    await client.query("COMMIT");
+    return { taskId: deleteResult.rows[0].id };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getProjectTags(projectId) {
@@ -1298,10 +2034,11 @@ export async function getTaskTags(taskId) {
   return result.rows.map((r) => ({ id: r.id, taskId: r.task_id, tagName: r.tag_name, projectId: r.project_id }));
 }
 
-export async function createTaskTag({ taskId, tagName, projectId }) {
+export async function createTaskTag({ taskId, tagName, projectId, requesterId }) {
   const normalizedTaskId = Number(taskId);
   const normalizedTag = (tagName || "").trim();
   const normalizedProjectId = (projectId || "").trim();
+  const normalizedRequesterId = (requesterId || "").trim();
 
   if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
     const error = new Error("taskId is required");
@@ -1319,6 +2056,22 @@ export async function createTaskTag({ taskId, tagName, projectId }) {
     const error = new Error("projectId is required");
     error.code = "INVALID_PROJECT";
     throw error;
+  }
+
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+  if (access.projectId !== normalizedProjectId) {
+    const error = new Error("Tag does not belong to this project");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!access.isOwner && !access.isAdmin) {
+    const isCreatorOrAssignee = access.isCreator || access.isAssignee;
+    if (!isCreatorOrAssignee) {
+      const error = new Error("Forbidden: only the task creator or assignees can create tags");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
   }
 
   const countRes = await pool.query(
@@ -1357,13 +2110,43 @@ export async function createTaskTag({ taskId, tagName, projectId }) {
   return { id: row.id, taskId: row.task_id, tagName: row.tag_name, projectId: row.project_id };
 }
 
-export async function deleteTaskTag(tagId) {
+export async function deleteTaskTag({ tagId, requesterId }) {
   const normalizedTagId = Number(tagId);
+  const normalizedRequesterId = (requesterId || "").trim();
 
   if (!Number.isInteger(normalizedTagId) || normalizedTagId <= 0) {
     const error = new Error("tagId is required");
     error.code = "INVALID_TAG";
     throw error;
+  }
+
+  const tagAccessResult = await pool.query(
+    `
+    SELECT tt.task_id, tc.project_id
+    FROM task_tags tt
+    JOIN tasks t ON t.id = tt.task_id
+    JOIN tasks_categories tc ON tc.id = t.category_id
+    WHERE tt.id = $1
+    LIMIT 1
+    `,
+    [normalizedTagId]
+  );
+
+  const tagAccessRow = tagAccessResult.rows[0];
+  if (!tagAccessRow) {
+    const error = new Error("Tag not found");
+    error.code = "TAG_NOT_FOUND";
+    throw error;
+  }
+
+  const taskAccess = await getTaskPermissionContext({ taskId: tagAccessRow.task_id, requesterId: normalizedRequesterId });
+  if (!taskAccess.isOwner && !taskAccess.isAdmin) {
+    const isCreatorOrAssignee = taskAccess.isCreator || taskAccess.isAssignee;
+    if (!isCreatorOrAssignee) {
+      const error = new Error("Forbidden: only the task creator or assignees can delete tags");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
   }
 
   const result = await pool.query(
@@ -1385,13 +2168,20 @@ export async function deleteTaskTag(tagId) {
   return { id: row.id, taskId: row.task_id, tagName: row.tag_name, projectId: row.project_id };
 }
 
-export async function updateTaskPriority({ taskId, priority }) {
+export async function updateTaskPriority({ taskId, requesterId, priority }) {
   const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = (requesterId || "").trim();
   const normalizedPriority = String(priority || "").trim().toLowerCase();
 
   if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
     const error = new Error("taskId is required");
     error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
     throw error;
   }
 
@@ -1409,6 +2199,13 @@ export async function updateTaskPriority({ taskId, priority }) {
   }
 
   // Database enum may still use "critical"; map "urgent" to keep API/UI language consistent.
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_edit_task) {
+    const error = new Error("Forbidden: editing task priority is disabled for members in this project");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
   const dbPriority = normalizedPriority === "urgent" ? "critical" : normalizedPriority;
 
   const result = await pool.query(
@@ -1431,6 +2228,134 @@ export async function updateTaskPriority({ taskId, priority }) {
   return {
     id: row.id,
     priority: row.priority === "critical" ? "urgent" : row.priority,
+  };
+}
+
+export async function updateTaskName({ taskId, requesterId, name }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = (requesterId || "").trim();
+  const trimmedName = String(name || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!trimmedName) {
+    const error = new Error("name is required");
+    error.code = "INVALID_NAME";
+    throw error;
+  }
+
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_edit_task) {
+    const error = new Error("Forbidden: editing tasks is disabled for members in this project");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
+  const updateResult = await pool.query(
+    `
+    UPDATE tasks
+    SET title = $2
+    WHERE id = $1::int
+    RETURNING id, title
+    `,
+    [normalizedTaskId, trimmedName]
+  );
+
+  const updated = updateResult.rows[0];
+  return { id: updated.id, title: updated.title };
+}
+
+export async function updateTaskDescription({ taskId, requesterId, description }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = (requesterId || "").trim();
+  const trimmedDesc = String(description || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  if (!trimmedDesc) {
+    const error = new Error("description is required");
+    error.code = "INVALID_DESCRIPTION";
+    throw error;
+  }
+
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_edit_task) {
+    const error = new Error("Forbidden: editing tasks is disabled for members in this project");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
+  const updateResult = await pool.query(
+    `
+    UPDATE tasks
+    SET description = $2
+    WHERE id = $1::int
+    RETURNING id, description
+    `,
+    [normalizedTaskId, trimmedDesc]
+  );
+
+  const updated = updateResult.rows[0];
+  return { id: updated.id, description: updated.description };
+}
+
+export async function updateTaskTargetDate({ taskId, targetDate }) {
+  const normalizedTaskId = Number(taskId);
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  const normalizedTargetDate = targetDate === null ? null : String(targetDate || "").trim();
+
+  const result = await pool.query(
+    `
+    UPDATE tasks
+    SET
+      target_date = $2::date,
+      is_past_due = CASE
+        WHEN $2::date IS NOT NULL AND CURRENT_DATE > $2::date THEN true
+        ELSE false
+      END
+    WHERE id = $1
+    RETURNING id, target_date, is_past_due
+    `,
+    [normalizedTaskId, normalizedTargetDate]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    const error = new Error("Task not found");
+    error.code = "TASK_NOT_FOUND";
+    throw error;
+  }
+
+  return {
+    id: row.id,
+    targetDate: row.target_date,
+    isPastDue: row.is_past_due,
   };
 }
 
@@ -1475,26 +2400,16 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
     throw error;
   }
 
-  const assignmentResult = await pool.query(
-    `
-    SELECT 1
-    FROM task_assignees
-    WHERE task_id = $1
-      AND user_id = $2::uuid
-    LIMIT 1
-    `,
-    [normalizedTaskId, normalizedUserId]
-  );
-
-  if (assignmentResult.rows.length === 0) {
-    const error = new Error("Forbidden: you can only move tasks assigned to you");
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedUserId });
+  if (!access.isOwner && !access.isAdmin && !access.isAssignee) {
+    const error = new Error("Forbidden: only assigned users can move this task");
     error.code = "TASK_FORBIDDEN";
     throw error;
   }
 
   const targetCategoryResult = await pool.query(
     `
-    SELECT id
+    SELECT id, name
     FROM tasks_categories
     WHERE id = $1
       AND project_id = $2::uuid
@@ -1506,6 +2421,16 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
   if (targetCategoryResult.rows.length === 0) {
     const error = new Error("Target category not found in this project");
     error.code = "INVALID_CATEGORY";
+    throw error;
+  }
+
+  const targetCategory = targetCategoryResult.rows[0];
+  const targetCategoryName = String(targetCategory.name || "").trim().toLowerCase();
+  const isDoneCategory = targetCategoryName === "done";
+
+  if (isDoneCategory && !access.isOwner && !access.isAdmin) {
+    const error = new Error("Forbidden: only admins and project owners can move tasks to Done");
+    error.code = "TASK_FORBIDDEN";
     throw error;
   }
 
@@ -1559,3 +2484,237 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
 //     client.release();
 //   }
 // }
+
+// New methods for project deletion and member role management
+
+export async function deleteProject({ projectId, requesterId }) {
+  const normalizedProjectId = (projectId || "").trim();
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const projectResult = await pool.query(
+    `
+    SELECT id, owner
+    FROM projects
+    WHERE id = $1::uuid
+    LIMIT 1
+    `,
+    [normalizedProjectId]
+  );
+
+  if (projectResult.rows.length === 0) {
+    const error = new Error("Project not found");
+    error.code = "PROJECT_NOT_FOUND";
+    throw error;
+  }
+
+  const project = projectResult.rows[0];
+
+  // Only project owner can delete
+  if (project.owner !== normalizedRequesterId) {
+    const error = new Error("Forbidden: only project owner can delete the project");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  const client = await pool.connect();
+
+  try {
+    // Just delete the project - CASCADE will handle related tables
+    const deleteResult = await client.query(
+      `DELETE FROM projects WHERE id = $1::uuid RETURNING id`,
+      [normalizedProjectId]
+    );
+
+    if (deleteResult.rows.length === 0) {
+      const error = new Error("Project not found");
+      error.code = "PROJECT_NOT_FOUND";
+      throw error;
+    }
+
+    return { id: deleteResult.rows[0].id };
+  } catch (error) {
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function removeMemberFromProject({ projectId, memberId, requesterId }) {
+  const normalizedProjectId = (projectId || "").trim();
+  const normalizedMemberId = (memberId || "").trim();
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!normalizedMemberId) {
+    const error = new Error("memberId is required");
+    error.code = "INVALID_MEMBER";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const access = await getProjectPermissionContext({
+    projectId: normalizedProjectId,
+    requesterId: normalizedRequesterId,
+  });
+
+  // Check if requester has permission to remove members
+  const canRemove =
+    access.isOwner ||
+    (access.isAdmin && access.settings.allow_admin_remove_member);
+
+  if (!canRemove) {
+    const error = new Error("Forbidden: you do not have permission to remove members");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  // Cannot remove owner
+  const memberResult = await pool.query(
+    `
+    SELECT pm.role
+    FROM project_members pm
+    WHERE pm.project_id = $1::uuid
+      AND pm.user_id = $2::uuid
+    LIMIT 1
+    `,
+    [normalizedProjectId, normalizedMemberId]
+  );
+
+  if (memberResult.rows.length === 0) {
+    const error = new Error("Member not found in this project");
+    error.code = "MEMBER_NOT_FOUND";
+    throw error;
+  }
+
+  const member = memberResult.rows[0];
+
+  if (member.role === "owner") {
+    const error = new Error("Cannot remove the project owner");
+    error.code = "CANNOT_REMOVE_OWNER";
+    throw error;
+  }
+
+  // Cannot remove yourself
+  if (normalizedMemberId === normalizedRequesterId) {
+    const error = new Error("Cannot remove yourself from the project");
+    error.code = "CANNOT_REMOVE_SELF";
+    throw error;
+  }
+
+  const deleteResult = await pool.query(
+    `
+    DELETE FROM project_members
+    WHERE project_id = $1::uuid AND user_id = $2::uuid
+    RETURNING project_id, user_id
+    `,
+    [normalizedProjectId, normalizedMemberId]
+  );
+
+  return { projectId: normalizedProjectId, memberId: normalizedMemberId };
+}
+
+export async function updateMemberRole({ projectId, memberId, newRole, requesterId }) {
+  const normalizedProjectId = (projectId || "").trim();
+  const normalizedMemberId = (memberId || "").trim();
+  const normalizedNewRole = (newRole || "").trim().toLowerCase();
+  const normalizedRequesterId = (requesterId || "").trim();
+
+  if (!normalizedProjectId) {
+    const error = new Error("projectId is required");
+    error.code = "INVALID_PROJECT";
+    throw error;
+  }
+
+  if (!normalizedMemberId) {
+    const error = new Error("memberId is required");
+    error.code = "INVALID_MEMBER";
+    throw error;
+  }
+
+  if (!["owner", "admin", "member"].includes(normalizedNewRole)) {
+    const error = new Error("newRole must be 'owner', 'admin', or 'member'");
+    error.code = "INVALID_ROLE";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const access = await getProjectPermissionContext({
+    projectId: normalizedProjectId,
+    requesterId: normalizedRequesterId,
+  });
+
+  // Only owner can promote/demote
+  if (!access.isOwner) {
+    const error = new Error("Forbidden: only project owner can change member roles");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  // Cannot change the project owner
+  if (normalizedMemberId === access.ownerId) {
+    const error = new Error("Cannot change the project owner's role");
+    error.code = "CANNOT_CHANGE_OWNER";
+    throw error;
+  }
+
+  const memberResult = await pool.query(
+    `
+    SELECT pm.role
+    FROM project_members pm
+    WHERE pm.project_id = $1::uuid
+      AND pm.user_id = $2::uuid
+    LIMIT 1
+    `,
+    [normalizedProjectId, normalizedMemberId]
+  );
+
+  if (memberResult.rows.length === 0) {
+    const error = new Error("Member not found in this project");
+    error.code = "MEMBER_NOT_FOUND";
+    throw error;
+  }
+
+  const updateResult = await pool.query(
+    `
+    UPDATE project_members
+    SET role = $3
+    WHERE project_id = $1::uuid AND user_id = $2::uuid
+    RETURNING project_id, user_id, role
+    `,
+    [normalizedProjectId, normalizedMemberId, normalizedNewRole]
+  );
+
+  const row = updateResult.rows[0];
+  return {
+    projectId: row.project_id,
+    memberId: row.user_id,
+    role: row.role,
+  };
+}

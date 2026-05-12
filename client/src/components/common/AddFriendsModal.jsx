@@ -2,30 +2,52 @@ import React, { useState } from "react";
 import { addFriend } from "../../services/friendService";
 import "./CreateProjectModal.css";
 
-export default function AddFriendModal({ isOpen, onClose, onCreated }) {
+export default function AddFriendModal({
+  isOpen,
+  onClose,
+  onCreated,
+  onOptimisticCreate,
+  onCreateResolved,
+  onCreateFailed,
+}) {
   const [friendData, setFriendData] = useState({
     email: "",
   });
 
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!friendData.email.trim()) {
+    const trimmedEmail = friendData.email.trim();
+    if (!trimmedEmail) {
       setError("E-Mail is required.");
       return;
     }
 
-    console.log("Project Data:", friendData);
+    const tempId = `temp-friend-request-${Date.now()}`;
+    const optimisticRequest = {
+      id: tempId,
+      email: trimmedEmail,
+      first_name: "",
+      last_name: "",
+      isPending: true,
+    };
+
+    onOptimisticCreate?.(optimisticRequest);
+    setSubmitting(true);
 
     try {
-      await addFriend({
-        email: friendData.email.trim(),
+      const data = await addFriend({
+        email: trimmedEmail,
       });
+      const createdRequest = data?.friendRequest || data?.request;
       // Reset form and close modal after successful creation
       setFriendData({ email: "" });
+
+      onCreateResolved?.(tempId, createdRequest);
 
       if (onCreated) {
         await onCreated();
@@ -34,7 +56,10 @@ export default function AddFriendModal({ isOpen, onClose, onCreated }) {
       onClose();
     } catch (err) {
       console.error(err);
+      onCreateFailed?.(tempId, err);
       setError(err.message || "Failed Adding Friend.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -85,8 +110,8 @@ export default function AddFriendModal({ isOpen, onClose, onCreated }) {
             <button type="button" className="cancel-btn" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="submit-btn">
-              Send Friend Request
+            <button type="submit" className="submit-btn" disabled={submitting}>
+              {submitting ? "Sending..." : "Send Friend Request"}
             </button>
           </div>
         </form>

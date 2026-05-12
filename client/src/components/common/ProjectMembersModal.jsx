@@ -1,5 +1,6 @@
 import "../styles/ProjectMembersModal.css";
 import "./CreateProjectModal.css";
+import normalizeProfileImage from "../../utils/normalizeProfileImage";
 import ProjectMembersList from "./ProjectMembersList";
 import { getFriends } from "../../services/friendService";
 import { inviteMemberToProject } from "../../services/projectService";
@@ -13,6 +14,14 @@ export default function ProjectMembersModal({
   loading = false,
   error = "",
   currentUserId = "",
+  currentUserRole = "member",
+  canRemoveMembers = false,
+  canUpdateRoles = false,
+  onRemoveMember,
+  onUpdateRole,
+  removePending = {},
+  updateRolePending = {},
+  memberActionError = "",
   onAdded,
 }) {
 
@@ -21,6 +30,8 @@ export default function ProjectMembersModal({
   const [inviteLoading, setInviteLoading] = useState(false);
   const [friends, setFriends] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [friendSearch, setFriendSearch] = useState("");
+  const [pendingFriendId, setPendingFriendId] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -42,6 +53,7 @@ export default function ProjectMembersModal({
   const handleSelectFriend = async (friend, project) => {
     setInviteLoading(true);
     setInviteError("");
+    setPendingFriendId(String(friend));
 
     try {
       await inviteMemberToProject ({
@@ -55,6 +67,7 @@ export default function ProjectMembersModal({
       setInviteError(err?.message || "Failed to send an invite.");
     } finally {
       setInviteLoading(false);
+      setPendingFriendId("");
     }
   };
 
@@ -93,6 +106,15 @@ export default function ProjectMembersModal({
   
   if (!isOpen) return null;
 
+  const normalizedSearch = friendSearch.trim().toLowerCase();
+  const filteredFriends = normalizedSearch
+    ? friends.filter((f) => {
+        const fullName = `${f.firstName || ""} ${f.lastName || ""}`.trim().toLowerCase();
+        const emailValue = String(f.email || "").toLowerCase();
+        return fullName.includes(normalizedSearch) || emailValue.includes(normalizedSearch);
+      })
+    : friends;
+
   return (
     <div className="pmv-overlay" role="dialog" aria-modal="true" aria-label="Project members">
       <div className="pmv-modal">
@@ -111,8 +133,17 @@ export default function ProjectMembersModal({
           loading={loading}
           error={error}
           currentUserId={currentUserId}
+          currentUserRole={currentUserRole}
+          canRemoveMembers={canRemoveMembers}
+          canUpdateRoles={canUpdateRoles}
+          onRemoveMember={onRemoveMember}
+          onUpdateRole={onUpdateRole}
+          removePending={removePending}
+          updateRolePending={updateRolePending}
           compact
         />
+
+        {memberActionError && <p className="error-message">{memberActionError}</p>}
 
         <div className="modal-header">
           <h2>Add Someone to "{project?.name || 'Project'}"</h2>
@@ -137,21 +168,45 @@ export default function ProjectMembersModal({
 
             <div className="modal-subsection">
               <strong>Your Friends</strong>
+              <div className="form-group" style={{ marginTop: 10 }}>
+                <label htmlFor="projectMemberSearch">Search</label>
+                <input
+                  id="projectMemberSearch"
+                  name="projectMemberSearch"
+                  type="text"
+                  placeholder="Search by name or email"
+                  value={friendSearch}
+                  onChange={(e) => setFriendSearch(e.target.value)}
+                />
+              </div>
               {friendsLoading && <p>Loading friends...</p>}
               {!friendsLoading && friends.length === 0 && <p className="modal-muted">You have no friends yet.</p>}
-              {!friendsLoading && friends.length > 0 && (
+              {!friendsLoading && friends.length > 0 && filteredFriends.length === 0 && (
+                <p className="modal-muted">No matches found.</p>
+              )}
+              {!friendsLoading && filteredFriends.length > 0 && (
                 <div className="friends-list">
-                  {friends.map((f) => (
+                  {filteredFriends.map((f) => (
                     <div key={f.id} className="friend-item">
-                      <div className="friend-item-main">
-                        <div className="friend-initials">{((f.firstName||'').charAt(0) + (f.lastName||'').charAt(0)).toUpperCase()}</div>
-                        <div className="friend-meta">
-                          <div className="friend-name">{`${f.firstName || ''} ${f.lastName || ''}`.trim() || f.email}</div>
-                          <div className="friend-email">{f.email}</div>
-                        </div>
-                      </div>
+                          <div className="friend-item-main">
+                            {(() => {
+                              const src = normalizeProfileImage(f?.profileImageBase64 || f?.profile_image_base64);
+                              return src ? <div className="friend-avatar"><img src={src} alt={`${f.firstName || ''} ${f.lastName || ''}`.trim() || f.email} /></div> : <div className="friend-initials">{((f.firstName||'').charAt(0) + (f.lastName||'').charAt(0)).toUpperCase()}</div>;
+                            })()}
+                            <div className="friend-meta">
+                              <div className="friend-name">{`${f.firstName || ''} ${f.lastName || ''}`.trim() || f.email}</div>
+                              <div className="friend-email">{f.email}</div>
+                            </div>
+                          </div>
                       <div className="friend-item-action">
-                        <button type="button" className="friend-add-btn" onClick={() => handleSelectFriend(f.id, project.id)}>Add</button>
+                        <button
+                          type="button"
+                          className="friend-add-btn"
+                          onClick={() => handleSelectFriend(f.id, project.id)}
+                          disabled={pendingFriendId === String(f.id)}
+                        >
+                          {pendingFriendId === String(f.id) ? "Sending..." : "Add"}
+                        </button>
                       </div>
                     </div>
                   ))}

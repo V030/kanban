@@ -58,6 +58,18 @@ export async function getTaskCategories(projectId) {
   if (!projectId) throw new Error('projectId is required');
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/get-task-categories`, {
     method: 'GET',
+    cache: 'no-cache',
+    headers: { 'Cache-Control': 'no-store' },
+  });
+}
+
+export async function getTaskById(taskId) {
+  if (!taskId) throw new Error("taskId is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}`, {
+    method: "GET",
+    cache: "no-cache",
+    headers: { "Cache-Control": "no-store" },
   });
 }
 
@@ -65,6 +77,14 @@ export async function getProjectTasks(projectId) {
   if (!projectId) throw new Error("projectId is required");
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/tasks`, {
     method: "GET",
+  });
+}
+
+export async function getMyTasks() {
+  return fetchWithAuth(`${API_URL}/auth/tasks/my-tasks`, {
+    method: "GET",
+    cache: "no-cache",
+    headers: { "Cache-Control": "no-store" },
   });
 }
 
@@ -108,6 +128,28 @@ export async function updateProjectSettings(projectId, setting, value) {
   });
 }
 
+export async function updateProjectName(projectId, name) {
+  if (!projectId) throw new Error("projectId is required");
+  const trimmed = String(name || "").trim();
+  if (!trimmed) throw new Error("name is required");
+
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/name`, {
+    method: "PATCH",
+    body: JSON.stringify({ name: trimmed }),
+  });
+}
+
+export async function updateProjectDescription(projectId, description) {
+  if (!projectId) throw new Error("projectId is required");
+  const trimmed = String(description || "").trim();
+  if (!trimmed) throw new Error("description is required");
+
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/description`, {
+    method: "PATCH",
+    body: JSON.stringify({ description: trimmed }),
+  });
+}
+
 export async function takeTask(taskId) {
   if (!taskId) throw new Error("task id is required");
 
@@ -136,6 +178,37 @@ export async function updateTaskPriority(taskId, priority) {
   });
 }
 
+export async function updateTaskName(taskId, name) {
+  if (!taskId) throw new Error("taskId is required");
+  const trimmed = String(name || "").trim();
+  if (!trimmed) throw new Error("name is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/name`, {
+    method: "PATCH",
+    body: JSON.stringify({ name: trimmed }),
+  });
+}
+
+export async function updateTaskDescription(taskId, description) {
+  if (!taskId) throw new Error("taskId is required");
+  const trimmed = String(description || "").trim();
+  if (!trimmed) throw new Error("description is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/description`, {
+    method: "PATCH",
+    body: JSON.stringify({ description: trimmed }),
+  });
+}
+
+export async function updateTaskTargetDate(taskId, targetDate) {
+  if (!taskId) throw new Error("taskId is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/target-date`, {
+    method: "PATCH",
+    body: JSON.stringify({ targetDate: targetDate ?? null }),
+  });
+}
+
 export async function assignTaskToOthers(taskId, memberId) {
   if (!taskId) throw new Error("task id is required");
   if (!memberId) throw new Error("member id is required");
@@ -159,6 +232,14 @@ export async function unassignTask(taskId) {
   if (!taskId) throw new Error("task id is required");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/unassign-task/${taskId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function deleteTask(taskId) {
+  if (!taskId) throw new Error("task id is required");
+
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}`, {
     method: "DELETE",
   });
 }
@@ -229,6 +310,16 @@ export async function getProjectTags(projectId) {
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/tags`, { method: "GET" });
 }
 
+export async function getProjectMetrics(projectId, days = 30) {
+  if (!projectId) throw new Error("projectId is required");
+  const safeDays = Number.isFinite(Number(days)) ? Number(days) : 30;
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/metrics?days=${safeDays}`, {
+    method: "GET",
+    cache: "no-cache",
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
 export async function getTaskTags(taskId) {
   if (!taskId) throw new Error("taskId is required");
   return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/tags`, { method: "GET" });
@@ -251,5 +342,58 @@ export async function deleteTaskTag(taskId, tagId) {
 
   return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/tags/${tagId}`, {
     method: "DELETE",
+  });
+}
+
+export async function deleteProject(projectId) {
+  if (!projectId) throw new Error("projectId is required");
+
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function removeMemberFromProject(projectId, memberId) {
+  if (!projectId) throw new Error("projectId is required");
+  if (!memberId) throw new Error("memberId is required");
+
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/members/${memberId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function updateMemberRole(projectId, memberId, role) {
+  if (!projectId) throw new Error("projectId is required");
+  if (!memberId) throw new Error("memberId is required");
+  if (!role) throw new Error("role is required");
+
+  return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/members/${memberId}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function getTaskReviews(taskId) {
+  if (!taskId) throw new Error("taskId is required");
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/reviews`, {
+    method: "GET",
+    cache: "no-cache",
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+export async function approveTaskReview(taskId) {
+  if (!taskId) throw new Error("taskId is required");
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/review/approve`, {
+    method: "POST",
+  });
+}
+
+export async function rejectTaskReview(taskId, reason) {
+  if (!taskId) throw new Error("taskId is required");
+  if (!reason || String(reason).trim() === "") throw new Error("reason is required");
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/review/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
   });
 }

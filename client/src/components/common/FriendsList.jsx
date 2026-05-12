@@ -14,10 +14,11 @@ function FriendsList({ friends = [] }) {
             <div className="friends-meta">
               <p className="friends-name">{friend.name}</p>
               <p className="friends-email">{friend.email}</p>
+              {friend.isPending && <p className="friends-pending">Pending...</p>}
             </div>
           </div>
 
-          <button type="button" className="friend-more-btn" aria-label="More actions">...</button>
+          <button type="button" className="friend-more-btn" aria-label="More actions" disabled={friend.isPending}>...</button>
         </div>
       ))}
     </div>

@@ -14,6 +14,7 @@ import KanbanPage from "./pages/KanbanPage";
 import TaskDetailsPage from "./pages/TaskDetailsPage";
 import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
+import Metrics from "./pages/Metrics";
 import { ProtectedRoute } from './components/protected/ProtectedRoutes';
 import { PublicRoute } from './components/public/PublicRoutes';
 
@@ -48,6 +49,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="projects" element={<Projects />} />
             <Route path="kanban" element={<KanbanPage />} />
+            <Route path="metrics" element={<Metrics />} />
             <Route path="kanban/task/:taskId" element={<TaskDetailsPage />} />
             <Route path="friends" element={<Friends />} />
             <Route path="my-tasks" element={<MyTasks />} />

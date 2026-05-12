@@ -1,5 +1,6 @@
-import { NavLink, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import normalizeProfileImage from "../../utils/normalizeProfileImage";
 import { getCurrentUser, logout } from "../../services/authService";
 import "../styles/SideBar.css";
 
@@ -22,18 +23,7 @@ function ProjectsIcon() {
     );
 }
 
-function BoardIcon() {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M4 5h16" />
-            <path d="M4 12h16" />
-            <path d="M4 19h16" />
-            <circle cx="7" cy="5" r="1" fill="currentColor" />
-            <circle cx="7" cy="12" r="1" fill="currentColor" />
-            <circle cx="7" cy="19" r="1" fill="currentColor" />
-        </svg>
-    );
-}
+
 
 function TeamIcon() {
     return (
@@ -59,22 +49,11 @@ function TasksIcon() {
     );
 }
 
-function SettingsIcon() {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="m12 3.5 1.8 1.1 2.2-.4.8 2 2 1-.5 2.2 1.2 1.7-1.2 1.7.5 2.2-2 1-.8 2-2.2-.4L12 20.5l-1.8-1.1-2.2.4-.8-2-2-1 .5-2.2-1.2-1.7 1.2-1.7-.5-2.2 2-1 .8-2 2.2.4z" />
-            <circle cx="12" cy="12" r="3" />
-        </svg>
-    );
-}
-
 const navItems = [
     { to: "/main-page/dashboard", label: "Dashboard", icon: <DashboardIcon /> },
     { to: "/main-page/projects", label: "Projects", icon: <ProjectsIcon /> },
-    { to: "/main-page/kanban", label: "Boards", icon: <BoardIcon /> },
     { to: "/main-page/friends", label: "Connections", icon: <TeamIcon /> },
     { to: "/main-page/my-tasks", label: "My Tasks", icon: <TasksIcon /> },
-    { to: "/main-page/profile", label: "Settings", icon: <SettingsIcon /> },
 ];
 
 function getUserFullName(user) {
@@ -95,15 +74,29 @@ function getUserInitials(user) {
 
 export default function SideBar () {
     const [currentUser, setCurrentUser] = useState(false);
+    const [profileOpen, setProfileOpen] = useState(false);
+    const profileRef = useRef(null);
     const navigate = useNavigate();
+    const location = useLocation();
 
     const displayName = getUserFullName(currentUser);
     const displayInitials = getUserInitials(currentUser);
 
-    useEffect(() => {
-      const user = getCurrentUser();
-      setCurrentUser(user);
-    }, []);
+        useEffect(() => {
+            const user = getCurrentUser();
+            setCurrentUser(user);
+        }, []);
+
+        // close dropdown when clicking outside
+        useEffect(() => {
+            function handleDocClick(e) {
+                if (profileRef.current && !profileRef.current.contains(e.target)) {
+                    setProfileOpen(false);
+                }
+            }
+            document.addEventListener("mousedown", handleDocClick);
+            return () => document.removeEventListener("mousedown", handleDocClick);
+        }, []);
 
         function handleLogout() {
                 logout();
@@ -121,30 +114,84 @@ export default function SideBar () {
 
             <div className="sidebar-section">
               <p className="section-header">Workspace</p>
-              <nav className="nav-list" aria-label="Primary">
-                {navItems.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) => (isActive ? "nav-btn active" : "nav-btn")}
-                  >
-                    <span className="nav-icon">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </NavLink>
-                ))}
-              </nav>
+                            <nav className="nav-list" aria-label="Primary">
+                                {navItems.map((item) => (
+                                    <NavLink
+                                        key={item.to}
+                                        to={item.to}
+                                        className={({ isActive }) => {
+                                            // Keep Projects highlighted when user opens a project (which navigates to /main-page/kanban with project in state)
+                                            if (item.to === "/main-page/projects") {
+                                                const isProjectActive = location.pathname.startsWith("/main-page/projects") ||
+                                                    (location.pathname === "/main-page/kanban" && location.state && location.state.project);
+                                                return isProjectActive ? "nav-btn active" : "nav-btn";
+                                            }
+                                            return isActive ? "nav-btn active" : "nav-btn";
+                                        }}
+                                    >
+                                        <span className="nav-icon">{item.icon}</span>
+                                        <span>{item.label}</span>
+                                    </NavLink>
+                                ))}
+                            </nav>
             </div>
 
-            <div className="sidebar-bottom">
-              <div className="user">
-                                <div className="avatar">{displayInitials || "U"}</div>
-                <div className="meta">
-                                    <div className="name">{displayName || "Guest"}</div>
-                  <div className="email">{currentUser?.email || "Not signed in"}</div>
-                </div>
-              </div>
-              <button className="logout" onClick={handleLogout}>Log Out</button>
-            </div>
+                        <div className="sidebar-bottom">
+                            <div className="user-wrapper" ref={profileRef}>
+                                <button
+                                    type="button"
+                                    className="user user-btn"
+                                    onClick={() => setProfileOpen((v) => !v)}
+                                    aria-label="Open profile menu"
+                                >
+                                    {(() => {
+                                        const src = normalizeProfileImage(currentUser?.profileImageBase64 || currentUser?.profile_image_base64);
+                                        return src ? (
+                                            <img src={src} alt={displayName || "Profile"} className="avatar avatar-image" />
+                                        ) : (
+                                            <div className="avatar">{displayInitials || "U"}</div>
+                                        );
+                                    })()}
+
+                                    <div className="meta">
+                                        <div className="name">{displayName || "Guest"}</div>
+                                        <div className="email">{currentUser?.email || "Not signed in"}</div>
+                                    </div>
+                                </button>
+
+                                {profileOpen && (
+                                    <div className="profile-dropdown" role="menu">
+                                        <div className="profile-dropdown-card">
+                                            <div className="dropdown-profile-row">
+                                                {(() => {
+                                                    const src = normalizeProfileImage(currentUser?.profileImageBase64 || currentUser?.profile_image_base64);
+                                                    return src ? (
+                                                        <img src={src} alt="Profile" className="avatar avatar-image" />
+                                                    ) : (
+                                                        <div className="avatar">{displayInitials || "U"}</div>
+                                                    );
+                                                })()}
+                                                <div className="dropdown-meta">
+                                                    <div className="name">{displayName || "Guest"}</div>
+                                                    <div className="email">{currentUser?.email || "Not signed in"}</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="dropdown-list">
+                                                <button className="dropdown-item" onClick={() => { setProfileOpen(false); navigate('/main-page/profile'); }}>Account</button>
+                                                <button className="dropdown-item" onClick={() => { setProfileOpen(false); /* placeholder */ }}>Give feedback</button>
+                                            </div>
+
+                                            <div className="dropdown-actions">
+                                                <button className="logout small" onClick={() => { setProfileOpen(false); handleLogout(); }}>Sign out</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button className="logout" onClick={handleLogout}>Log Out</button>
+                        </div>
         </aside>
     );
 }

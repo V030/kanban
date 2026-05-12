@@ -46,7 +46,6 @@ function Dashboard() {
 
     const openProjectBoard = (project) => {
         if (!project) return;
-        localStorage.setItem("selectedProject", JSON.stringify(project));
         navigate("/main-page/kanban", { state: { project } });
     };
 

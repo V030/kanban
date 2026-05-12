@@ -33,8 +33,23 @@ export async function fetchWithAuth(url, options = {}) {
   }
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Request failed");
+    let errorMessage = "Request failed";
+
+    try {
+      const error = await response.json();
+      errorMessage = error.message || errorMessage;
+    } catch {
+      const fallbackText = await response.text();
+      if (fallbackText) {
+        errorMessage = fallbackText;
+      }
+    }
+
+    if (response.status === 413) {
+      errorMessage = "Image is too large. Please choose a smaller file.";
+    }
+
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -57,10 +72,10 @@ export async function login(email, password) {
     console.log("Login successful. Storing token...");
 
     localStorage.setItem("token", data.token);
+    // cache user in-memory only; do not persist user object to localStorage
+    cachedUser = data.user || null;
 
-    localStorage.setItem("user", JSON.stringify(data.user));
-
-    console.log("Token stored. User role:", data.user.role);
+    console.log("Token stored. User role:", cachedUser?.role);
 
     return data;
 }
@@ -85,32 +100,44 @@ export async function register(
   const data = await response.json();
 
   localStorage.setItem("token", data.token);
-  localStorage.setItem("user", JSON.stringify(data.user));
-
+  cachedUser = data.user || null;
   return data;
 }
 
 export function logout() {
   console.log("Logging out...");
   localStorage.removeItem("token");
-  localStorage.removeItem("user");
+  cachedUser = null;
   console.log("Token cleared");
 }
 
 export function getCurrentUser() {
-  const userJson = localStorage.getItem("user");
-  if (!userJson) return null;
-
-  try {
-    return JSON.parse(userJson);
-  } catch (error) {
-    console.error("Error parsing user data.");
-    return null;
-  }
+  return cachedUser;
 }
 
 export async function getProfile() {
   return fetchWithAuth(`${API_URL}/api/protected/profile`);
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  return fetchWithAuth(`${API_URL}/api/protected/change-password`, {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+export async function updateProfile(firstName, lastName, email, profileImageBase64) {
+  const response = await fetchWithAuth(`${API_URL}/api/protected/profile`, {
+    method: "PUT",
+    body: JSON.stringify({ firstName, lastName, email, profileImageBase64 }),
+  });
+  
+  // Update cached user with new profile data
+  if (response?.user) {
+    cachedUser = response.user;
+  }
+  
+  return response;
 }
 
 export async function getAllUsers() {
@@ -128,4 +155,21 @@ export function isAuthenticated() {
 export function hasRole(role) {
   const user = getCurrentUser();
   return user && user.role === role;
+}
+
+// in-memory cached user; populated on login/register or via explicit hydration
+let cachedUser = null;
+
+// attempt to hydrate cached user from server using token
+export async function hydrateUserFromToken() {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const profile = await getProfile();
+    cachedUser = profile?.user || profile || cachedUser;
+    return cachedUser;
+  } catch (err) {
+    return null;
+  }
 }

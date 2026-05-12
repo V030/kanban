@@ -19,6 +19,7 @@ function Projects() {
     const [error, setError] = useState("");
     const [memberLoading, setMemberLoading] = useState(true);
     const [memberError, setMemberError] = useState("");
+    const [projectActionError, setProjectActionError] = useState("");
 
     const loadProjects = async () => {
         setLoading(true);
@@ -53,49 +54,87 @@ function Projects() {
       loadOtherProjects();
     }, []);
 
+    const handleOptimisticCreate = (optimisticProject) => {
+      setProjectActionError("");
+      setProjects((prev) => [optimisticProject, ...(prev || [])]);
+    };
+
+    const handleCreateResolved = (tempId, createdProject) => {
+      if (!tempId) return;
+      if (createdProject) {
+        setProjects((prev) =>
+          (prev || []).map((project) =>
+            String(project?.id) === String(tempId) ? { ...createdProject, isPending: false } : project
+          )
+        );
+      } else {
+        setProjects((prev) => (prev || []).filter((project) => String(project?.id) !== String(tempId)));
+      }
+    };
+
+    const handleCreateFailed = (tempId, err) => {
+      if (tempId) {
+        setProjects((prev) => (prev || []).filter((project) => String(project?.id) !== String(tempId)));
+      }
+      setProjectActionError(err?.message || "Project creation failed");
+    };
+
     const openKanban = (project) => {
-      localStorage.setItem("selectedProject", JSON.stringify(project));
       navigate("/main-page/kanban", { state: { project } });
     };
 
-    const renderProjectCard = (project, type = "owner") => (
-      <article
-        key={project.id}
-        className="project-card"
-        onClick={() => openKanban(project)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
+    const renderProjectCard = (project, type = "owner") => {
+      const isPending = !!project?.isPending;
+      const canOpen = !isPending;
+
+      return (
+        <article
+          key={project.id}
+          className="project-card"
+          onClick={() => {
+            if (!canOpen) return;
             openKanban(project);
-          }
-        }}
-      >
-        <h3>{project.name}</h3>
-        <p>{project.description || "No description added yet."}</p>
-        <p className="meta-line">
-          {type === "owner"
-            ? `Created ${new Date(project.created_at).toLocaleString()}`
-            : `Joined ${new Date(project.joined_at).toLocaleString()}`}
-        </p>
-        <div className="project-card-foot">
-          <span className={`pill ${type}`}>{type === "owner" ? "Owner" : "Member"}</span>
-          {type === "owner" && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={(event) => {
-                event.stopPropagation();
-                setSelectedProject(project);
-              }}
-            >
-              Add Member
-            </button>
-          )}
-        </div>
-      </article>
-    );
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              if (!canOpen) return;
+              openKanban(project);
+            }
+          }}
+        >
+          <h3>{project.name}</h3>
+          <p>{project.description || "No description added yet."}</p>
+          <p className="meta-line">
+            {isPending
+              ? "Creating project..."
+              : (type === "owner"
+                ? `Created ${new Date(project.created_at).toLocaleString()}`
+                : `Joined ${new Date(project.joined_at).toLocaleString()}`)}
+          </p>
+          <div className="project-card-foot">
+            <span className={`pill ${type}`}>{type === "owner" ? "Owner" : "Member"}</span>
+            {isPending && <span className="pill pending">Pending</span>}
+            {type === "owner" && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!canOpen) return;
+                  setSelectedProject(project);
+                }}
+                disabled={isPending}
+              >
+                Add Member
+              </button>
+            )}
+          </div>
+        </article>
+      );
+    };
 
     return (
       <section className="page-shell projects-page">
@@ -121,6 +160,9 @@ function Projects() {
           isOpen={isCreateModalOpen} 
           onClose={() => setIsCreateModalOpen(false)} 
           onCreated={loadProjects}
+          onOptimisticCreate={handleOptimisticCreate}
+          onCreateResolved={handleCreateResolved}
+          onCreateFailed={handleCreateFailed}
         />
 
         <section className="project-section">
@@ -128,6 +170,8 @@ function Projects() {
             <h2>My Projects</h2>
             <p>{projects.length} total</p>
           </div>
+
+          {projectActionError && <p className="status-text error">{projectActionError}</p>}
 
           {loading && <p className="status-text">Loading your projects...</p>}
           {error && <p className="status-text error">{error}</p>}
