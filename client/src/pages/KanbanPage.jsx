@@ -8,7 +8,7 @@ import ProjectMembersModal from "../components/common/ProjectMembersModal";
 import "../components/styles/KanbanPage.css";
 import "../components/styles/ColumnsReorderModal.css";
 import { getCurrentUser } from "../services/authService";
-import { getProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
+import { getProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, approveTaskReview, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
 
 const DEFAULT_TASK_PERMISSIONS = {
@@ -43,6 +43,17 @@ function getInitials(user) {
 	const parts = name.split(/\s+/).filter(Boolean);
 	const initials = parts.slice(0, 2).map((part) => part.charAt(0)).join("");
 	return (initials || "?").toUpperCase();
+}
+
+/** Matches columns used for review workflow (same idea as task card flags). */
+function isReviewLikeCategoryName(name) {
+	const n = String(name || "")
+		.trim()
+		.toLowerCase()
+		.replace(/\s+/g, " ");
+	if (!n) return false;
+	if (n === "to_review" || n === "to review") return true;
+	return n.includes("review");
 }
 
 function getProfileImageSrc(user) {
@@ -616,7 +627,15 @@ function KanbanPage() {
 		setTaskPending(taskId, "move");
 
 		try {
-			await updateTaskStatus(taskId, column.id);
+			const sourceName = currentLocation.categoryName || "";
+			const fromReviewColumn = isReviewLikeCategoryName(sourceName);
+			// Dragging into Done from a review column must use the review approve API so a `reviews` row
+			// is written (same as Task Details → Approve). Plain updateTaskStatus never inserts reviews.
+			if (targetCategoryName === "done" && fromReviewColumn) {
+				await approveTaskReview(taskId, "");
+			} else {
+				await updateTaskStatus(taskId, column.id);
+			}
 			setError("");
 			await loadTaskCategories();
 		} catch (dropError) {

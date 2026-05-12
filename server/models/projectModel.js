@@ -443,11 +443,12 @@ export async function getTaskComments(taskId) {
   }));
 }
 
-export async function createReview({ taskId, reviewerId, action, comment }) {
+async function insertReviewRow(executor, { taskId, reviewerId, action, comment }) {
   const normalizedTaskId = Number(taskId);
   const normalizedReviewerId = (reviewerId || "").trim();
   const normalizedAction = String(action || "").toLowerCase();
-  const normalizedComment = (comment || null);
+  const normalizedCommentInput =
+    comment != null && String(comment).trim() !== "" ? String(comment).trim() : null;
 
   if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
     const error = new Error("taskId is required");
@@ -467,7 +468,16 @@ export async function createReview({ taskId, reviewerId, action, comment }) {
     throw error;
   }
 
-  const result = await pool.query(
+  if (normalizedAction === "rejected" && !normalizedCommentInput) {
+    const error = new Error("Rejection reason is required");
+    error.code = "INVALID_COMMENT";
+    throw error;
+  }
+
+  // Keep approved reviews non-null for easier filtering/history and parity in UI expectations.
+  const normalizedComment = normalizedAction === "approved" ? (normalizedCommentInput || "Approved") : normalizedCommentInput;
+
+  const result = await executor(
     `
     INSERT INTO reviews (task_id, reviewer_id, action, comment)
     VALUES ($1::int, $2::uuid, $3, $4)
@@ -477,6 +487,10 @@ export async function createReview({ taskId, reviewerId, action, comment }) {
   );
 
   return result.rows[0];
+}
+
+export async function createReview(params) {
+  return insertReviewRow((text, params) => pool.query(text, params), params);
 }
 
 export async function getReviewsByTask(taskId) {
@@ -523,9 +537,11 @@ export async function getReviewsByTask(taskId) {
   }));
 }
 
-export async function approveTaskReview({ taskId, reviewerId }) {
+export async function approveTaskReview({ taskId, reviewerId, comment: commentInput }) {
   const normalizedTaskId = Number(taskId);
   const normalizedReviewerId = (reviewerId || "").trim();
+  const normalizedComment =
+    commentInput != null && String(commentInput).trim() !== "" ? String(commentInput).trim() : null;
 
   if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
     const error = new Error("taskId is required");
@@ -561,20 +577,40 @@ export async function approveTaskReview({ taskId, reviewerId }) {
 
   const doneCategoryId = Number(catRes.rows[0].id);
 
-  const updateRes = await pool.query(
-    `UPDATE tasks SET category_id = $1 WHERE id = $2::int RETURNING id, board_id, category_id, title, description, priority, created_by, created_at, position`,
-    [doneCategoryId, normalizedTaskId]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  if (updateRes.rows.length === 0) {
-    const error = new Error("Task not found");
-    error.code = "TASK_NOT_FOUND";
-    throw error;
+    await insertReviewRow((text, params) => client.query(text, params), {
+      taskId: normalizedTaskId,
+      reviewerId: normalizedReviewerId,
+      action: "approved",
+      comment: normalizedComment,
+    });
+
+    const updateRes = await client.query(
+      `UPDATE tasks SET category_id = $1 WHERE id = $2::int RETURNING id, board_id, category_id, title, description, priority, created_by, created_at, position`,
+      [doneCategoryId, normalizedTaskId]
+    );
+
+    if (updateRes.rows.length === 0) {
+      const error = new Error("Task not found");
+      error.code = "TASK_NOT_FOUND";
+      throw error;
+    }
+
+    await client.query("COMMIT");
+    return updateRes.rows[0];
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      /* ignore */
+    }
+    throw err;
+  } finally {
+    client.release();
   }
-
-  await createReview({ taskId: normalizedTaskId, reviewerId: normalizedReviewerId, action: "approved", comment: null });
-
-  return updateRes.rows[0];
 }
 
 export async function rejectTaskReview({ taskId, reviewerId, comment }) {
@@ -622,20 +658,40 @@ export async function rejectTaskReview({ taskId, reviewerId, comment }) {
 
   const todoCategoryId = Number(catRes.rows[0].id);
 
-  const updateRes = await pool.query(
-    `UPDATE tasks SET category_id = $1 WHERE id = $2::int RETURNING id, board_id, category_id, title, description, priority, created_by, created_at, position`,
-    [todoCategoryId, normalizedTaskId]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  if (updateRes.rows.length === 0) {
-    const error = new Error("Task not found");
-    error.code = "TASK_NOT_FOUND";
-    throw error;
+    await insertReviewRow((text, params) => client.query(text, params), {
+      taskId: normalizedTaskId,
+      reviewerId: normalizedReviewerId,
+      action: "rejected",
+      comment: normalizedComment,
+    });
+
+    const updateRes = await client.query(
+      `UPDATE tasks SET category_id = $1 WHERE id = $2::int RETURNING id, board_id, category_id, title, description, priority, created_by, created_at, position`,
+      [todoCategoryId, normalizedTaskId]
+    );
+
+    if (updateRes.rows.length === 0) {
+      const error = new Error("Task not found");
+      error.code = "TASK_NOT_FOUND";
+      throw error;
+    }
+
+    await client.query("COMMIT");
+    return updateRes.rows[0];
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      /* ignore */
+    }
+    throw err;
+  } finally {
+    client.release();
   }
-
-  await createReview({ taskId: normalizedTaskId, reviewerId: normalizedReviewerId, action: "rejected", comment: normalizedComment });
-
-  return updateRes.rows[0];
 }
 
 

@@ -12,16 +12,22 @@ export async function fetchWithAuth(url, options = {}) {
   
   console.log("Making authenticated request to:", url);
   
-  // add Authorization header
+  // Pull `headers` out so spreading options never duplicates or drops fields (must keep JSON body intact).
+  const { headers: incomingHeaders = {}, ...restOptions } = options;
+
+  const optionalHeaders = Object.fromEntries(
+    Object.entries(incomingHeaders).filter(([, value]) => value !== undefined)
+  );
+
   const headers = {
     "Content-Type": "application/json",
-    ...options.headers,
-    "Authorization": `Bearer ${token}`  // this sends token to backend
+    ...optionalHeaders,
+    Authorization: `Bearer ${token}`,
   };
   
   const response = await fetch(url, {
-    ...options,
-    headers
+    ...restOptions,
+    headers,
   });
   
   // handle token expiration/authentication failure

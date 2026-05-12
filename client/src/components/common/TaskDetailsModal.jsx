@@ -92,6 +92,17 @@ function capitalizeFirst(value) {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
+function getReviewEntryAction(review) {
+  return String(review?.action || "").trim().toLowerCase();
+}
+
+/** Comment/reason text stored on a review row (approve note or rejection reason). */
+function getReviewEntryComment(review) {
+  const raw = review?.comment ?? review?.Comment;
+  if (raw == null) return "";
+  return String(raw).trim();
+}
+
 function formatCategoryLabel(value) {
   return String(value || "")
     .replace(/_/g, " ")
@@ -170,10 +181,11 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
-  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [reviewFeedbackMode, setReviewFeedbackMode] = useState(null); // 'approve' | 'reject' | null
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
-  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [reviewFeedbackText, setReviewFeedbackText] = useState("");
+  const [reviewFeedbackSubmitting, setReviewFeedbackSubmitting] = useState(false);
+  const reviewFeedbackTextareaRef = useRef(null);
   const isCurrentUserAssigned = useMemo(() => {
     if (!currentUserIdValue) return false;
     return assignees.some((member) => String(member?.id || member?.user_id || "") === String(currentUserIdValue));
@@ -326,56 +338,51 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     })();
   }, [task?.id, loadComments, getTaskTags, task?.priority, task?.targetDate, task?.target_date, task?.isPastDue, task?.is_past_due, task?.tags]);
 
-  const handleApproveClick = async () => {
-    if (!task?.id) return;
-    try {
-      const data = await approveTaskReview(task.id);
-      const updated = data?.task || data?.task || data;
-      // try to sync parent state if updateTaskStatus prop exists
-      if (updated && (updateTaskStatus instanceof Function)) {
-        const newCategoryId = updated?.category_id ?? updated?.categoryId;
-        if (newCategoryId) {
-          await updateTaskStatus(task.id, newCategoryId);
-        }
-      }
-      // reload reviews
-      const revs = await getTaskReviews(task.id);
-      setReviews(revs?.reviews || revs || []);
-    } catch (err) {
-      console.error("Approve review failed", err);
-      // show minimal feedback
-      alert(err?.message || "Unable to approve task review");
-    }
+  const openReviewFeedbackModal = (mode) => {
+    setReviewFeedbackText("");
+    setReviewFeedbackMode(mode);
   };
 
-  const openRejectModal = () => {
-    setRejectReason("");
-    setShowRejectModal(true);
+  const closeReviewFeedbackModal = () => {
+    if (reviewFeedbackSubmitting) return;
+    setReviewFeedbackMode(null);
   };
 
-  const handleSubmitReject = async () => {
-    if (!task?.id) return;
-    const reason = String(rejectReason || "").trim();
-    if (!reason) return alert("Please provide a rejection reason.");
-    setRejectSubmitting(true);
+  const handleSubmitReviewFeedback = async () => {
+    if (!task?.id || !reviewFeedbackMode) return;
+    // Prefer live textarea value so the note is never lost to a stale render before the click.
+    const text = String(
+      reviewFeedbackTextareaRef.current?.value ?? reviewFeedbackText ?? ""
+    ).trim();
+    if (!text) return alert("Please provide a review note.");
+    setReviewFeedbackSubmitting(true);
     try {
-      const data = await rejectTaskReview(task.id, reason);
+      const data =
+        reviewFeedbackMode === "approve"
+          ? await approveTaskReview(task.id, text)
+          : await rejectTaskReview(task.id, text);
       const updated = data?.task || data;
+      // Sync parent/board category when possible. Approve already moves the task server-side;
+      // updateTaskStatus can fail for reviewers who may move tasks to Done via review API but
+      // not via the generic status endpoint — must not block reloading reviews.
       if (updated && (updateTaskStatus instanceof Function)) {
         const newCategoryId = updated?.category_id ?? updated?.categoryId;
         if (newCategoryId) {
-          await updateTaskStatus(task.id, newCategoryId);
+          try {
+            await updateTaskStatus(task.id, newCategoryId);
+          } catch (syncErr) {
+            console.warn("Board sync after review skipped:", syncErr?.message || syncErr);
+          }
         }
       }
-      // reload reviews
       const revs = await getTaskReviews(task.id);
       setReviews(revs?.reviews || revs || []);
-      setShowRejectModal(false);
+      setReviewFeedbackMode(null);
     } catch (err) {
-      console.error("Reject review failed", err);
-      alert(err?.message || "Unable to reject task review");
+      console.error(`${reviewFeedbackMode === "approve" ? "Approve" : "Reject"} review failed`, err);
+      alert(err?.message || `Unable to ${reviewFeedbackMode === "approve" ? "approve" : "reject"} task review`);
     } finally {
-      setRejectSubmitting(false);
+      setReviewFeedbackSubmitting(false);
     }
   };
 
@@ -1355,19 +1362,23 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
               </button>
               {canReview && (Array.isArray(taskCategories) ? taskCategories.find(c => String(c.id) === String(taskCategoryId) && String((c.name||c.name).toLowerCase()).includes('review')) : false) ? (
                 <div className="tdm-review-actions">
-                  <button type="button" className="tdm-approve-btn" onClick={handleApproveClick}>Approve</button>
-                  <button type="button" className="tdm-reject-btn" onClick={openRejectModal}>Reject</button>
+                  <button type="button" className="tdm-approve-btn" onClick={() => openReviewFeedbackModal("approve")}>Approve</button>
+                  <button type="button" className="tdm-reject-btn" onClick={() => openReviewFeedbackModal("reject")}>Reject</button>
                 </div>
               ) : null}
             </div>
 
-            {/* Rejected label below tags */}
+            {/* Latest review feedback below tags (matches Review History) */}
             {Array.isArray(reviews) && reviews.length > 0 ? (() => {
               const last = reviews[0];
-              if (last && String(last.action).toLowerCase() === "rejected") {
-                return (
-                  <div className="tdm-rejected-label">Rejected: {last.comment}</div>
-                );
+              const action = getReviewEntryAction(last);
+              const note = getReviewEntryComment(last);
+              if (!note) return null;
+              if (action === "rejected") {
+                return <div className="tdm-rejected-label">Rejected: {note}</div>;
+              }
+              if (action === "approved") {
+                return <div className="tdm-approved-label">Approved: {note}</div>;
               }
               return null;
             })() : null}
@@ -1746,24 +1757,48 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
         </div>
       )}
 
-      {showRejectModal && (
-        <div className="tdm-confirm-overlay" role="presentation" onClick={() => setShowRejectModal(false)}>
-          <div className="tdm-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="reject-task-title" onClick={(e) => e.stopPropagation()}>
+      {reviewFeedbackMode && (
+        <div className="tdm-confirm-overlay" role="presentation" onClick={closeReviewFeedbackModal}>
+          <div
+            className="tdm-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-feedback-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="tdm-confirm-title-row">
-              <h3 id="reject-task-title">Reject Task</h3>
+              <h3 id="review-feedback-title">{reviewFeedbackMode === "approve" ? "Approve Task" : "Reject Task"}</h3>
             </div>
-            <p>Please provide a reason for rejecting this task. This will be recorded in the review history.</p>
+            <p>
+              {reviewFeedbackMode === "approve"
+                ? "Add a review note with this approval. It will be recorded in the review history."
+                : "Please provide a reason for rejecting this task. This will be recorded in the review history."}
+            </p>
             <textarea
+              ref={reviewFeedbackTextareaRef}
+              id="tdm-review-feedback-textarea"
               className="tdm-reject-textarea"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Enter rejection reason"
+              value={reviewFeedbackText}
+              onChange={(e) => setReviewFeedbackText(e.target.value)}
+              placeholder={
+                reviewFeedbackMode === "approve" ? "Enter approval note" : "Enter rejection reason"
+              }
               rows={4}
+              autoComplete="off"
             />
 
             <div className="tdm-confirm-actions">
-              <button type="button" className="tdm-confirm-cancel" onClick={() => setShowRejectModal(false)} disabled={rejectSubmitting}>Cancel</button>
-              <button type="button" className="tdm-confirm-delete" onClick={handleSubmitReject} disabled={rejectSubmitting}>{rejectSubmitting ? "Submitting..." : "Reject Task"}</button>
+              <button type="button" className="tdm-confirm-cancel" onClick={closeReviewFeedbackModal} disabled={reviewFeedbackSubmitting}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={reviewFeedbackMode === "approve" ? "tdm-confirm-approve" : "tdm-confirm-delete"}
+                onClick={handleSubmitReviewFeedback}
+                disabled={reviewFeedbackSubmitting}
+              >
+                {reviewFeedbackSubmitting ? "Submitting..." : reviewFeedbackMode === "approve" ? "Approve Task" : "Reject Task"}
+              </button>
             </div>
           </div>
         </div>
@@ -1783,21 +1818,32 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
               <div className="tdm-dropdown-note">No reviews yet.</div>
             ) : (
               <ul className="tdm-review-modal-list">
-                {reviews.map((r) => (
-                  <li key={r.id} className="tdm-review-modal-item">
-                    <div className="tdm-review-modal-header">
-                      <div className="tdm-review-modal-icon">{r.action === 'approved' ? '✔' : '✕'}</div>
-                      <div className="tdm-review-modal-info">
-                        <div className="tdm-review-modal-name">
-                          <strong>{r.reviewerName}</strong>
-                          {r.reviewerRole && <span className="tdm-review-modal-role">{capitalizeFirst(r.reviewerRole)}</span>}
+                {reviews.map((r) => {
+                  const actionNorm = getReviewEntryAction(r);
+                  const commentText = getReviewEntryComment(r);
+                  const isApproved = actionNorm === "approved";
+                  return (
+                    <li key={r.id} className="tdm-review-modal-item">
+                      <div className="tdm-review-modal-header">
+                        <div className="tdm-review-modal-icon">{isApproved ? "✔" : "✕"}</div>
+                        <div className="tdm-review-modal-info">
+                          <div className="tdm-review-modal-name">
+                            <strong>{r.reviewerName}</strong>
+                            {r.reviewerRole && <span className="tdm-review-modal-role">{capitalizeFirst(r.reviewerRole)}</span>}
+                          </div>
                         </div>
+                        <div className="tdm-review-modal-time">{formatTimeAgo(r.createdAt)}</div>
                       </div>
-                      <div className="tdm-review-modal-time">{formatTimeAgo(r.createdAt)}</div>
-                    </div>
-                    {r.comment && <div className="tdm-review-modal-comment">{r.comment}</div>}
-                  </li>
-                ))}
+                      {commentText ? (
+                        <div
+                          className={`tdm-review-modal-comment${isApproved ? " tdm-review-modal-comment--approved" : " tdm-review-modal-comment--rejected"}`}
+                        >
+                          {commentText}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
 

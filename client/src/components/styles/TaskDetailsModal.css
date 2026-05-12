@@ -298,7 +298,8 @@
 }
 
 .tdm-confirm-cancel,
-.tdm-confirm-delete {
+.tdm-confirm-delete,
+.tdm-confirm-approve {
   border-radius: 10px;
   padding: 8px 14px;
   font-size: var(--text-sm);
@@ -323,8 +324,19 @@
   background: #ffd9d6;
 }
 
+.tdm-confirm-approve {
+  background: #dcfae6;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.tdm-confirm-approve:hover:not(:disabled) {
+  background: #bbf7d0;
+}
+
 .tdm-confirm-cancel:disabled,
-.tdm-confirm-delete:disabled {
+.tdm-confirm-delete:disabled,
+.tdm-confirm-approve:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
@@ -544,10 +556,21 @@
   width: 24px;
   height: 24px;
   border-radius: 999px;
+  overflow: hidden;
   background: #dbe9f5;
   color: var(--color-text-primary);
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.tdm-chip-avatar img,
+.tdm-member-avatar img,
+.tdm-comment-avatar img,
+.tdm-reply-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .tdm-members-panel {
@@ -603,6 +626,7 @@
   width: 30px;
   height: 30px;
   border-radius: 999px;
+  overflow: hidden;
   background: linear-gradient(180deg, #e4eef8 0%, #d8e7f5 100%);
   color: var(--color-text-primary);
   font-weight: 700;
@@ -1217,6 +1241,7 @@
   width: 32px;
   height: 32px;
   border-radius: 999px;
+  overflow: hidden;
   background: linear-gradient(180deg, #e4eef8 0%, #d8e7f5 100%);
   color: var(--color-text-primary);
   font-weight: 700;
@@ -1342,6 +1367,7 @@
   width: 26px;
   height: 26px;
   border-radius: 999px;
+  overflow: hidden;
   background: #edf3f9;
   color: var(--color-text-primary);
   font-weight: 700;
@@ -1560,6 +1586,13 @@
   font-weight: 600;
 }
 
+.tdm-approved-label {
+  margin-top: 8px;
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .tdm-review-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .tdm-review-row { display: flex; gap: 10px; align-items: flex-start; border-bottom: 1px solid #f1f7fb; padding-bottom: 8px; }
 .tdm-review-icon { font-size: 1.05rem; flex: 0 0 28px; }
@@ -1657,4 +1690,14 @@
   color: var(--color-text-secondary);
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+.tdm-review-modal-comment--approved {
+  color: #166534;
+  font-weight: 500;
+}
+
+.tdm-review-modal-comment--rejected {
+  color: #b42318;
+  font-weight: 500;
 }

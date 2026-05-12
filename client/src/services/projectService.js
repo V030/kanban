@@ -382,18 +382,22 @@ export async function getTaskReviews(taskId) {
   });
 }
 
-export async function approveTaskReview(taskId) {
+export async function approveTaskReview(taskId, reason) {
   if (!taskId) throw new Error("taskId is required");
+  const trimmed = String(reason ?? "").trim();
+  // Keep `review` canonical while preserving `reason` compatibility on older handlers.
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/review/approve`, {
     method: "POST",
+    body: JSON.stringify({ review: trimmed, reason: trimmed }),
   });
 }
 
 export async function rejectTaskReview(taskId, reason) {
   if (!taskId) throw new Error("taskId is required");
   if (!reason || String(reason).trim() === "") throw new Error("reason is required");
+  const trimmed = String(reason).trim();
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/review/reject`, {
     method: "POST",
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({ review: trimmed, reason: trimmed }),
   });
 }

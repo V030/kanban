@@ -557,13 +557,32 @@ export async function getTaskReviews(req, res) {
   }
 }
 
+function getReviewTextFromBody(body) {
+  const payload = body || {};
+  return payload.review ?? payload.reason ?? payload.comment ?? payload.note ?? payload.message;
+}
+
 export async function approveTaskReview(req, res) {
   if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
   const { taskId } = req.params;
+  const body = req.body || {};
+  const reviewRaw = getReviewTextFromBody(body);
   if (!taskId) return res.status(400).json({ message: "taskId parameter is required" });
 
+  if (reviewRaw == null && Object.keys(body).length === 0) {
+    console.warn(
+      "[approveTaskReview] req.body is empty — JSON body may not have been parsed (check Content-Type / fetch client)."
+    );
+  }
+
   try {
-    const updated = await approveTaskReviewModel({ taskId, reviewerId: req.user.userId });
+    const comment =
+      reviewRaw != null && String(reviewRaw).trim() !== "" ? String(reviewRaw).trim() : undefined;
+    const updated = await approveTaskReviewModel({
+      taskId,
+      reviewerId: req.user.userId,
+      comment,
+    });
     return res.status(200).json({ message: "Task approved and moved to Done", task: updated });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER" || error?.code === "CATEGORY_NOT_FOUND") {
@@ -584,13 +603,13 @@ export async function approveTaskReview(req, res) {
 export async function rejectTaskReview(req, res) {
   if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
   const { taskId } = req.params;
-  const { reason } = req.body || {};
+  const reviewRaw = getReviewTextFromBody(req.body || {});
 
   if (!taskId) return res.status(400).json({ message: "taskId parameter is required" });
-  if (!reason || String(reason).trim() === "") return res.status(400).json({ message: "Rejection reason is required" });
+  if (!reviewRaw || String(reviewRaw).trim() === "") return res.status(400).json({ message: "Rejection reason is required" });
 
   try {
-    const updated = await rejectTaskReviewModel({ taskId, reviewerId: req.user.userId, comment: reason });
+    const updated = await rejectTaskReviewModel({ taskId, reviewerId: req.user.userId, comment: reviewRaw });
     return res.status(200).json({ message: "Task rejected and moved to TODO", task: updated });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER" || error?.code === "INVALID_COMMENT" || error?.code === "CATEGORY_NOT_FOUND") {

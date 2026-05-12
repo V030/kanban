@@ -80,6 +80,7 @@
   width: 42px;
   height: 42px;
   border-radius: var(--radius-full);
+  overflow: hidden;
   background: linear-gradient(140deg, #1496a8 0%, #0f7f8f 100%);
   color: var(--color-bg-surface);
   border: 1px solid rgba(15, 127, 143, 0.18);
@@ -88,6 +89,13 @@
   justify-content: center;
   font-size: var(--text-sm);
   font-weight: 700;
+}
+
+.friends-page .friends-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .friends-page .friends-meta {
