@@ -569,15 +569,13 @@ export async function approveTaskReview(req, res) {
   const reviewRaw = getReviewTextFromBody(body);
   if (!taskId) return res.status(400).json({ message: "taskId parameter is required" });
 
-  if (reviewRaw == null && Object.keys(body).length === 0) {
-    console.warn(
-      "[approveTaskReview] req.body is empty — JSON body may not have been parsed (check Content-Type / fetch client)."
-    );
+  // Require a review note for approval (same as rejection requires a reason)
+  if (!reviewRaw || String(reviewRaw).trim() === "") {
+    return res.status(400).json({ message: "Approval review note is required" });
   }
 
   try {
-    const comment =
-      reviewRaw != null && String(reviewRaw).trim() !== "" ? String(reviewRaw).trim() : undefined;
+    const comment = String(reviewRaw).trim();
     const updated = await approveTaskReviewModel({
       taskId,
       reviewerId: req.user.userId,

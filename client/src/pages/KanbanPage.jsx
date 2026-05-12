@@ -632,7 +632,7 @@ function KanbanPage() {
 			// Dragging into Done from a review column must use the review approve API so a `reviews` row
 			// is written (same as Task Details → Approve). Plain updateTaskStatus never inserts reviews.
 			if (targetCategoryName === "done" && fromReviewColumn) {
-				await approveTaskReview(taskId, "");
+				await approveTaskReview(taskId, "Approved via drag");
 			} else {
 				await updateTaskStatus(taskId, column.id);
 			}

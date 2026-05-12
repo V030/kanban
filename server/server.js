@@ -2,6 +2,8 @@ import expressPkg from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { pool } from "./config/db.js";
+import { rateLimitTrustProxy } from "./config/rateLimitConfig.js";
+import { generalApiLimiter } from "./middleware/rateLimiter.js";
 import authRoutes from "./routes/authRoutes.js"; 
 import protectedRoutes from "./routes/protectedRoutes.js"; 
 
@@ -10,12 +12,24 @@ dotenv.config();
 const express = expressPkg;
 const app = express();
 
+app.set("trust proxy", rateLimitTrustProxy);
+
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-app.use("/auth", authRoutes);
-app.use("/api/protected", protectedRoutes);
+// Debug middleware for review endpoints
+app.use((req, res, next) => {
+  if (req.path.includes("/review/approve") || req.path.includes("/review/reject")) {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log("Body:", JSON.stringify(req.body));
+    console.log("Headers:", JSON.stringify(req.headers));
+  }
+  next();
+});
+
+app.use("/auth", generalApiLimiter, authRoutes);
+app.use("/api/protected", generalApiLimiter, protectedRoutes);
 
 app.get("/", (req, res) => {
 //   res.send("API running");

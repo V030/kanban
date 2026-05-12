@@ -468,14 +468,13 @@ async function insertReviewRow(executor, { taskId, reviewerId, action, comment }
     throw error;
   }
 
-  if (normalizedAction === "rejected" && !normalizedCommentInput) {
-    const error = new Error("Rejection reason is required");
+  if (!normalizedCommentInput) {
+    const error = new Error("Review comment is required");
     error.code = "INVALID_COMMENT";
     throw error;
   }
 
-  // Keep approved reviews non-null for easier filtering/history and parity in UI expectations.
-  const normalizedComment = normalizedAction === "approved" ? (normalizedCommentInput || "Approved") : normalizedCommentInput;
+  const normalizedComment = normalizedCommentInput;
 
   const result = await executor(
     `

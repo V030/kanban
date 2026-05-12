@@ -1,11 +1,12 @@
 import express from "express";
 import { pool } from "../config/db.js";
 import { authenticateToken, authorizeRole } from "../middleware/authMiddleware.js";
+import { authenticatedLimiter } from "../middleware/rateLimiter.js";
 import { changePasswordController, updateProfileController } from "../controllers/authController.js";
 
 const router = express.Router();
 
-router.get("/profile", authenticateToken, async (req, res) => {
+router.get("/profile", authenticateToken, authenticatedLimiter, async (req, res) => {
     try {
         const userId = req.user.userId;
 
@@ -38,8 +39,8 @@ router.get("/profile", authenticateToken, async (req, res) => {
     }
 });
 
-router.post("/change-password", authenticateToken, changePasswordController);
+router.post("/change-password", authenticateToken, authenticatedLimiter, changePasswordController);
 
-router.put("/profile", authenticateToken, updateProfileController);
+router.put("/profile", authenticateToken, authenticatedLimiter, updateProfileController);
 
 export default router;
