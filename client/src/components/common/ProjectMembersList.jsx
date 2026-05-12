@@ -17,6 +17,18 @@ function getRoleClassName(role) {
   }
 }
 
+function getProfileImageSrc(member) {
+  return normalizeProfileImage(
+    member?.profileImageBase64 ||
+    member?.profile_image_base64 ||
+    member?.avatar ||
+    member?.avatarUrl ||
+    member?.imageUrl ||
+    member?.profileImage ||
+    null
+  );
+}
+
 export default function ProjectMembersList({
   members = [],
   loading = false,
@@ -60,7 +72,7 @@ export default function ProjectMembersList({
                 <div className="pm-info">
                   <div className="pm-avatar">
                     {(() => {
-                      const src = normalizeProfileImage(member?.profileImageBase64 || member?.profile_image_base64);
+                      const src = getProfileImageSrc(member);
                       return src ? <img src={src} alt={getMemberName(member)} /> : <div className="pm-initials">{(member.firstName||'').charAt(0).toUpperCase() + (member.lastName||'').charAt(0).toUpperCase()}</div>;
                     })()}
                   </div>

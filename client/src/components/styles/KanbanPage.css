@@ -181,6 +181,7 @@
 .kanban-icon-btn svg {
   width: 22px;
   height: 22px;
+  fill: currentColor;
 }
 
 .permission-summary {

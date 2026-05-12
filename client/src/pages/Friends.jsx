@@ -27,6 +27,7 @@ function Friends() {
         initials: `${(friend.firstName || "").charAt(0)}${(friend.lastName || "").charAt(0)}`.toUpperCase(),
         name: `${friend.firstName || ""} ${friend.lastName || ""}`.trim(),
         email: friend.email,
+        profileImageBase64: friend.profileImageBase64 || friend.profile_image_base64 || null,
       }));
       setFriends(mappedFriends);
     } catch (err) {

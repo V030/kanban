@@ -70,8 +70,9 @@
   align-items: center;
   justify-content: center;
   margin-right: 10px;
-  background: linear-gradient(180deg, #eef7ff 0%, #e6f0fa 100%);
-  border: 1px solid #d7eafc;
+  background: linear-gradient(140deg, #1496a8 0%, #0f7f8f 100%);
+  color: #ffffff;
+  border: 1px solid rgba(15, 127, 143, 0.18);
   flex: 0 0 36px;
 }
 
@@ -84,7 +85,7 @@
 
 .pm-initials {
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: #ffffff;
 }
 
 .pm-name {

@@ -426,7 +426,6 @@
   border: 1px solid #cbd5e1;
   border-radius: var(--tf-radius-pill);
   background: var(--tf-bg-card);
-  background-color: red;
   color: var(--tf-text-dark);
   font-size: 0.7rem;
   font-weight: 700;

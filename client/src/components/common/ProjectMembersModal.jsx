@@ -6,6 +6,18 @@ import { getFriends } from "../../services/friendService";
 import { inviteMemberToProject } from "../../services/projectService";
 import { useState, useEffect } from "react";
 
+function getProfileImageSrc(user) {
+  return normalizeProfileImage(
+    user?.profileImageBase64 ||
+    user?.profile_image_base64 ||
+    user?.avatar ||
+    user?.avatarUrl ||
+    user?.imageUrl ||
+    user?.profileImage ||
+    null
+  );
+}
+
 export default function ProjectMembersModal({
   isOpen,
   onClose,
@@ -190,8 +202,12 @@ export default function ProjectMembersModal({
                     <div key={f.id} className="friend-item">
                           <div className="friend-item-main">
                             {(() => {
-                              const src = normalizeProfileImage(f?.profileImageBase64 || f?.profile_image_base64);
-                              return src ? <div className="friend-avatar"><img src={src} alt={`${f.firstName || ''} ${f.lastName || ''}`.trim() || f.email} /></div> : <div className="friend-initials">{((f.firstName||'').charAt(0) + (f.lastName||'').charAt(0)).toUpperCase()}</div>;
+                              const src = getProfileImageSrc(f);
+                              return src ? (
+                                <div className="friend-avatar"><img src={src} alt={`${f.firstName || ''} ${f.lastName || ''}`.trim() || f.email} /></div>
+                              ) : (
+                                <div className="friend-initials">{((f.firstName||'').charAt(0) + (f.lastName||'').charAt(0)).toUpperCase()}</div>
+                              );
                             })()}
                             <div className="friend-meta">
                               <div className="friend-name">{`${f.firstName || ''} ${f.lastName || ''}`.trim() || f.email}</div>

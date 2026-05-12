@@ -9,6 +9,7 @@ import "../components/styles/KanbanPage.css";
 import "../components/styles/ColumnsReorderModal.css";
 import { getCurrentUser } from "../services/authService";
 import { getProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
+import normalizeProfileImage from "../utils/normalizeProfileImage";
 
 const DEFAULT_TASK_PERMISSIONS = {
 	allow_member_create_task: false,
@@ -42,6 +43,18 @@ function getInitials(user) {
 	const parts = name.split(/\s+/).filter(Boolean);
 	const initials = parts.slice(0, 2).map((part) => part.charAt(0)).join("");
 	return (initials || "?").toUpperCase();
+}
+
+function getProfileImageSrc(user) {
+	return normalizeProfileImage(
+		user?.profileImageBase64 ||
+		user?.profile_image_base64 ||
+		user?.avatar ||
+		user?.avatarUrl ||
+		user?.imageUrl ||
+		user?.profileImage ||
+		null
+	);
 }
 
 function formatDateShort(value) {
@@ -157,6 +170,15 @@ function KanbanPage() {
 					tasks: category.tasks || [],
 			  }))
 			: demoColumns;
+
+	const { columnCount, taskCount } = useMemo(() => {
+		const countColumns = columnsForBoard.length;
+		const countTasks = columnsForBoard.reduce(
+			(total, column) => total + (Array.isArray(column.tasks) ? column.tasks.length : 0),
+			0
+		);
+		return { columnCount: countColumns, taskCount: countTasks };
+	}, [columnsForBoard]);
 
 	const loadTaskCategories = useCallback(async () => {
 		if (!project?.id) return;
@@ -494,25 +516,47 @@ function KanbanPage() {
 		[localTaskAssignees]
 	);
 
+	const getTaskAssignedMembers = useCallback(
+		(task) => {
+			if (!task?.id) return [];
+
+			const merged = [];
+			const localAssignee = localTaskAssignees[task.id];
+			if (localAssignee) merged.push(localAssignee);
+
+			if (Array.isArray(task.assignees)) {
+				merged.push(...task.assignees);
+			} else if (task.assignee) {
+				merged.push(task.assignee);
+			}
+
+			return merged.filter(Boolean).filter((member, index, list) => {
+				const memberId = String(member?.id || member?.userId || member?.user_id || "");
+				return memberId && list.findIndex((item) => String(item?.id || item?.userId || item?.user_id || "") === memberId) === index;
+			});
+		},
+		[localTaskAssignees]
+	);
+
 	const isTaskAssignedToMe = useCallback(
 		(task) => {
 			if (!task) return false;
-			if (isAdminOrOwner) return true;
 
 			const assignee = getTaskAssignee(task);
+			const assignedMembers = getTaskAssignedMembers(task);
 			return (
-				(task.assignees && task.assignees.some((a) => a?.id === currentUser?.id)) ||
+				assignedMembers.some((a) => String(a?.id || a?.userId || a?.user_id || "") === String(currentUser?.id || "")) ||
 				(assignee && assignee.id === currentUser?.id)
 			);
 		},
-		[getTaskAssignee, currentUser?.id, isAdminOrOwner]
+		[getTaskAssignee, getTaskAssignedMembers, currentUser?.id]
 	);
 
 	const handleTakeTask = useCallback(
 		async (task) => {
 			if (!task?.id || !currentUser) return;
 			if (!canTakeTask) return;
-			if (getTaskAssignee(task)) return;
+			if (isTaskAssignedToMe(task)) return;
 			if (pendingTaskActions[String(task.id)]) return;
 			const taskId = task.id;
 			const previousAssignee = localTaskAssignees[taskId];
@@ -548,7 +592,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[currentUser, canTakeTask, getTaskAssignee, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending]
+		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending]
 	);
 
 	const handleTaskDrop = async (taskId, column) => {
@@ -813,6 +857,10 @@ function KanbanPage() {
 		<section className="page-shell kanban-page">
 			<div className="kanban-header">
 				<div className="kanban-title">
+					<div className="kanban-project-meta">
+						<span className="kanban-project-tag">Active Project</span>
+						<span className="kanban-project-summary">{columnCount} columns - {taskCount} tasks</span>
+					</div>
 					<div className="kanban-title-row">
 						<h1
 							ref={projectNameRef}
@@ -900,19 +948,49 @@ function KanbanPage() {
 					</div>
 					{projectDescError && <p className="error-message">{projectDescError}</p>}
 				</div>
-			</div>
 
-			<div className="kanban-actions">
-					<button className="btn btn-secondary" onClick={() => setMembersOpen(true)}>
-						Project Members
+				<div className="kanban-actions">
+					<button
+						className="kanban-icon-btn"
+						onClick={() => setMembersOpen(true)}
+						title="Project Members"
+						aria-label="Project Members"
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+						</svg>
 					</button>
-					<button className="btn btn-secondary" onClick={() => setSettingsOpen(true)}>
-						Project Settings
+					<button
+						className="kanban-icon-btn"
+						onClick={() => setSettingsOpen(true)}
+						title="Project Settings"
+						aria-label="Project Settings"
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<path d="M19.14 12.94a7.14 7.14 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.44 7.44 0 0 0-1.63-.95l-.36-2.53a.5.5 0 0 0-.49-.41h-3.84a.5.5 0 0 0-.49.41l-.36 2.53a7.44 7.44 0 0 0-1.63.95l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.14 7.14 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96a7.44 7.44 0 0 0 1.63.95l.36 2.53a.5.5 0 0 0 .49.41h3.84a.5.5 0 0 0 .49-.41l.36-2.53a7.44 7.44 0 0 0 1.63-.95l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64ZM12 15.2a3.2 3.2 0 1 1 3.2-3.2 3.2 3.2 0 0 1-3.2 3.2z" />
+						</svg>
 					</button>
-					<button className="btn btn-secondary" onClick={() => navigate('/main-page/metrics', { state: { project } })}>
-						Metrics
+					<button
+						className="kanban-icon-btn"
+						onClick={() => navigate("/main-page/metrics", { state: { project } })}
+						title="Metrics"
+						aria-label="Metrics"
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<path d="M10 20h4V4h-4v16zM4 20h4V10H4v10zm12 0h4V14h-4v6z" />
+						</svg>
 					</button>
-					<button className="btn btn-primary" onClick={openReorder}>Organize Columns</button>
+					<button
+						className="kanban-icon-btn"
+						onClick={openReorder}
+						title="Organize Columns"
+						aria-label="Organize Columns"
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
+						</svg>
+					</button>
+				</div>
 			</div>
 			{settingsError && <p className="error-message">{settingsError}</p>}
 
@@ -944,13 +1022,11 @@ function KanbanPage() {
 						setAddTaskOpen(true);
 					}}
 					renderTask={(task, column) => {
-						const assignee = getTaskAssignee(task);
-						const isUnassigned = !assignee;
 						const isAssignedToMe = isTaskAssignedToMe(task);
 						const columnName = String(column?.title || "").toLowerCase();
 						const isToReview = columnName === "to_review" || columnName === "to review";
 						const isDone = columnName === "done";
-						const showTakeTask = canTakeTask && isUnassigned && !isDone;
+							const showTakeTask = canTakeTask && !isAssignedToMe && !isDone;
 						const showUnassignTask = canTakeTask && isAssignedToMe && !isDone && !isToReview;
 						const showRemoveTask = isDone && isAdminOrOwner;
 						const pendingAction = pendingTaskActions[String(task?.id)] || (task?.isPending ? "create" : "");
@@ -974,12 +1050,12 @@ function KanbanPage() {
 						const showTaskAction = showTakeTask || showUnassignTask || showRemoveTask || isPending;
 						const actionLabel = isPending ? pendingLabel : (showUnassignTask ? "Unassign" : "Take Task");
 						const creatorName = `${task.creator?.firstName || task.createdBy?.firstName || task.creator?.first_name || task.createdBy?.first_name || ""} ${task.creator?.lastName || task.createdBy?.lastName || task.creator?.last_name || task.createdBy?.last_name || ""}`.trim();
-						const assignedMembers = Array.isArray(task.assignees) && task.assignees.length > 0 ? task.assignees : assignee ? [assignee] : [];
+							const assignedMembers = getTaskAssignedMembers(task);
 
 						return (
 							<>
-								<div className="kb-task-card-inner">
-									<div className="kb-task-card-topline">
+								<div className="tf-task-card-inner">
+									<div className="tf-task-card-topline">
 										{(() => {
 											const pr = String(task?.priority || "").toLowerCase();
 												const normalized = pr.replace(/_priority$/i, "").replace(/\s+/g, "_");
@@ -990,27 +1066,27 @@ function KanbanPage() {
 														.replace(/_/g, " ")
 														.replace(/\b\w/g, (c) => c.toUpperCase());
 											return (
-												<span className="kb-priority-line">
-													<span className="kb-priority-prefix">Priority •</span>{" "}
-													<span className={`kb-priority-pill kb-priority-${pillClass}`}>{label}</span>
+											<span className="tf-priority-line">
+												<span className="tf-priority-prefix">Priority •</span>{" "}
+												<span className={`tf-priority-pill tf-priority-${pillClass}`}>{label}</span>
 												</span>
 											);
 										})()}
 									</div>
 
-									<h4 className="kb-task-title">{task.title}</h4>
-									{isPending && <p className="kb-task-pending">{pendingLabel}</p>}
-									{task.description && <p className="kb-task-desc">{task.description}</p>}
+								<h4 className="tf-task-title">{task.title}</h4>
+								{isPending && <p className="tf-task-pending">{pendingLabel}</p>}
+								{task.description && <p className="tf-task-desc">{task.description}</p>}
 										
 									{creatorName && (
-										<p className="kb-task-meta">
-											Created by: <strong className="kb-task-meta-name">{creatorName}</strong>
+										<p className="tf-task-meta">
+											Created by: <strong className="tf-task-meta-name">{creatorName}</strong>
 										</p>
 									)}
 
 									{(task.targetDate || task.target_date) && (
-										<p className="kb-task-meta">
-											Target: <span className={`kb-task-meta-name tdm-target-value${(task.isPastDue || task.is_past_due) ? " is-overdue" : ""}`}>
+										<p className="tf-task-meta">
+											Target: <span className={`tf-task-meta-name tdm-target-value${(task.isPastDue || task.is_past_due) ? " is-overdue" : ""}`}>
 												{formatDateShort(task.targetDate || task.target_date)}
 											</span>
 											{(task.isPastDue || task.is_past_due) ? (
@@ -1019,20 +1095,24 @@ function KanbanPage() {
 										</p>
 									)}
 
-									<div className="kb-task-divider" />
+									<div className="tf-task-divider" />
 
-									<div className="kb-task-footer-row">
-										<div className="kb-task-assignee-block">
-											<span className="kb-task-assignee-label">Assigned:</span>
-											<div className="kb-task-avatar-row">
+									<div className="tf-task-footer-row">
+										<div className="tf-task-assignee-block">
+											<span className="tf-task-assignee-label">Assigned:</span>
+											<div className="tf-task-avatar-row">
 												{assignedMembers.length > 0 ? (
 													assignedMembers.slice(0, 3).map((member, idx) => (
-														<span key={member?.id ?? idx} className="kb-task-avatar" title={getDisplayName(member)}>
-															{getInitials(member)}
+														<span key={member?.id ?? idx} className="tf-task-avatar" title={getDisplayName(member)}>
+															{getProfileImageSrc(member) ? (
+																<img src={getProfileImageSrc(member)} alt={getDisplayName(member)} />
+															) : (
+																getInitials(member)
+															)}
 														</span>
 													))
 												) : (
-													<span className="kb-task-unassigned">None</span>
+													<span className="tf-task-unassigned">None</span>
 												)}
 											</div>
 										</div>
@@ -1040,7 +1120,7 @@ function KanbanPage() {
 										{(showRemoveTask || showTakeTask || showUnassignTask) && (
 											<button
 												type="button"
-												className={`kb-task-action${(showUnassignTask || showRemoveTask) ? " kb-task-action--unassign" : " kb-task-action--take"}`}
+												className={`tf-task-action${(showUnassignTask || showRemoveTask) ? " tf-task-action--unassign" : " tf-task-action--take"}`}
 												onClick={(event) => {
 													event.stopPropagation();
 													if (isPending) return;
@@ -1064,8 +1144,8 @@ function KanbanPage() {
 									</div>
 								</div>
 
-								{isUnassigned && !showTaskAction && projectRole === "member" && (
-									<p className="kb-task-helper">Take Task is hidden in strict mode.</p>
+								{!showTaskAction && projectRole === "member" && (
+									<p className="tf-task-helper">Take Task is hidden in strict mode.</p>
 								)}
 							</>
 						);

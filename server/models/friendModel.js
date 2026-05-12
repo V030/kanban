@@ -129,7 +129,8 @@ export async function getFriends(userId) {
 			u.id,
 			u.first_name,
 			u.last_name,
-			u.email
+			u.email,
+			u.profile_image_base64
 		FROM friends f
 		JOIN users u
 			ON u.id = CASE
@@ -147,6 +148,7 @@ export async function getFriends(userId) {
 		firstName: row.first_name,
 		lastName: row.last_name,
 		email: row.email,
+		profileImageBase64: row.profile_image_base64,
 		friendshipId: row.friendship_id,
 		friendsSince: row.friends_since,
 	}));
@@ -165,6 +167,7 @@ export async function getSentFriendRequests(userId) {
 			fr.created_at,
 			recipient.first_name AS recipient_first_name,
 			recipient.last_name AS recipient_last_name,
+			recipient.profile_image_base64 AS recipient_profile_image_base64,
 			recipient.email AS recipient_email
 			FROM friend_requests fr
 			JOIN users recipient 
@@ -182,6 +185,7 @@ export async function getSentFriendRequests(userId) {
 		first_name: row.recipient_first_name,
 		last_name: row.recipient_last_name,
 		email: row.recipient_email,
+		profileImageBase64: row.recipient_profile_image_base64,
 		status: row.status,
 		createdAt: row.created_at,
 	}));
@@ -196,6 +200,7 @@ export async function getIncomingFriendRequests(userId) {
 			fr.created_at,
 			requester.first_name AS requester_first_name,
 			requester.last_name AS requester_last_name,
+			requester.profile_image_base64 AS requester_profile_image_base64,
 			requester.email AS requester_email
 			FROM friend_requests fr
 			JOIN users requester 
@@ -213,6 +218,7 @@ export async function getIncomingFriendRequests(userId) {
 		first_name: row.requester_first_name,
 		last_name: row.requester_last_name,
 		email: row.requester_email,
+		profileImageBase64: row.requester_profile_image_base64,
 		status: row.status,
 		createdAt: row.created_at,
 	}));

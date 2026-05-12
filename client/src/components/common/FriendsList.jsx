@@ -1,4 +1,11 @@
 import React from "react";
+import normalizeProfileImage from "../../utils/normalizeProfileImage";
+
+function getFriendDisplayInitials(friend) {
+  const first = friend?.firstName || friend?.first_name || friend?.name?.split?.(" ")?.[0] || "";
+  const last = friend?.lastName || friend?.last_name || friend?.name?.split?.(" ")?.[1] || "";
+  return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || (friend?.initials || "U");
+}
 
 function FriendsList({ friends = [] }) {
   if (friends.length === 0) {
@@ -10,7 +17,23 @@ function FriendsList({ friends = [] }) {
       {friends.map((friend) => (
         <div key={friend.id} className="friends-row friends-row-actions">
           <div className="friends-row-main">
-            <div className="friends-avatar">{friend.initials}</div>
+            {(() => {
+              const src = normalizeProfileImage(
+                friend?.profileImageBase64 ||
+                friend?.profile_image_base64 ||
+                friend?.avatar ||
+                friend?.avatarUrl ||
+                friend?.imageUrl ||
+                friend?.profileImage ||
+                null
+              );
+
+              return src ? (
+                <div className="friends-avatar"><img src={src} alt={friend.name || friend.email || "Profile"} /></div>
+              ) : (
+                <div className="friends-avatar">{friend.initials || getFriendDisplayInitials(friend)}</div>
+              );
+            })()}
             <div className="friends-meta">
               <p className="friends-name">{friend.name}</p>
               <p className="friends-email">{friend.email}</p>
