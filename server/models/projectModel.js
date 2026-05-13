@@ -1085,6 +1085,8 @@ export async function getProjectSettings({ projectId, requesterId }) {
       allow_member_delete_task: true,
       allow_member_add_board: true,
       allow_member_add_member: true,
+      allow_member_review: false,
+      allow_member_move_task_to_done: false,
       allow_assign_task_to_member: false,
       allow_admin_add_member: true,
       allow_admin_remove_member: true,
@@ -1121,6 +1123,8 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
     "allow_member_delete_task",
     "allow_member_add_board",
     "allow_member_add_member",
+    "allow_member_review",
+    "allow_member_move_task_to_done",
     "allow_assign_task_to_member",
     "allow_admin_add_member",
     "allow_admin_remove_member",
@@ -1137,6 +1141,8 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
     allow_member_delete_task: true,
     allow_member_add_board: true,
     allow_member_add_member: true,
+    allow_member_review: false,
+    allow_member_move_task_to_done: false,
     allow_assign_task_to_member: false,
     allow_admin_add_member: true,
     allow_admin_remove_member: true,
@@ -1158,11 +1164,13 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
     throw error;
   }
 
-  if (Object.prototype.hasOwnProperty.call(settingDefaults, setting)) {
+  // Ensure all expected settings columns exist so the RETURNING clause won't fail
+  for (const key of Object.keys(settingDefaults)) {
+    const defaultVal = settingDefaults[key] ? "true" : "false";
     await pool.query(
       `
       ALTER TABLE IF EXISTS project_settings
-      ADD COLUMN IF NOT EXISTS ${setting} boolean NOT NULL DEFAULT ${settingDefaults[setting] ? "true" : "false"}
+      ADD COLUMN IF NOT EXISTS ${key} boolean NOT NULL DEFAULT ${defaultVal}
       `
     );
   }
@@ -1199,6 +1207,8 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
       allow_member_delete_task,
       allow_member_add_board,
       allow_member_add_member,
+      allow_member_review,
+      allow_member_move_task_to_done,
       allow_assign_task_to_member,
       allow_admin_add_member,
       allow_admin_remove_member,
@@ -2439,7 +2449,7 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
 
   const taskResult = await pool.query(
     `
-    SELECT t.id, t.category_id, tc.project_id
+    SELECT t.id, t.category_id, tc.project_id, tc.name AS category_name
     FROM tasks t
     JOIN tasks_categories tc ON tc.id = t.category_id
     WHERE t.id = $1
@@ -2455,8 +2465,16 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
     throw error;
   }
 
+  // Prevent tasks in Done from being moved to another column
+  const currentCategoryName = String(taskRow.category_name || "").trim().toLowerCase();
+  if (currentCategoryName === "done") {
+    const error = new Error("Tasks in Done cannot be moved to another status");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
   const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedUserId });
-  if (!access.isOwner && !access.isAdmin && !access.isAssignee) {
+  if (!access.isOwner && !access.isAdmin && !access.isManager && !access.isAssignee) {
     const error = new Error("Forbidden: only assigned users can move this task");
     error.code = "TASK_FORBIDDEN";
     throw error;
@@ -2483,10 +2501,13 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
   const targetCategoryName = String(targetCategory.name || "").trim().toLowerCase();
   const isDoneCategory = targetCategoryName === "done";
 
-  if (isDoneCategory && !access.isOwner && !access.isAdmin) {
-    const error = new Error("Forbidden: only admins and project owners can move tasks to Done");
-    error.code = "TASK_FORBIDDEN";
-    throw error;
+  if (isDoneCategory && !access.isOwner && !access.isAdmin && !access.isManager) {
+    const canMoveAssignedTaskToDone = access.isAssignee && access.settings && access.settings.allow_member_move_task_to_done === true;
+    if (!canMoveAssignedTaskToDone) {
+      const error = new Error("Forbidden: moving assigned tasks to Done is disabled for members in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
   }
 
   const movedTaskResult = await pool.query(

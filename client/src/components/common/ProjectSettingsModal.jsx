@@ -1,4 +1,5 @@
 import "../styles/ProjectSettingsModal.css";
+import "../styles/SkeletonLoading.css";
 
 function ToggleRow({ id, label, description, checked, onChange, disabled = false, pending = false }) {
   return (
@@ -194,6 +195,26 @@ export default function ProjectSettingsModal({
           />
 
           <ToggleRow
+            id="allow-member-review"
+            label="Review tasks"
+            description="Allow project members to approve or reject tasks in review."
+            checked={settings.allow_member_review}
+            onChange={(nextValue) => onSettingChange("allow_member_review", nextValue)}
+            disabled={!canEditPermissions}
+            pending={!!pendingSettings.allow_member_review}
+          />
+
+          <ToggleRow
+            id="allow-member-move-task-to-done"
+            label="Move assigned tasks to Done"
+            description="Allow an assignee to mark their own task as Done."
+            checked={settings.allow_member_move_task_to_done}
+            onChange={(nextValue) => onSettingChange("allow_member_move_task_to_done", nextValue)}
+            disabled={!canEditPermissions}
+            pending={!!pendingSettings.allow_member_move_task_to_done}
+          />
+
+          <ToggleRow
             id="allow-assign-task-to-member"
             label="Allow members to assign task to others"
             description="This allows the project members to assign task to other members in this project."
@@ -204,7 +225,7 @@ export default function ProjectSettingsModal({
           />
 
           <p className="ps-member-note">
-            Members can create tags only when they created the task or are assigned to it. Admins and owners can create tags normally.
+            Members can create tags only when they created the task or are assigned to it. Review and Done actions are controlled separately. Admins and owners can create tags normally.
           </p>
         </section>
 

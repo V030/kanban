@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "../../services/authService";
 import { getTaskReviews, approveTaskReview, rejectTaskReview } from "../../services/projectService";
+import { SkeletonCommentInline } from "./SkeletonComponents";
 import "../styles/TaskDetailsModal.css";
+import "../styles/SkeletonLoading.css";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
 
 
@@ -124,7 +126,7 @@ function normalizeTaskPriority(value) {
   return "unset";
 }
 
-export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
+export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersReviewTasks = false, canMembersMoveTaskToDone = false, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
   const taskData = task || {};
   const currentUser = useMemo(() => getCurrentUser(), []);
   const currentUserIdValue = currentUserId || currentUser?.id || "";
@@ -192,7 +194,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     if (!currentUserIdValue) return false;
     return assignees.some((member) => String(member?.id || member?.user_id || "") === String(currentUserIdValue));
   }, [assignees, currentUserIdValue]);
-  const canChangeTaskCategory = isAdminOrOwner || isCurrentUserAssigned;
   const canEditTaskTitle = useMemo(() => {
     if (!currentUserIdValue) return false;
     const creatorId = taskData?.createdBy || taskData?.created_by;
@@ -205,7 +206,8 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   }, [projectMembers, currentUserIdValue]);
 
   const currentUserRole = String(currentMemberEntry?.role || "").toLowerCase();
-  const canReview = isAdminOrOwner || currentUserRole === "manager";
+  const canReview = isAdminOrOwner || currentUserRole === "manager" || (currentUserRole === "member" && canMembersReviewTasks);
+  const canChangeTaskCategory = isAdminOrOwner || currentUserRole === "manager" || isCurrentUserAssigned;
   const taskTitleRef = useRef(null);
   const taskDescRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -994,7 +996,11 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       {commentsError && <p className="tdm-comment-error">{commentsError}</p>}
 
       {commentsLoading ? (
-        <p>Loading comments...</p>
+        <div className="skeleton-list">
+          <SkeletonCommentInline />
+          <SkeletonCommentInline />
+          <SkeletonCommentInline />
+        </div>
       ) : (
         <ul className="tdm-comment-list tdm-comments-list" aria-label="Comments">
                 {sortedComments.length === 0 ? (
@@ -1206,39 +1212,53 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
                     <div className="dropdown-section">
                       <p className="dropdown-label">Mark as</p>
-                      <select
-                        id={`task-category-${taskData.id || "unknown"}`}
-                        className="tdm-priority-select"
-                        value={taskCategoryId || ""}
-                        onChange={(event) => handleUpdateTaskCategory(event.target.value)}
-                        disabled={taskCategorySubmitting || !canChangeTaskCategory || (Array.isArray(taskCategories) && taskCategories.length === 0)}
-                      >
-                        <option value="" disabled>
-                          Select status
-                        </option>
-                        {(taskCategories || []).map((category) => {
-                          const categoryId = String(category?.id || "");
-                          const categoryName = String(category?.name || "");
-                          const isDoneCategory = categoryName.trim().toLowerCase() === "done";
-                          const disableDoneForMember = isDoneCategory && !isAdminOrOwner;
+                      {(() => {
+                        const currentCategory = (taskCategories || []).find((cat) => String(cat?.id || "") === String(taskCategoryId || ""));
+                        const currentCategoryName = String(currentCategory?.name || "").trim().toLowerCase();
+                        const isTaskInDone = currentCategoryName === "done";
 
-                          return (
-                            <option key={categoryId || categoryName} value={categoryId} disabled={disableDoneForMember}>
-                              {formatCategoryLabel(categoryName)}
-                            </option>
-                          );
-                        })}
-                      </select>
-                      {!canChangeTaskCategory && (
-                        <p className="tdm-dropdown-note">Assigned users only.</p>
-                      )}
-                      {canChangeTaskCategory && !isAdminOrOwner && (
-                        <p className="tdm-dropdown-note">Done is for admins and owners only.</p>
-                      )}
+                        return (
+                          <>
+                            <select
+                              id={`task-category-${taskData.id || "unknown"}`}
+                              className="tdm-priority-select"
+                              value={taskCategoryId || ""}
+                              onChange={(event) => handleUpdateTaskCategory(event.target.value)}
+                              disabled={isTaskInDone || taskCategorySubmitting || !canChangeTaskCategory || (Array.isArray(taskCategories) && taskCategories.length === 0)}
+                            >
+                              <option value="" disabled>
+                                Select status
+                              </option>
+                              {(taskCategories || []).map((category) => {
+                                const categoryId = String(category?.id || "");
+                                const categoryName = String(category?.name || "");
+                                const isDoneCategory = categoryName.trim().toLowerCase() === "done";
+                                const disableDoneForMember = isDoneCategory && !isAdminOrOwner && !(currentUserRole === "manager" || (currentUserRole === "member" && canMembersMoveTaskToDone && isCurrentUserAssigned));
+
+                                return (
+                                  <option key={categoryId || categoryName} value={categoryId} disabled={disableDoneForMember}>
+                                    {formatCategoryLabel(categoryName)}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            {isTaskInDone && (
+                              <p className="tdm-dropdown-note">Tasks in Done cannot be moved to another status.</p>
+                            )}
+                            {!canChangeTaskCategory && (
+                              <p className="tdm-dropdown-note">Assigned users only.</p>
+                            )}
+                            {canChangeTaskCategory && !isAdminOrOwner && (
+                              <p className="tdm-dropdown-note">
+                                Assigned members can move tasks to Done only when project settings allow it.
+                              </p>
+                            )}
+                            {taskCategoryError && <p className="tdm-dropdown-note">Status update failed.</p>}
+                            {taskCategorySubmitting && <p className="tdm-dropdown-note">Updating...</p>}
+                          </>
+                        );
+                      })()}
                     </div>
-
-                    {taskCategoryError && <p className="tdm-dropdown-note">Status update failed.</p>}
-                    {taskCategorySubmitting && <p className="tdm-dropdown-note">Updating...</p>}
 
                                     <div className="dropdown-section">
                                       <p className="dropdown-label">Review History</p>

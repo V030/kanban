@@ -1,7 +1,37 @@
 /* ── Metrics & Analytics Dashboard ─────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 
-@import url('../../DesignSystem.css');
+:root {
+  --font-base: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  --ink-900: #0b1622;
+  --ink-700: #1e293b;
+  --ink-500: #475569;
+  --ink-300: #94a3b8;
+  --ink-100: #e2e8f0;
+  --ink-50:  #f8fafc;
+
+  --brand:       #4f46e5;
+  --brand-soft:  #eef2ff;
+  --brand-muted: #c7d2fe;
+
+  --green:       #10b981;
+  --green-soft:  #ecfdf5;
+  --amber:       #f59e0b;
+  --amber-soft:  #fffbeb;
+  --red:         #ef4444;
+  --red-soft:    #fef2f2;
+
+  --surface: #ffffff;
+  --bg:      #f1f5f9;
+  --border:  #e2e8f0;
+  --shadow:  0 1px 3px rgba(15,23,42,.06), 0 4px 12px rgba(15,23,42,.04);
+  --shadow-lg: 0 4px 24px rgba(15,23,42,.10);
+
+  --radius:    14px;
+  --radius-sm: 8px;
+}
 
 /* ── Page shell ─────────────────────────────────────────────────── */
 .metrics-page {
@@ -544,5 +574,3 @@
   .review-cards { grid-template-columns: 1fr; }
   .donut-wrap { grid-template-columns: 1fr; justify-items: center; }
 }
-
-

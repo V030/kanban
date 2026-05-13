@@ -807,7 +807,8 @@ export async function updateProjectSettings(req, res) {
     if (error?.code === "PROJECT_FORBIDDEN") return res.status(403).json({ message: error.message });
     if (error?.code === "INVALID_PROJECT") return res.status(400).json({ message: error.message });
     if (error?.code === "INVALID_SETTINGS") return res.status(400).json({ message: error.message });
-    return res.status(500).json({ message: "Unable to update project settings" });
+    console.error("Update project settings error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to update project settings" });
   }
 }
 

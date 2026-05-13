@@ -90,6 +90,8 @@ Important columns:
 - allow_member_delete_task
 - allow_member_add_board
 - allow_member_add_member
+- allow_member_review
+- allow_member_move_task_to_done
 - allow_assign_task_to_member
 - allow_admin_add_member
 - allow_admin_remove_member
@@ -101,7 +103,7 @@ Important columns:
 Lifecycle:
 - Seeded on project creation with defaults.
 - Updated one flag at a time.
-- Some permission helpers reference allow_member_review, but the current schema does not define it. That is a documented mismatch.
+- Review and assignee-to-Done permissions are tracked separately so review flow and manual completion can be controlled independently.
 
 Security:
 - These flags directly gate write access.

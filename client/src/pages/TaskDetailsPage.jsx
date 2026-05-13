@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { TaskDetailsContent } from "../components/common/TaskDetailsModal";
+import { SkeletonRow, SkeletonBox } from "../components/common/SkeletonComponents";
 import {
   getProjectMembers,
   getTaskCategories,
@@ -25,6 +26,7 @@ import {
 } from "../services/projectService";
 import { getCurrentUser } from "../services/authService";
 import "../components/styles/TaskDetailsModal.css";
+import "../components/styles/SkeletonLoading.css";
 
 export default function TaskDetailsPage() {
   const location = useLocation();
@@ -36,8 +38,12 @@ export default function TaskDetailsPage() {
   const initialMembers = location.state?.projectMembers || [];
   const hasInitialIsAdmin = Object.prototype.hasOwnProperty.call(location.state || {}, "isAdminOrOwner");
   const hasInitialCanAssign = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersAssignTaskToOthers");
+  const hasInitialCanReview = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersReviewTasks");
+  const hasInitialCanMoveDone = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersMoveTaskToDone");
   const initialIsAdmin = location.state?.isAdminOrOwner || false;
   const initialCanAssign = location.state?.canMembersAssignTaskToOthers || false;
+  const initialCanReview = location.state?.canMembersReviewTasks || false;
+  const initialCanMoveDone = location.state?.canMembersMoveTaskToDone || false;
 
   const [task, setTask] = useState(initialTask);
   const [project, setProject] = useState(initialProject);
@@ -47,6 +53,8 @@ export default function TaskDetailsPage() {
   const [taskError, setTaskError] = useState("");
   const [isAdminOrOwner, setIsAdminOrOwner] = useState(initialIsAdmin);
   const [canMembersAssignTaskToOthers, setCanMembersAssignTaskToOthers] = useState(initialCanAssign);
+  const [canMembersReviewTasks, setCanMembersReviewTasks] = useState(initialCanReview);
+  const [canMembersMoveTaskToDone, setCanMembersMoveTaskToDone] = useState(initialCanMoveDone);
 
   const currentUser = getCurrentUser();
 
@@ -91,16 +99,30 @@ export default function TaskDetailsPage() {
       try {
         const settings = await getProjectSettings(project.id);
         const nextCanAssign = !!settings?.allow_assign_task_to_member;
+        const nextCanReview = !!settings?.allow_member_review;
+        const nextCanMoveDone = !!settings?.allow_member_move_task_to_done;
         if (!hasInitialCanAssign) {
           setCanMembersAssignTaskToOthers(nextCanAssign);
+        }
+        if (!hasInitialCanReview) {
+          setCanMembersReviewTasks(nextCanReview);
+        }
+        if (!hasInitialCanMoveDone) {
+          setCanMembersMoveTaskToDone(nextCanMoveDone);
         }
       } catch (err) {
         if (!hasInitialCanAssign) {
           setCanMembersAssignTaskToOthers(false);
         }
+        if (!hasInitialCanReview) {
+          setCanMembersReviewTasks(false);
+        }
+        if (!hasInitialCanMoveDone) {
+          setCanMembersMoveTaskToDone(false);
+        }
       }
     })();
-  }, [project?.id, hasInitialCanAssign]);
+  }, [project?.id, hasInitialCanAssign, hasInitialCanMoveDone, hasInitialCanReview]);
 
   const loadTaskById = useCallback(async (id) => {
     setTaskLoading(true);
@@ -220,8 +242,20 @@ export default function TaskDetailsPage() {
     return (
       <div className="page-shell tdm-page-container">
         <div className="tdm-section-card">
-          <h3>{taskLoading ? "Loading task..." : "Task not available"}</h3>
-          <p>{taskError || "Open this page from the board to see task details."}</p>
+          {taskLoading ? (
+            <>
+              <SkeletonBox width="200px" height="24px" />
+              <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+                <SkeletonRow showAvatar={false} lineCount={3} />
+                <SkeletonRow showAvatar={false} lineCount={2} />
+              </div>
+            </>
+          ) : (
+            <>
+              <h3>Task not available</h3>
+              <p>{taskError || "Open this page from the board to see task details."}</p>
+            </>
+          )}
           <div style={{ marginTop: 12 }}>
             <button onClick={() => navigate(-1)} className="tdm-close-action">Back</button>
           </div>
@@ -240,6 +274,8 @@ export default function TaskDetailsPage() {
         projectId={project?.id}
         isAdminOrOwner={isAdminOrOwner}
         canMembersAssignTaskToOthers={canMembersAssignTaskToOthers}
+        canMembersReviewTasks={canMembersReviewTasks}
+        canMembersMoveTaskToDone={canMembersMoveTaskToDone}
         assignMemberToTask={handleAssignMemberToTask}
         unassignMemberFromTask={handleUnassignMemberFromTask}
         createSubtasks={async ({ subtaskData }) => createSubtask(subtaskData)}

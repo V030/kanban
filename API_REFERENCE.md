@@ -251,6 +251,8 @@ Success example:
   "allow_member_delete_task": true,
   "allow_member_add_board": true,
   "allow_member_add_member": true,
+  "allow_member_review": false,
+  "allow_member_move_task_to_done": false,
   "allow_assign_task_to_member": false,
   "allow_admin_add_member": true,
   "allow_admin_remove_member": true,
@@ -263,6 +265,8 @@ Success example:
 
 ### PATCH /auth/project-settings
 Purpose: update one boolean permission at a time.
+
+Common settings include task creation, member invites, review approval, and the assignee-to-Done rule.
 
 Request example:
 ```json
@@ -421,6 +425,8 @@ Success example:
 ### PATCH /auth/project/tasks/:taskId/status
 Purpose: move a task to another column.
 
+Assigned members can move their own task to Done only when allow_member_move_task_to_done is enabled. Managers, admins, and owners keep their existing bypass access.
+
 Request example:
 ```json
 { "categoryId": 2 }
@@ -493,6 +499,8 @@ Success example:
 ### POST /auth/project/tasks/:taskId/review/approve
 Purpose: approve a task and move it to Done.
 
+Requires owner/admin/manager access, or the allow_member_review project setting for regular members.
+
 Request example:
 ```json
 { "review": "Approved after QA pass" }
@@ -505,6 +513,8 @@ Success example:
 
 ### POST /auth/project/tasks/:taskId/review/reject
 Purpose: reject a task and move it back to Todo.
+
+Requires owner/admin/manager access, or the allow_member_review project setting for regular members.
 
 Request example:
 ```json

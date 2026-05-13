@@ -5,10 +5,12 @@ import AddTaskModal from "../components/common/AddTaskModal";
 import ColumnsReorderModal from "../components/common/ColumnsReorderModal";
 import ProjectSettingsModal from "../components/common/ProjectSettingsModal";
 import ProjectMembersModal from "../components/common/ProjectMembersModal";
+import { SkeletonColumn } from "../components/common/SkeletonComponents";
 import "../components/styles/KanbanPage.css";
 import "../components/styles/ColumnsReorderModal.css";
+import "../components/styles/SkeletonLoading.css";
 import { getCurrentUser } from "../services/authService";
-import { getProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, approveTaskReview, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
+import { getProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, approveTaskReview, rejectTaskReview, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
 
 const DEFAULT_TASK_PERMISSIONS = {
@@ -18,6 +20,8 @@ const DEFAULT_TASK_PERMISSIONS = {
 	allow_member_delete_task: false,
 	allow_member_add_board: false,
 	allow_member_add_member: false,
+	allow_member_review: false,
+	allow_member_move_task_to_done: false,
 	allow_assign_task_to_member: false,
 	allow_admin_add_member: true,
 	allow_admin_remove_member: true,
@@ -146,6 +150,9 @@ function KanbanPage() {
 	const [memberActionError, setMemberActionError] = useState("");
 	const [memberActionPending, setMemberActionPending] = useState({});
 	const [deleteProjectPending, setDeleteProjectPending] = useState(false);
+	const [dragReviewModal, setDragReviewModal] = useState({ isOpen: false, taskId: null, targetColumn: null, action: null });
+	const [dragReviewReason, setDragReviewReason] = useState("");
+	const [dragReviewSubmitting, setDragReviewSubmitting] = useState(false);
 	const taskCategoriesRef = useRef(taskCategories);
 
 
@@ -155,7 +162,7 @@ function KanbanPage() {
 		if (!project || !currentUser) return "member";
 
 		const explicitRole = (project.role || "").toLowerCase();
-		if (["owner", "admin", "member"].includes(explicitRole)) {
+		if (["owner", "admin", "manager", "member"].includes(explicitRole)) {
 			return explicitRole;
 		}
 
@@ -170,6 +177,8 @@ function KanbanPage() {
 	const canCreateTask = isAdminOrOwner || taskPermissions.allow_member_create_task;
 	const canTakeTask = isAdminOrOwner || taskPermissions.allow_member_take_task;
 	const canMembersAssignTaskToOthers = taskPermissions.allow_assign_task_to_member;
+	const canMembersReviewTasks = taskPermissions.allow_member_review;
+	const canMembersMoveTaskToDone = taskPermissions.allow_member_move_task_to_done;
 	const canEditProjectSettings = isAdminOrOwner;
 	const canEditProjectName = projectRole === "owner";
 
@@ -563,6 +572,19 @@ function KanbanPage() {
 		[getTaskAssignee, getTaskAssignedMembers, currentUser?.id]
 	);
 
+	const canDragTask = useCallback(
+		(task, column) => {
+			if (!task || !column) return false;
+			const columnName = String(column?.title || column?.name || "").trim().toLowerCase();
+			// Tasks in Done column cannot be dragged by anyone
+			if (columnName === "done") return false;
+			// Otherwise check if task is assigned to me (original logic)
+			if (isTaskAssignedToMe) return isTaskAssignedToMe(task);
+			return true;
+		},
+		[isTaskAssignedToMe]
+	);
+
 	const handleTakeTask = useCallback(
 		async (task) => {
 			if (!task?.id || !currentUser) return;
@@ -606,16 +628,91 @@ function KanbanPage() {
 		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending]
 	);
 
+	const handleDragReviewConfirm = useCallback(
+		async () => {
+			const { taskId, targetColumn, action } = dragReviewModal;
+			if (!taskId || !targetColumn || !action) return;
+
+			setDragReviewSubmitting(true);
+			setTaskActionError("");
+			const reason = String(dragReviewReason || "").trim() || `${capitalizeFirst(action)} via drag`;
+
+			try {
+				const moved = moveTaskToCategory(taskCategoriesRef.current, taskId, targetColumn.id, {
+					categoryId: targetColumn.id,
+					isPending: true,
+				});
+				setTaskCategories(moved.next);
+				setTaskPending(taskId, "move");
+
+				if (action === "approve") {
+					await approveTaskReview(taskId, reason);
+				} else if (action === "reject") {
+					await rejectTaskReview(taskId, reason);
+				}
+
+				setError("");
+				await loadTaskCategories();
+				setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null });
+				setDragReviewReason("");
+			} catch (err) {
+				setTaskCategories((prev) => {
+					const currentLoc = findTaskLocation(prev, taskId);
+					if (!currentLoc) return prev;
+					const reverted = moveTaskToCategory(prev, taskId, currentLoc.categoryId, currentLoc.task);
+					return reverted.next;
+				});
+				setTaskActionError(err?.message || "Unable to process review action.");
+			} finally {
+				setDragReviewSubmitting(false);
+				clearTaskPending(taskId);
+			}
+		},
+		[dragReviewModal, dragReviewReason, moveTaskToCategory, setTaskPending, clearTaskPending, findTaskLocation, loadTaskCategories]
+	);
+
+	const capitalizeFirst = (str) => {
+		if (!str) return "";
+		return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+	};
+
 	const handleTaskDrop = async (taskId, column) => {
 		if (!taskId || !column?.id) return;
 		if (pendingTaskActions[String(taskId)]) return;
 		const currentLocation = findTaskLocation(taskCategoriesRef.current, taskId);
 		if (!currentLocation) return;
 		if (String(currentLocation.categoryId) === String(column.id)) return;
-		const targetCategoryName = String(column?.title || column?.name || "").trim().toLowerCase();
-		if (targetCategoryName === "done" && !isAdminOrOwner) {
-			setTaskActionError("Only admins and project owners can move tasks to Done.");
+		
+		// Prevent tasks in Done from being moved
+		const sourceColumnName = String(currentLocation.categoryName || "").trim().toLowerCase();
+		if (sourceColumnName === "done") {
+			setTaskActionError("Tasks in Done cannot be moved.");
 			return;
+		}
+		
+		const targetCategoryName = String(column?.title || column?.name || "").trim().toLowerCase();
+		
+		// If dragging from To Review to To Do or Done, show approval/rejection modal
+		if (sourceColumnName === "to_review" || sourceColumnName === "to review") {
+			if (targetCategoryName === "to_do" || targetCategoryName === "todo") {
+				// Moving back to To Do = reject
+				setDragReviewModal({ isOpen: true, taskId, targetColumn: column, action: "reject" });
+				setDragReviewReason("");
+				return;
+			} else if (targetCategoryName === "done") {
+				// Moving to Done = approve
+				setDragReviewModal({ isOpen: true, taskId, targetColumn: column, action: "approve" });
+				setDragReviewReason("");
+				return;
+			}
+		}
+		
+		if (targetCategoryName === "done" && !isAdminOrOwner && projectRole !== "manager") {
+			const canMoveAssignedTaskToDone = canMembersMoveTaskToDone && isTaskAssignedToMe(currentLocation.task);
+			if (!canMoveAssignedTaskToDone) {
+				setTaskActionError("Only admins, owners, or assigned members with this project setting can move tasks to Done.");
+				return;
+			}
 		}
 
 		setTaskActionError("");
@@ -1023,15 +1120,25 @@ function KanbanPage() {
 			</div> */}
 
 			<div className="kanban-shell">
-				{loading && <p>Loading columns...</p>}
-				{error && <p className="error-message">{error}</p>}
-				{taskActionError && <p className="error-message">{taskActionError}</p>}
-				<KanbanBoard
-					columns={columnsForBoard}
-					isTaskAssignedToMe={isTaskAssignedToMe}
+				{loading && (
+					<div style={{ display: "flex", gap: "16px", overflowX: "auto", paddingBottom: "16px" }}>
+						<SkeletonColumn taskCount={3} />
+						<SkeletonColumn taskCount={2} />
+						<SkeletonColumn taskCount={4} />
+						<SkeletonColumn taskCount={1} />
+					</div>
+				)}
+				{!loading && (
+					<>
+						{error && <p className="error-message">{error}</p>}
+						{taskActionError && <p className="error-message">{taskActionError}</p>}
+						<KanbanBoard
+							columns={columnsForBoard}
+							isTaskAssignedToMe={isTaskAssignedToMe}
+					canDragTask={canDragTask}
 					onTaskClick={(task) => {
 						if (pendingTaskActions[String(task?.id)] || task?.isPending) return;
-						navigate(`/main-page/kanban/task/${task.id}`, { state: { task, project, projectMembers, isAdminOrOwner, canMembersAssignTaskToOthers } });
+						navigate(`/main-page/kanban/task/${task.id}`, { state: { task, project, projectMembers, isAdminOrOwner, canMembersAssignTaskToOthers, canMembersReviewTasks, canMembersMoveTaskToDone } });
 					}}
 					showAddTaskButton={canCreateTask}
 					onTaskDrop={handleTaskDrop}
@@ -1277,7 +1384,58 @@ function KanbanPage() {
 					onSave={handleReorderSave}
 				/>
 
+				{dragReviewModal.isOpen && (
+					<div className="kanban-confirm-overlay" role="presentation" onClick={() => setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null })}>
+						<div className="kanban-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="drag-review-title" onClick={(e) => e.stopPropagation()}>
+							<div className="kanban-confirm-title-row">
+								<h3 id="drag-review-title">
+									{dragReviewModal.action === "approve" ? "Approve Task" : "Reject Task"}
+								</h3>
+							</div>
+							<p>
+								{dragReviewModal.action === "approve"
+									? "Please provide an approval note. This will be recorded in the review history."
+									: "Please provide a reason for rejecting this task. This will be recorded in the review history."}
+							</p>
+							<textarea
+								className="kanban-review-textarea"
+								value={dragReviewReason}
+								onChange={(e) => setDragReviewReason(e.target.value)}
+								placeholder={dragReviewModal.action === "approve" ? "Enter approval note" : "Enter rejection reason"}
+								rows={4}
+								autoComplete="off"
+							/>
+							<div className="kanban-confirm-actions">
+								<button
+									type="button"
+									className="kanban-confirm-cancel"
+									onClick={() => setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null })}
+									disabled={dragReviewSubmitting}
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									className={dragReviewModal.action === "approve" ? "kanban-confirm-approve" : "kanban-confirm-reject"}
+									onClick={handleDragReviewConfirm}
+									disabled={dragReviewSubmitting}
+								>
+									{dragReviewSubmitting
+										? dragReviewModal.action === "approve"
+											? "Approving..."
+											: "Rejecting..."
+										: dragReviewModal.action === "approve"
+											? "Approve Task"
+											: "Reject Task"}
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
+
 				{/* Task details are now a dedicated page: /main-page/kanban/task/:taskId */}
+					</>
+				)}
 			</div>
 		</section>
 	);

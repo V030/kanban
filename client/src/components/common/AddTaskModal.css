@@ -1,3 +1,4 @@
+@import url('../../DesignSystem.css');
 @import "./CreateProjectModal.css";
 
 .form-group select {
@@ -18,12 +19,13 @@
   font-weight: 700;
 }
 
-.priority-unset { color: #a8b3c2; }
-.priority-low { color: #16a34a; }
-.priority-medium { color: #eab308; }
-.priority-high { color: #f97316; }
-.priority-urgent { color: #dc2626; }
+.priority-unset { color: var(--color-text-secondary); }
+.priority-low { color: var(--color-success); }
+.priority-medium { color: var(--color-warning); }
+.priority-high { color: var(--color-warning-dark); }
+.priority-urgent { color: var(--color-danger); }
 
 .priority-select option {
   color: initial;
 }
+

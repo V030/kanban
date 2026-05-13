@@ -1,3 +1,4 @@
+@import url('../../DesignSystem.css');
 .sidebar {
   position: sticky;
   top: 16px;

@@ -1,0 +1,98 @@
+/* Dashboard theme - uses unified design system from DesignSystem.css */
+@import url('../../DesignSystem.css');
+
+.dashboard-page {
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  width: min(1280px, 100%);
+}
+
+.dashboard-stats {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stat-card {
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.stat-card:hover { 
+  box-shadow: var(--shadow-md); 
+  transform: translateY(-1px); 
+}
+
+.stat-label { 
+  font-size: var(--text-xs); 
+  font-weight: var(--fw-extrabold); 
+  color: var(--color-text-tertiary); 
+  text-transform: uppercase; 
+  letter-spacing: var(--ls-wider); 
+}
+
+.stat-value { 
+  margin-top: var(--space-2); 
+  font-size: 1.8rem; 
+  font-weight: var(--fw-extrabold); 
+  color: var(--color-text-primary); 
+}
+
+.stat-caption { 
+  margin-top: var(--space-2); 
+  font-size: var(--text-sm); 
+  color: var(--color-text-secondary); 
+}
+
+.dashboard-grid { 
+  display: grid; 
+  gap: 16px; 
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.95fr); 
+}
+
+.dashboard-panel {
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.panel-heading h3 { 
+  margin: 0; 
+  font-size: 1.04rem; 
+  font-weight: var(--fw-bold); 
+  color: var(--color-text-primary); 
+}
+
+.panel-heading .btn-ghost { 
+  border-radius: var(--radius-sm); 
+}
+
+.project-peek-item { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  gap: var(--space-3); 
+  padding: var(--space-3); 
+  border-radius: var(--radius-md); 
+  border: 1px solid var(--color-border); 
+  background: var(--color-bg-surface); 
+}
+
+.panel-link { 
+  color: var(--color-primary); 
+  font-weight: var(--fw-bold); 
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card, .dashboard-panel { 
+    transition: none; 
+  }
+}

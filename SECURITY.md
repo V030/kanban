@@ -52,8 +52,8 @@ Operational note:
 
 ## Permission Risks
 
-- The code references allow_member_review, but the schema/migrations shown in the repo do not define it.
-- That mismatch can silently produce false assumptions in review authorization.
+- Review approval and assignee-to-Done permissions are controlled by allow_member_review and allow_member_move_task_to_done.
+- Those flags must stay aligned across the migration, permission helper, project settings UI, and server-side task handlers.
 - Any new permission flag must be added in three places: migration, permission helper, and updateProjectSettings allowed keys.
 
 ## SQL Injection Protection

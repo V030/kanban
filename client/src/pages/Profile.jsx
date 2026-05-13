@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { getCurrentUser, changePassword, updateProfile } from "../services/authService";
 import "../components/styles/WorkspacePages.css";
+import "../components/styles/SkeletonLoading.css";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
 
 function toBase64(file) {

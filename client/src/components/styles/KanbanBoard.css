@@ -1,42 +1,5 @@
 /* TaskFlow Design System - Vanilla CSS with tf- prefix */
-:root {
-  /* Primary Colors & Accents */
-  --tf-teal-base: #14b8a6;
-  --tf-teal-hover: #0d9488;
-  --tf-teal-light: #f0fdfa;
-  --tf-teal-subtle: #ccf0ee;
-
-  /* Backgrounds */
-  --tf-bg-main-start: #f4f7f9;
-  --tf-bg-main-end: #e8f0f2;
-  --tf-bg-sidebar: #0f172a;
-  --tf-bg-card: #ffffff;
-  --tf-bg-column-start: #f8fafc;
-  --tf-bg-column-end: #f1f5f9;
-
-  /* Text Colors */
-  --tf-text-dark: #0f172a;
-  --tf-text-muted: #64748b;
-  --tf-text-light: #94a3b8;
-
-  /* Shadows */
-  --tf-shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --tf-shadow-hover: 0 12px 24px -4px rgba(20, 184, 166, 0.15);
-  --tf-shadow-lg: 0 20px 40px -4px rgba(20, 184, 166, 0.2);
-
-  /* Border Radius */
-  --tf-radius-card: 12px;
-  --tf-radius-pill: 9999px;
-
-  /* Spacing */
-  --tf-gap-sm: 8px;
-  --tf-gap-md: 12px;
-  --tf-gap-lg: 16px;
-
-  /* Transitions */
-  --tf-transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
+@import url('../../DesignSystem.css');
 /* Main Board Grid */
 .tf-board {
   display: grid;
@@ -54,17 +17,17 @@
   display: flex;
   flex-direction: column;
   background: #f6f9fc;
-  border-radius: var(--tf-radius-card);
+  border-radius: var(--radius-lg);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.02);
   overflow: hidden;
   min-height: 300px;
-  transition: var(--tf-transition);
+  transition: var(--transition-base);
 }
 
 /* Column Hover State (when dragging over) */
 .tf-column.tf-column--drag-over {
   background: linear-gradient(180deg, var(--tf-teal-light) 0%, #f0fdfa 100%);
-  border-color: var(--tf-teal-base);
+  border-color: var(--color-primary);
   box-shadow: 0 8px 16px -2px rgba(20, 184, 166, 0.12);
 }
 
@@ -93,7 +56,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--tf-text-dark);
+  color: var(--color-text-primary);
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -104,7 +67,7 @@
   justify-content: center;
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--tf-teal-base);
+  color: var(--color-primary);
   background: transparent;
   border: none;
 }
@@ -115,9 +78,9 @@
   height: 32px;
   padding: 0;
   border: none;
-  border-radius: var(--tf-radius-pill);
+  border-radius: var(--radius-full);
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-size: 1.65rem;
   font-weight: 400;
   line-height: 1;
@@ -130,7 +93,7 @@
 }
 
 .tf-column-add-btn:hover {
-  color: #14b8a6;
+  color: var(--color-primary);
 }
 
 .tf-column-add-btn:active {
@@ -165,13 +128,13 @@
 .tf-task-card {
   background: var(--tf-bg-card);
   border: 1px solid #e2e8f0;
-  border-radius: var(--tf-radius-card);
+  border-radius: var(--radius-lg);
   padding: 12px;
-  box-shadow: var(--tf-shadow-sm);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 0;
-  transition: var(--tf-transition);
+  transition: var(--transition-base);
   position: relative;
   cursor: pointer;
 }
@@ -220,7 +183,7 @@
   gap: 4px;
   font-size: 0.7rem;
   line-height: 1;
-  color: var(--tf-text-muted);
+  color: var(--color-text-secondary);
 }
 
 /* Priority Prefix */
@@ -235,7 +198,7 @@
   align-items: center;
   justify-content: center;
   padding: 2px 8px;
-  border-radius: var(--tf-radius-pill);
+  border-radius: var(--radius-full);
   font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -275,7 +238,7 @@
   font-size: 0.95rem;
   font-weight: 800;
   line-height: 1.3;
-  color: var(--tf-text-dark);
+  color: var(--color-text-primary);
   word-wrap: break-word;
 }
 
@@ -283,14 +246,14 @@
 .tf-task-pending {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--tf-teal-base);
+  color: var(--color-primary);
   font-weight: 600;
 }
 
 /* Task Description */
 .tf-task-desc {
   margin: 0;
-  color: var(--tf-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
   line-height: 1.45;
 }
@@ -299,13 +262,13 @@
 .tf-task-meta {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--tf-text-muted);
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
 .tf-task-meta-name {
   font-weight: 700;
-  color: var(--tf-text-dark);
+  color: var(--color-text-primary);
 }
 
 /* Overdue Badge */
@@ -321,7 +284,7 @@
   color: #991b1b;
   font-size: 0.65rem;
   font-weight: 700;
-  border-radius: var(--tf-radius-pill);
+  border-radius: var(--radius-full);
 }
 
 /* Task Divider */
@@ -351,7 +314,7 @@
 
 /* Task Assignee Label */
 .tf-task-assignee-label {
-  color: var(--tf-text-muted);
+  color: var(--color-text-secondary);
   font-weight: 600;
   font-size: 0.75rem;
   white-space: nowrap;
@@ -375,14 +338,14 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: var(--tf-radius-pill);
+  border-radius: var(--radius-full);
   border: 2px solid #ffffff;
   background: linear-gradient(135deg, var(--tf-teal-light) 0%, #d1fae5 100%);
-  color: var(--tf-teal-base);
+  color: var(--color-primary);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  box-shadow: var(--tf-shadow-sm);
+  box-shadow: var(--shadow-sm);
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -391,7 +354,7 @@
   width: 100%;
   height: 100%;
   display: block;
-  border-radius: var(--tf-radius-pill);
+  border-radius: var(--radius-full);
   object-fit: cover;
 }
 
@@ -414,7 +377,7 @@
 
 /* Unassigned */
 .tf-task-unassigned {
-  color: var(--tf-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.75rem;
   font-weight: 500;
 }
@@ -424,16 +387,16 @@
   width: fit-content;
   padding: 6px 12px;
   border: 1px solid #cbd5e1;
-  border-radius: var(--tf-radius-pill);
+  border-radius: var(--radius-full);
   background: var(--tf-bg-card);
-  color: var(--tf-text-dark);
+  color: var(--color-text-primary);
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: var(--tf-transition);
-  box-shadow: var(--tf-shadow-sm);
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-sm);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -444,21 +407,21 @@
 }
 
 .tf-task-action--take {
-  color: var(--tf-teal-base);
+  color: var(--color-primary);
   border-color: var(--tf-teal-subtle);
   background: var(--tf-teal-light);
 }
 
 .tf-task-action--take:hover:not(:disabled) {
   background: var(--tf-teal-subtle);
-  border-color: var(--tf-teal-base);
-  color: var(--tf-teal-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 .tf-task-action--unassign {
   border-color: #cbd5e1;
   background: var(--tf-bg-card);
-  color: var(--tf-text-dark);
+  color: var(--color-text-primary);
 }
 
 .tf-task-action--unassign:hover:not(:disabled) {
@@ -511,4 +474,7 @@
     justify-content: center;
   }
 }
+
+
+
 

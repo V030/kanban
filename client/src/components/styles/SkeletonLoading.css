@@ -1,0 +1,255 @@
+@import url('../../DesignSystem.css');
+/* Skeleton Loading Styles */
+
+/* Shimmer animation */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Base skeleton styles */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #e5e7eb 25%,
+    #f3f4f6 50%,
+    #e5e7eb 75%
+  );
+  background-size: 1000px 100%;
+  animation: skeleton-shimmer 2s infinite;
+  border-radius: 4px;
+}
+
+.skeleton-box {
+  display: block;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-text {
+  height: 14px;
+  border-radius: 3px;
+}
+
+.skeleton-button {
+  border-radius: 6px;
+}
+
+/* Card skeleton */
+.skeleton-card {
+  padding: 16px;
+  background: white;
+  border: 1px solid rgba(203, 213, 225, 0.3);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Row skeleton (for lists) */
+.skeleton-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  align-items: flex-start;
+}
+
+.skeleton-row-avatar {
+  flex-shrink: 0;
+}
+
+.skeleton-row-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Toggle skeleton */
+.skeleton-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.3);
+}
+
+.skeleton-toggle-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-toggle-switch {
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+/* Column skeleton (for Kanban) */
+.skeleton-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  min-width: 320px;
+}
+
+.skeleton-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.skeleton-column-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Task card skeleton */
+.skeleton-task-card {
+  padding: 12px;
+  background: white;
+  border: 1px solid rgba(203, 213, 225, 0.3);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Chart skeleton */
+.skeleton-chart {
+  width: 100%;
+  min-height: 200px;
+}
+
+/* Avatar with text skeleton */
+.skeleton-avatar-text {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 0;
+}
+
+.skeleton-avatar-text-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Inline comment skeleton */
+.skeleton-comment-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+}
+
+/* Form field skeleton */
+.skeleton-form-field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+/* Tabs skeleton */
+.skeleton-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.3);
+}
+
+/* Skeleton wrapper - container for skeleton layouts */
+.skeleton-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Skeleton grid (for dashboard stats) */
+.skeleton-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+/* Skeleton panel (for project snapshot) */
+.skeleton-panel {
+  padding: 20px;
+  background: white;
+  border: 1px solid rgba(203, 213, 225, 0.3);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeleton-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.3);
+}
+
+/* Skeleton list (for friends, requests, reviews) */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Accessibility: announce loading to screen readers */
+.skeleton[aria-busy="true"] {
+  position: relative;
+}
+
+.skeleton::after {
+  content: attr(data-loading-text);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduced motion - disable animation for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: linear-gradient(
+      90deg,
+      #e5e7eb 0%,
+      #f3f4f6 50%,
+      #e5e7eb 100%
+    );
+  }
+}
+
+/* Mobile responsive - adjust skeleton sizes for smaller screens */
+@media (max-width: 640px) {
+  .skeleton-column {
+    min-width: calc(100vw - 32px);
+  }
+
+  .skeleton-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -1,3 +1,4 @@
+@import url('../../DesignSystem.css');
 .friends-page {
   width: min(1280px, 100%);
   margin: 0 auto;
@@ -155,7 +156,7 @@
   border: 1px solid #cbd5e1;
   border-radius: 999px;
   padding: 4px 10px;
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 600;
 }
@@ -193,3 +194,5 @@
     flex: 1;
   }
 }
+
+

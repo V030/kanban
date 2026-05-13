@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import "../components/styles/Metrics.css";
+import "../components/styles/SkeletonLoading.css";
 import { getProjectMetrics, getProjects } from "../services/projectService";
 
 // ── Chart helpers ────────────────────────────────────────────────

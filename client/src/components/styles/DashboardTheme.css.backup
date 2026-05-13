@@ -1,0 +1,75 @@
+/* Dashboard theme aligned with Metrics & Analytics */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --font-base: 'DM Sans', system-ui, sans-serif;
+  --ink-900: #0b1622;
+  --ink-700: #1e293b;
+  --ink-500: #475569;
+  --ink-300: #94a3b8;
+
+  --brand:       #4f46e5;
+  --brand-soft:  #eef2ff;
+  --brand-muted: #c7d2fe;
+
+  --surface: #ffffff;
+  --bg:      #f1f5f9;
+  --border:  #e2e8f0;
+  --shadow:  0 1px 3px rgba(15,23,42,.06), 0 4px 12px rgba(15,23,42,.04);
+  --shadow-lg: 0 4px 24px rgba(15,23,42,.10);
+
+  --radius:    14px;
+  --radius-sm: 8px;
+}
+
+/* Apply Metrics-like tokens to dashboard scope */
+.dashboard-page {
+  font-family: var(--font-base);
+  color: var(--ink-700);
+  width: min(1280px, 100%);
+}
+
+.dashboard-stats {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stat-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: box-shadow .15s, transform .12s;
+}
+.stat-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+
+.stat-label { font-size: 0.75rem; font-weight: 800; color: var(--ink-300); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat-value { margin-top: 8px; font-size: 1.8rem; font-weight: 800; color: var(--ink-900); }
+.stat-caption { margin-top: 6px; font-size: 0.82rem; color: var(--ink-500); }
+
+.dashboard-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.95fr); }
+.dashboard-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-heading h3 { margin: 0; font-size: 1.04rem; font-weight: 700; color: var(--ink-900); }
+.panel-heading .btn-ghost { border-radius: var(--radius-sm); }
+
+.project-peek-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
+
+/* subtle accent for links */
+.panel-link { color: var(--brand); font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card, .dashboard-panel { transition: none; }
+  * { animation: none !important; }
+}

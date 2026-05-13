@@ -70,7 +70,7 @@ export const rateLimitTrustProxy = parseTrustProxy(process.env.TRUST_PROXY);
 export const rateLimitConfig = {
   general: {
     windowMs: parsePositiveInt(process.env.RATE_LIMIT_GENERAL_WINDOW_MS, 15 * 60 * 1000),
-    max: parsePositiveInt(process.env.RATE_LIMIT_GENERAL_MAX, 300),
+    max: parsePositiveInt(process.env.RATE_LIMIT_GENERAL_MAX, 600),
   },
   auth: {
     windowMs: parsePositiveInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS, 15 * 60 * 1000),

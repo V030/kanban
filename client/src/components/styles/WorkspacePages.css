@@ -1,3 +1,4 @@
+@import url('../../DesignSystem.css');
 .dashboard-page,
 .projects-page,
 .tasks-page,
@@ -315,7 +316,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: linear-gradient(140deg, #1496a8 0%, #0f7f8f 100%);
+  background: linear-gradient(140deg, #1496a8 0%, var(--color-primary) 100%);
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -362,7 +363,7 @@
   letter-spacing: 0.02em;
 }
 
-.priority-low { background: #edf7fa; color: #0f7f8f; border: 1px solid #d9f0f3; }
+.priority-low { background: #edf7fa; color: var(--color-primary); border: 1px solid #d9f0f3; }
 .priority-medium { background: #fff6e8; color: #8f5600; border: 1px solid #f0d3a8; }
 .priority-high { background: #fdecef; color: #9b1530; border: 1px solid #f8c4cc; }
 
@@ -617,7 +618,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(140deg, #1496a8 0%, #0f7f8f 100%);
+  background: linear-gradient(140deg, #1496a8 0%, var(--color-primary) 100%);
   color: #fff;
   font-size: 1.18rem;
   font-weight: 800;
@@ -792,7 +793,7 @@
   justify-content: center;
   font-size: 2rem;
   font-weight: 800;
-  background: linear-gradient(140deg, #1496a8 0%, #0f7f8f 100%);
+  background: linear-gradient(140deg, #1496a8 0%, var(--color-primary) 100%);
   color: #fff;
   object-fit: cover;
   flex: 0 0 90px;
@@ -931,7 +932,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: linear-gradient(140deg, #1496a8 0%, #0f7f8f 100%);
+  background: linear-gradient(140deg, #1496a8 0%, var(--color-primary) 100%);
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -1000,7 +1001,7 @@
   white-space: nowrap;
 }
 
-.priority-low { background: #edf7fa; color: #0f7f8f; border: 1px solid #d9f0f3; }
+.priority-low { background: #edf7fa; color: var(--color-primary); border: 1px solid #d9f0f3; }
 .priority-medium { background: #fff6e8; color: #8f5600; border: 1px solid #f0d3a8; }
 .priority-high { background: #fdecef; color: #9b1530; border: 1px solid #f8c4cc; }
 
@@ -1112,7 +1113,7 @@
   justify-content: center;
   font-size: 2rem;
   font-weight: 800;
-  background: linear-gradient(140deg, #1496a8 0%, #0f7f8f 100%);
+  background: linear-gradient(140deg, #1496a8 0%, var(--color-primary) 100%);
   color: #fff;
 }
 

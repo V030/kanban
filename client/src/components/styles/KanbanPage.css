@@ -1,3 +1,4 @@
+@import url('../../DesignSystem.css');
 .kanban-page {
   width: min(1280px, 100%);
   margin: 0 auto;
@@ -34,8 +35,8 @@
   gap: 6px;
   padding: 4px 10px;
   border-radius: 9999px;
-  background: #eefaf8;
-  color: #0d9488;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -47,12 +48,12 @@
   width: 8px;
   height: 8px;
   border-radius: 9999px;
-  background: #14b8a6;
+  background: var(--color-primary);
   flex-shrink: 0;
 }
 
 .kanban-project-summary {
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
   font-weight: 600;
   white-space: nowrap;
@@ -168,13 +169,13 @@
   justify-content: center !important;
   background: transparent !important;
   border: none !important;
-  color: #64748b;
+  color: var(--color-text-secondary);
   transition: color 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .kanban-icon-btn:hover {
   background: transparent !important;
-  color: #14b8a6;
+  color: var(--color-primary);
   border: none !important;
 }
 
@@ -226,3 +227,115 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Drag Review Modal Styles */
+.kanban-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.kanban-confirm-modal {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.kanban-confirm-title-row {
+  margin-bottom: 16px;
+}
+
+.kanban-confirm-title-row h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.kanban-confirm-modal p {
+  margin: 0 0 16px 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.kanban-review-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  border-radius: 6px;
+  font-family: var(--font-family);
+  font-size: 14px;
+  resize: vertical;
+  margin-bottom: 20px;
+}
+
+.kanban-review-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.kanban-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.kanban-confirm-cancel,
+.kanban-confirm-approve,
+.kanban-confirm-reject {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.kanban-confirm-cancel {
+  background: rgba(203, 213, 225, 0.5);
+  color: var(--color-text-primary);
+}
+
+.kanban-confirm-cancel:hover:not(:disabled) {
+  background: rgba(203, 213, 225, 0.7);
+}
+
+.kanban-confirm-approve {
+  background: #10b981;
+  color: white;
+}
+
+.kanban-confirm-approve:hover:not(:disabled) {
+  background: #059669;
+}
+
+.kanban-confirm-reject {
+  background: #ef4444;
+  color: white;
+}
+
+.kanban-confirm-reject:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.kanban-confirm-cancel:disabled,
+.kanban-confirm-approve:disabled,
+.kanban-confirm-reject:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+

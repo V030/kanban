@@ -3,8 +3,10 @@ import FriendsList from "../components/common/FriendsList";
 import IncomingFriendRequests from "../components/common/IncomingFriendRequests";
 import SentFriendRequests from "../components/common/SentFriendRequests";
 import AddFriendsModal from "../components/common/AddFriendsModal";
+import { SkeletonAvatarWithText } from "../components/common/SkeletonComponents";
 import { getFriends, getSentFriendRequests, getFriendRequests } from "../services/friendService";
 import "../components/styles/FriendsPage.css";
+import "../components/styles/SkeletonLoading.css";
 
 function Friends() {
   const [activeTab, setActiveTab] = useState("friends");
@@ -145,7 +147,12 @@ function Friends() {
 
       {activeTab === "friends" ? (
         friendsLoading ? (
-          <p className="status-text">Loading members...</p>
+          <div className="skeleton-list">
+            <SkeletonAvatarWithText />
+            <SkeletonAvatarWithText />
+            <SkeletonAvatarWithText />
+            <SkeletonAvatarWithText />
+          </div>
         ) : friendsError ? (
           <p className="status-text error">{friendsError}</p>
         ) : (

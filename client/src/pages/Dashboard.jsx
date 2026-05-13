@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { getCurrentUser } from "../services/authService";
 import { getFriends } from "../services/friendService";
 import { getMemberProjects, getProjectInvitations, getProjects } from "../services/projectService";
+import { SkeletonCard, SkeletonRow } from "../components/common/SkeletonComponents";
 import "../components/styles/WorkspacePages.css";
+import "../components/styles/DashboardTheme.css";
+import "../components/styles/SkeletonLoading.css";
 
 function Dashboard() {
     const navigate = useNavigate();
@@ -78,29 +81,40 @@ function Dashboard() {
             {error && <p className="status-text error">{error}</p>}
 
             <section className="dashboard-stats" aria-live="polite">
-                <article className="stat-card">
-                    <p className="stat-label">Owned Projects</p>
-                    <p className="stat-value">{loading ? ".." : ownedProjects.length}</p>
-                    <p className="stat-caption">Your active portfolios</p>
-                </article>
+                {loading ? (
+                    <>
+                        <SkeletonCard />
+                        <SkeletonCard />
+                        <SkeletonCard />
+                        <SkeletonCard />
+                    </>
+                ) : (
+                    <>
+                        <article className="stat-card">
+                            <p className="stat-label">Owned Projects</p>
+                            <p className="stat-value">{ownedProjects.length}</p>
+                            <p className="stat-caption">Your active portfolios</p>
+                        </article>
 
-                <article className="stat-card">
-                    <p className="stat-label">Shared Projects</p>
-                    <p className="stat-value">{loading ? ".." : memberProjects.length}</p>
-                    <p className="stat-caption">Boards where you collaborate</p>
-                </article>
+                        <article className="stat-card">
+                            <p className="stat-label">Shared Projects</p>
+                            <p className="stat-value">{memberProjects.length}</p>
+                            <p className="stat-caption">Boards where you collaborate</p>
+                        </article>
 
-                <article className="stat-card">
-                    <p className="stat-label">Pending Invites</p>
-                    <p className="stat-value">{loading ? ".." : inviteCount}</p>
-                    <p className="stat-caption">Awaiting response</p>
-                </article>
+                        <article className="stat-card">
+                            <p className="stat-label">Pending Invites</p>
+                            <p className="stat-value">{inviteCount}</p>
+                            <p className="stat-caption">Awaiting response</p>
+                        </article>
 
-                <article className="stat-card">
-                    <p className="stat-label">Connections</p>
-                    <p className="stat-value">{loading ? ".." : friendCount}</p>
-                    <p className="stat-caption">Team members in your network</p>
-                </article>
+                        <article className="stat-card">
+                            <p className="stat-label">Connections</p>
+                            <p className="stat-value">{friendCount}</p>
+                            <p className="stat-caption">Team members in your network</p>
+                        </article>
+                    </>
+                )}
             </section>
 
             <section className="dashboard-grid">
@@ -116,7 +130,15 @@ function Dashboard() {
                         </button>
                     </div>
 
-                    {loading && <p className="status-text">Loading project snapshot...</p>}
+                    {loading && (
+                        <div className="skeleton-list">
+                            <SkeletonRow showAvatar={false} lineCount={2} />
+                            <SkeletonRow showAvatar={false} lineCount={2} />
+                            <SkeletonRow showAvatar={false} lineCount={2} />
+                            <SkeletonRow showAvatar={false} lineCount={2} />
+                            <SkeletonRow showAvatar={false} lineCount={2} />
+                        </div>
+                    )}
 
                     {!loading && allProjects.length === 0 && (
                         <div className="empty-state-card">

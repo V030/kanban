@@ -7,6 +7,7 @@ export default function KanbanBoard({
   onTaskClick,
   renderTask,
   isTaskAssignedToMe,
+  canDragTask,
   showAddTaskButton = true,
 }) {
   const formatCategoryLabel = (value) =>
@@ -94,7 +95,7 @@ export default function KanbanBoard({
             )}
 
             {(sortTasks(column.tasks) || []).map((task) => {
-              const canDrag = isTaskAssignedToMe ? isTaskAssignedToMe(task) : true;
+              const canDrag = canDragTask ? canDragTask(task, column) : (isTaskAssignedToMe ? isTaskAssignedToMe(task) : true);
 
               return (
                 <article
