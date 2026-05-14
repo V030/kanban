@@ -1138,24 +1138,27 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   return (
     <div className="tdm-modal">
-      <header className="tdm-header">
-        <div className="tdm-header-text">
-          <h2>Task Details</h2>
-          <p>Review task information and manage assignee view.</p>
-        </div>
-        <div className="tdm-header-actions">
-          <button type="button" className="tdm-close-btn" onClick={onClose} aria-label="Close task details">
-            &times;
-          </button>
-        </div>
-      </header>
+      {!asPage && (
+        <header className="tdm-header">
+          <div className="tdm-header-text">
+            <h2>Task Details</h2>
+            <p>Review task information and manage assignee view.</p>
+          </div>
+          <div className="tdm-header-actions">
+            <button type="button" className="tdm-close-btn" onClick={onClose} aria-label="Close task details">
+              &times;
+            </button>
+          </div>
+        </header>
+      )}
 
       <div className="tdm-grid">
         <section className="tdm-main-column">
-          <article className="tdm-section-card tdm-focus-card">
-            <div className="tdm-section-header">
-              <h3 className="tdm-task-title-label">Task</h3>
-              <div className="task-actions-wrap" ref={menuButtonRef}>
+          <div className="tdm-task-shell">
+            <article className="tdm-section-card tdm-focus-card">
+              <div className="tdm-section-header">
+                <h3 className="tdm-task-title-label">Task</h3>
+                <div className="task-actions-wrap" ref={menuButtonRef}>
                 <button
                   className="task-more-btn"
                   onClick={() => setMenuOpen(prev => !prev)}
@@ -1271,6 +1274,17 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                                       </button>
                                     </div>
 
+                    <div className="dropdown-section">
+                      <p className="dropdown-label">Assignees</p>
+                      <button
+                        type="button"
+                        className="tdm-view-assignees-btn"
+                        onClick={() => { setMenuOpen(false); setShowAssigneesModal(true); }}
+                      >
+                        View Assignees
+                      </button>
+                    </div>
+
                     {isAdminOrOwner && onDeleteTask && (
                       <div className="dropdown-section">
                         <p className="dropdown-label">Remove Task</p>
@@ -1287,8 +1301,8 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     )}
                   </div>
                 )}
+                </div>
               </div>
-            </div>
 
             {/* review UI moved to dropdown; rejected label will render below tags */}
             <div className="tdm-task-title-row">
@@ -1442,151 +1456,135 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
             </div> */}
             {priorityError && <p className="tdm-priority-error">{priorityError}</p>}
             {prioritySubmitting && <p className="tdm-priority-pending">Updating...</p>}
-          </article>
+            </article>
 
-          <article className="tdm-section-card">
-            <h3>Subtasks (Optional)</h3>
-            {subtaskError && <p className="tdm-subtask-error">{subtaskError}</p>}
-            {localSubtasks.length === 0 ? (
-              <p>No subtasks added.</p>
-            ) : (
-              <ul className="tdm-subtasks-list">
-                {localSubtasks.map((st, idx) => {
-                  const createdByLabelName = st?.createdBy?.firstName + ' ' + st?.createdBy?.lastName || "Unknown";
-                  const createdAtLabel = st?.createdAt ? new Date(st.createdAt).toLocaleString() : "";
-                  const isCompleted = st?.status === "completed" || !!st.completed;
-                  const isPending = subtaskPendingIds[String(st?.id)] || st?.isPending;
+            <article className="tdm-section-card tdm-subtasks-shell">
+              <div className="tdm-subtasks-header">
+                <h3>Subtasks (Optional)</h3>
+                <button type="button" className="tdm-add-subtask-toggle" onClick={() => setShowAddSubtask((prev) => !prev)} aria-label="Add subtask">
+                  +
+                </button>
+              </div>
+              {subtaskError && <p className="tdm-subtask-error">{subtaskError}</p>}
+              {localSubtasks.length === 0 ? (
+                <p>No subtasks added.</p>
+              ) : (
+                <ul className="tdm-subtasks-list">
+                  {localSubtasks.map((st, idx) => {
+                    const createdByLabelName = st?.createdBy?.firstName + ' ' + st?.createdBy?.lastName || "Unknown";
+                    const createdAtLabel = st?.createdAt ? new Date(st.createdAt).toLocaleString() : "";
+                    const isCompleted = st?.status === "completed" || !!st.completed;
+                    const isPending = subtaskPendingIds[String(st?.id)] || st?.isPending;
 
-                  return (
-                    <li key={st.id || `${idx}-${st.title || st}` } className="tdm-subtask-row">
-                      <div className="tdm-subtask-left">
-                        <input
-                          type="checkbox"
-                          className="tdm-subtask-checkbox"
-                          defaultChecked={isCompleted}
-                          disabled
-                          aria-disabled="true"
-                          title="Subtask completion is not available yet."
-                          aria-label={`Mark ${st.title || 'subtask'} completed`}
-                        />
-                      </div>
-
-                      <div className="tdm-subtask-main">
-                        <div className="tdm-subtask-title">{st.title || String(st)}</div>
-                        {isPending && <div className="tdm-subtask-pending">Saving...</div>}
-                        <div className="tdm-subtask-meta">
-                          <span className="tdm-subtask-created-label">Created by: </span>
-                          <span className="tdm-subtask-created-by">{createdByLabelName}</span>
-                          {createdAtLabel ? <span className="tdm-subtask-created-at"> <b>On: </b> {createdAtLabel}</span> : null}
+                    return (
+                      <li key={st.id || `${idx}-${st.title || st}` } className="tdm-subtask-row">
+                        <div className="tdm-subtask-left">
+                          <input
+                            type="checkbox"
+                            className="tdm-subtask-checkbox"
+                            defaultChecked={isCompleted}
+                            disabled
+                            aria-disabled="true"
+                            title="Subtask completion is not available yet."
+                            aria-label={`Mark ${st.title || 'subtask'} completed`}
+                          />
                         </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
 
-            <div className="tdm-subtask-actions">
-              {showAddSubtask ? (
-                <div className="tdm-add-subtask-form">
-                  <input
-                    type="text"
-                    value={newSubtaskTitle}
-                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    placeholder="New subtask title"
-                    className="tdm-input"
-                  />
-                  <button
-                    type="button"
-                    className="tdm-add-subtask-btn"
-                    onClick={async () => {
-                      if (!newSubtaskTitle.trim()) return;
+                        <div className="tdm-subtask-main">
+                          <div className="tdm-subtask-title">{st.title || String(st)}</div>
+                          {isPending && <div className="tdm-subtask-pending">Saving...</div>}
+                          <div className="tdm-subtask-meta">
+                            <span className="tdm-subtask-created-label">Created by: </span>
+                            <span className="tdm-subtask-created-by">{createdByLabelName}</span>
+                            {createdAtLabel ? <span className="tdm-subtask-created-at"> <b>On: </b> {createdAtLabel}</span> : null}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
 
-                      const tempId = `temp-subtask-${Date.now()}`;
-                      const createdAt = new Date().toISOString();
-                      const optimisticSubtask = {
-                        id: tempId,
-                        title: newSubtaskTitle.trim(),
-                        status: "unfinished",
-                        createdAt,
-                        createdBy: currentUser
-                          ? {
-                              id: currentUser?.id || currentUserId,
-                              firstName: currentUser.firstName || currentUser.first_name,
-                              lastName: currentUser.lastName || currentUser.last_name,
-                              email: currentUser.email,
-                            }
-                          : { id: currentUserId },
-                        isPending: true,
-                      };
+              <div className="tdm-subtask-actions">
+                {showAddSubtask ? (
+                  <div className="tdm-add-subtask-form">
+                    <input
+                      type="text"
+                      value={newSubtaskTitle}
+                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                      placeholder="New subtask title"
+                      className="tdm-input"
+                    />
+                    <button
+                      type="button"
+                      className="tdm-add-subtask-btn"
+                      onClick={async () => {
+                        if (!newSubtaskTitle.trim()) return;
 
-                      setSubtaskError("");
-                      setSubtaskPendingIds((prev) => ({ ...prev, [tempId]: true }));
-                      setLocalSubtasks((prev) => [...prev, optimisticSubtask]);
-
-                      // build payload for backend
-                      const subtaskData = {
-                        taskId: task.id,
-                        title: newSubtaskTitle.trim(),
-                        createdBy: currentUserId,
-                        status: "unfinished"
-                      };
-
-                      // persist via parent handler
-                      try {
-                        const created = await createSubtasks({ subtaskData });
-                        const savedAt = created?.created_at || created?.createdAt || createdAt;
-                        const createdById = created?.created_by || currentUser?.id || currentUserId;
-                        const createdBy = currentUser
-                          ? {
-                              id: createdById,
-                              firstName: currentUser.firstName || currentUser.first_name,
-                              lastName: currentUser.lastName || currentUser.last_name,
-                              email: currentUser.email,
-                            }
-                          : { id: createdById };
-
-                        const nextSubtask = {
-                          id: created?.id || tempId,
-                          title: created?.title || subtaskData.title,
-                          status: created?.status || subtaskData.status,
-                          createdAt: savedAt,
-                          createdBy,
+                        const tempId = `temp-subtask-${Date.now()}`;
+                        const createdAt = new Date().toISOString();
+                        const optimisticSubtask = {
+                          id: tempId,
+                          title: newSubtaskTitle.trim(),
+                          status: "unfinished",
+                          createdAt,
+                          createdBy: currentUser
+                            ? {
+                                id: currentUser?.id || currentUserId,
+                                firstName: currentUser.firstName || currentUser.first_name,
+                                lastName: currentUser.lastName || currentUser.last_name,
+                                email: currentUser.email,
+                              }
+                            : { id: currentUserId },
+                          isPending: true,
                         };
 
-                        setLocalSubtasks((prev) =>
-                          prev.map((item) => (String(item?.id) === String(tempId) ? nextSubtask : item))
-                        );
+                        setSubtaskError("");
+                        setSubtaskPendingIds((prev) => ({ ...prev, [tempId]: true }));
+                        setLocalSubtasks((prev) => [...prev, optimisticSubtask]);
 
-                        // reset UI state
-                        setNewSubtaskTitle("");
-                        setShowAddSubtask(false);
-                      } catch (err) {
-                        setLocalSubtasks((prev) => prev.filter((item) => String(item?.id) !== String(tempId)));
-                        setSubtaskError(err?.message || "Failed to create subtask.");
-                      } finally {
-                        setSubtaskPendingIds((prev) => {
-                          const next = { ...prev };
-                          delete next[tempId];
-                          return next;
-                        });
-                      }
-                    }}
-                  >
-                    Add Subtask
-                  </button>
+                        try {
+                          const payload = await createSubtasks({
+                            subtaskData: {
+                              taskId: task?.id,
+                              title: newSubtaskTitle.trim(),
+                            },
+                          });
+                          const created = payload?.subtask || payload?.data || payload;
+                          if (created && created.id) {
+                            setLocalSubtasks((prev) =>
+                              prev.map((item) => (item.id === tempId ? { ...item, ...created, isPending: false } : item))
+                            );
+                          } else {
+                            setLocalSubtasks((prev) =>
+                              prev.map((item) => (item.id === tempId ? { ...item, isPending: false } : item))
+                            );
+                          }
+                          setShowAddSubtask(false);
+                          setNewSubtaskTitle("");
+                        } catch (error) {
+                          setSubtaskError(error.message || "Failed to add subtask");
+                          setLocalSubtasks((prev) => prev.filter((item) => item.id !== tempId));
+                        } finally {
+                          setSubtaskPendingIds((prev) => {
+                            const next = { ...prev };
+                            delete next[tempId];
+                            return next;
+                          });
+                        }
+                      }}
+                    >
+                      Add Subtask
+                    </button>
 
-                  <button type="button" className="tdm-cancel-subtask-btn" onClick={() => setShowAddSubtask(false)}>
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button type="button" className="tdm-add-subtask-toggle" onClick={() => setShowAddSubtask(true)}>
-                  + Add Subtask
-                </button>
-              )}
-            </div>
-          </article>
+                    <button type="button" className="tdm-cancel-subtask-btn" onClick={() => setShowAddSubtask(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          </div>
 
           
 
@@ -1774,15 +1772,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
           </div>
         </div>
       )}
-
-      <footer className="tdm-footer">
-        <button type="button" className="tdm-view-assignees-btn" onClick={() => setShowAssigneesModal(true)}>
-          View Assignees
-        </button>
-        <button type="button" className="tdm-close-action" onClick={onClose}>
-          Close
-        </button>
-      </footer>
 
       {showDeleteConfirm && (
         <div className="tdm-confirm-overlay" role="presentation" onClick={closeDeleteConfirm}>

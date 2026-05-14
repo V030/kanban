@@ -25,6 +25,7 @@ import {
   getTaskById,
 } from "../services/projectService";
 import { getCurrentUser } from "../services/authService";
+import "../components/styles/WorkspacePages.css";
 import "../components/styles/TaskDetailsModal.css";
 import "../components/styles/SkeletonLoading.css";
 
@@ -266,6 +267,19 @@ export default function TaskDetailsPage() {
 
   return (
     <div className="page-shell tdm-page-container" role="main">
+      <header className="workspace-hero tdm-page-hero">
+        <div className="workspace-hero-content">
+          <div>
+            <h1 className="page-title">Task Details</h1>
+            <p className="page-subtitle">Review task information and manage assignee view.</p>
+          </div>
+
+          <button type="button" className="tdm-close-btn" onClick={handleClose} aria-label="Close task details">
+            &times;
+          </button>
+        </div>
+      </header>
+
       <TaskDetailsContent
         asPage={true}
         currentUserId={currentUser?.id || ""}

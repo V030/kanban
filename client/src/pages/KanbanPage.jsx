@@ -9,6 +9,7 @@ import { SkeletonColumn } from "../components/common/SkeletonComponents";
 import "../components/styles/KanbanPage.css";
 import "../components/styles/ColumnsReorderModal.css";
 import "../components/styles/SkeletonLoading.css";
+import "../components/styles/WorkspacePages.css";
 import { getCurrentUser } from "../services/authService";
 import { getProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, approveTaskReview, rejectTaskReview, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
@@ -971,7 +972,8 @@ function KanbanPage() {
 
 	return (
 		<section className="page-shell kanban-page">
-			<div className="kanban-header">
+			<header className="workspace-hero">
+				<div className="workspace-hero-content">
 				<div className="kanban-title">
 					<div className="kanban-project-meta">
 						<span className="kanban-project-tag">Active Project</span>
@@ -1108,6 +1110,7 @@ function KanbanPage() {
 					</button>
 				</div>
 			</div>
+		</header>
 			{settingsError && <p className="error-message">{settingsError}</p>}
 
 			{/* <div className="permission-summary" role="status" aria-live="polite">

@@ -758,13 +758,29 @@
 }
 
 .tdm-add-subtask-toggle {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-primary-subtle);
-  color: var(--color-primary-hover);
-  padding: 8px 12px;
-  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #8a97a6;
+  padding: 0;
+  border-radius: 999px;
   cursor: pointer;
   font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.tdm-add-subtask-toggle:hover,
+.tdm-add-subtask-toggle:focus-visible {
+  color: var(--color-primary-hover);
+  background: transparent;
+  border: none;
+  outline: none;
 }
 
 .tdm-add-subtask-form {
@@ -1464,6 +1480,38 @@
   height: 100%;
 }
 
+.tdm-task-shell {
+  border: 1px solid rgba(176, 196, 216, 0.56);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
+  box-shadow: var(--shadow-md);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.tdm-page-hero {
+  margin-bottom: 16px;
+}
+
+.tdm-subtasks-shell {
+  border: 1px solid rgba(176, 196, 216, 0.56);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
+  box-shadow: none;
+}
+
+.tdm-subtasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tdm-subtasks-header h3 {
+  margin: 0;
+}
+
 .tdm-page-container.page-shell {
   gap: 0;
 }
@@ -1547,6 +1595,7 @@
 .tdm-page-container .tdm-comments-panel {
   flex: 1;
   min-height: 0;
+  border-radius: 28px;
 }
 
 /* Review actions */

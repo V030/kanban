@@ -138,22 +138,25 @@ function Projects() {
 
     return (
       <section className="page-shell projects-page">
-        <header className="page-header">
-          <div>
-            <h1 className="page-title">Projects</h1>
-            <p className="page-subtitle">
-              Create, review, and open boards quickly with a clean overview of ownership and collaboration.
-            </p>
+        <header className="workspace-hero">
+          <div className="workspace-hero-content">
+            <div>
+              <h1 className="page-title">Projects</h1>
+              <p className="page-subtitle">
+                Create, review, and open boards quickly with a clean overview of ownership and collaboration.
+              </p>
+            </div>
+
+            <div className="projects-header-actions">
+              <button type="button" className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                Create Project
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsInvitesOpen(true)}>
+                Project Invitations
+              </button>
+            </div>
           </div>
 
-          <div className="projects-header-actions">
-            <button type="button" className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-              Create Project
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsInvitesOpen(true)}>
-              Project Invitations
-            </button>
-          </div>
         </header>
 
         <CreateProjectModal 

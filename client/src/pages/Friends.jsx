@@ -116,71 +116,76 @@ function Friends() {
 
   return (
     <section className="page-shell friends-page">
-      <header className="page-header">
-        <div>
-          <h1 className="page-title">Team Network</h1>
-          <p className="page-subtitle">Manage collaborators, incoming requests, and outgoing invitations.</p>
+      <header className="workspace-hero">
+        <div className="workspace-hero-content">
+          <div>
+            <h1 className="page-title">Team Network</h1>
+            <p className="page-subtitle">Manage collaborators, incoming requests, and outgoing invitations.</p>
+          </div>
+
+          <button type="button" className="btn btn-primary" onClick={() => setIsAddFriendOpen(true)}>
+            Add Member
+          </button>
         </div>
 
-        <button type="button" className="btn btn-primary" onClick={() => setIsAddFriendOpen(true)}>
-          Add Member
-        </button>
       </header>
 
-      <div className="friends-tabs">
-        <button
-          type="button"
-          className={`friends-tab ${activeTab === "friends" ? "active" : ""}`}
-          onClick={() => setActiveTab("friends")}
-        >
-          My Friends ({friends.length})
-        </button>
+      <section className="friends-shell">
+        <div className="friends-tabs">
+          <button
+            type="button"
+            className={`friends-tab ${activeTab === "friends" ? "active" : ""}`}
+            onClick={() => setActiveTab("friends")}
+          >
+            My Friends ({friends.length})
+          </button>
 
-        <button
-          type="button"
-          className={`friends-tab ${activeTab === "requests" ? "active" : ""}`}
-          onClick={() => setActiveTab("requests")}
-        >
-          Friend Requests ({myFriendRequests.length + sentFriendRequests.length})
-        </button>
-      </div>
-
-      {activeTab === "friends" ? (
-        friendsLoading ? (
-          <div className="skeleton-list">
-            <SkeletonAvatarWithText />
-            <SkeletonAvatarWithText />
-            <SkeletonAvatarWithText />
-            <SkeletonAvatarWithText />
-          </div>
-        ) : friendsError ? (
-          <p className="status-text error">{friendsError}</p>
-        ) : (
-          <FriendsList friends={friends} />
-        )
-      ) : (
-        <div className="requests-grid">
-          <section>
-            <h2 className="request-section-title">Incoming Requests ({myFriendRequests.length})</h2>
-            <IncomingFriendRequests
-              requests={myFriendRequests}
-              onRequestsChange={handleIncomingRequestsChange}
-              onFriendOptimisticAdd={handleOptimisticFriendAdd}
-              onFriendRollback={handleFriendRollback}
-              onSync={handleFriendRequestCreated}
-            />
-          </section>
-
-          <section>
-            <h2 className="request-section-title">Sent Requests ({sentFriendRequests.length})</h2>
-            <SentFriendRequests
-              requests={sentFriendRequests}
-              onRequestsChange={handleSentRequestsChange}
-              onSync={handleFriendRequestCreated}
-            />
-          </section>
+          <button
+            type="button"
+            className={`friends-tab ${activeTab === "requests" ? "active" : ""}`}
+            onClick={() => setActiveTab("requests")}
+          >
+            Friend Requests ({myFriendRequests.length + sentFriendRequests.length})
+          </button>
         </div>
-      )}
+
+        {activeTab === "friends" ? (
+          friendsLoading ? (
+            <div className="skeleton-list">
+              <SkeletonAvatarWithText />
+              <SkeletonAvatarWithText />
+              <SkeletonAvatarWithText />
+              <SkeletonAvatarWithText />
+            </div>
+          ) : friendsError ? (
+            <p className="status-text error">{friendsError}</p>
+          ) : (
+            <FriendsList friends={friends} />
+          )
+        ) : (
+          <div className="requests-grid">
+            <section>
+              <h2 className="request-section-title">Incoming Requests ({myFriendRequests.length})</h2>
+              <IncomingFriendRequests
+                requests={myFriendRequests}
+                onRequestsChange={handleIncomingRequestsChange}
+                onFriendOptimisticAdd={handleOptimisticFriendAdd}
+                onFriendRollback={handleFriendRollback}
+                onSync={handleFriendRequestCreated}
+              />
+            </section>
+
+            <section>
+              <h2 className="request-section-title">Sent Requests ({sentFriendRequests.length})</h2>
+              <SentFriendRequests
+                requests={sentFriendRequests}
+                onRequestsChange={handleSentRequestsChange}
+                onSync={handleFriendRequestCreated}
+              />
+            </section>
+          </div>
+        )}
+      </section>
 
       <AddFriendsModal
         isOpen={isAddFriendOpen}

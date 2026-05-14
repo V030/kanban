@@ -183,22 +183,25 @@ function MyTasks() {
 
     return (
         <section className="page-shell tasks-page">
-            <header className="page-header">
-                <div>
-                    <h1 className="page-title">My Tasks</h1>
-                    <p className="page-subtitle">Assigned tasks grouped by project and status.</p>
-                </div>
+            <header className="workspace-hero">
+                <div className="workspace-hero-content">
+                    <div>
+                        <h1 className="page-title">My Tasks</h1>
+                        <p className="page-subtitle">Assigned tasks grouped by project and status.</p>
+                    </div>
 
-                <div className="tasks-top-controls">
-                    <div className="controls-right">
-                        <button type="button" className="btn btn-ghost">Filter</button>
-                        <button type="button" className="btn btn-ghost">Sort</button>
-                        <button type="button" className="btn btn-secondary" onClick={loadTasks}>Refresh</button>
-                        <button type="button" className="btn btn-primary" onClick={() => navigate("/main-page/projects") }>
-                            Browse Projects
-                        </button>
+                    <div className="tasks-top-controls">
+                        <div className="controls-right">
+                            <button type="button" className="btn btn-ghost">Filter</button>
+                            <button type="button" className="btn btn-ghost">Sort</button>
+                            <button type="button" className="btn btn-secondary" onClick={loadTasks}>Refresh</button>
+                            <button type="button" className="btn btn-primary" onClick={() => navigate("/main-page/projects") }>
+                                Browse Projects
+                            </button>
+                        </div>
                     </div>
                 </div>
+
             </header>
 
             {loading && <p className="status-text">Loading tasks...</p>}

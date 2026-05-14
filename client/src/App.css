@@ -9,6 +9,10 @@
   overflow: hidden;
 }
 
+.app-layout.sidebar-collapsed {
+  grid-template-columns: 92px minmax(0, 1fr);
+}
+
 .content {
   min-width: 0;
   min-height: 0;

@@ -6,19 +6,16 @@ import "../styles/SideBar.css";
 
 function DashboardIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <rect x="3" y="3" width="8" height="8" rx="2" />
-            <rect x="13" y="3" width="8" height="5" rx="2" />
-            <rect x="13" y="10" width="8" height="11" rx="2" />
-            <rect x="3" y="13" width="8" height="8" rx="2" />
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3h5A1.5 1.5 0 0 1 12 4.5v5A1.5 1.5 0 0 1 10.5 11h-5A1.5 1.5 0 0 1 4 9.5v-5Zm9 0A1.5 1.5 0 0 1 14.5 3h4A1.5 1.5 0 0 1 20 4.5v2A1.5 1.5 0 0 1 18.5 8h-4A1.5 1.5 0 0 1 13 6.5v-2ZM13 12.5A1.5 1.5 0 0 1 14.5 11h4A1.5 1.5 0 0 1 20 12.5v7A1.5 1.5 0 0 1 18.5 21h-4A1.5 1.5 0 0 1 13 19.5v-7ZM4 14.5A1.5 1.5 0 0 1 5.5 13h5A1.5 1.5 0 0 1 12 14.5v5A1.5 1.5 0 0 1 10.5 21h-5A1.5 1.5 0 0 1 4 19.5v-5Z" />
         </svg>
     );
 }
 
 function ProjectsIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M3 7.5C3 6.67 3.67 6 4.5 6h6.6c.4 0 .78.16 1.06.44l1.4 1.4c.28.28.66.44 1.06.44h4.88c.83 0 1.5.67 1.5 1.5v7.72c0 .83-.67 1.5-1.5 1.5H4.5A1.5 1.5 0 0 1 3 17.5z" />
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M4.5 6A2.5 2.5 0 0 0 2 8.5v7A2.5 2.5 0 0 0 4.5 18h15A2.5 2.5 0 0 0 22 15.5v-6A2.5 2.5 0 0 0 19.5 7h-5.8l-1.32-1.32A2 2 0 0 0 11.96 5H4.5Z" />
         </svg>
     );
 }
@@ -27,24 +24,21 @@ function ProjectsIcon() {
 
 function TeamIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="8" cy="9" r="3" />
-            <path d="M2.5 18c.6-2.4 2.58-4 5.5-4 2.93 0 4.9 1.6 5.5 4" />
-            <circle cx="17" cy="8" r="2" />
-            <path d="M14.4 17c.45-1.45 1.57-2.5 3.55-2.95" />
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M8 11.5A3.5 3.5 0 1 0 8 4.5a3.5 3.5 0 0 0 0 7ZM17 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM2.5 18.5A5.5 5.5 0 0 1 8 13h.1c1.58 0 3.01.61 4.08 1.6A5.5 5.5 0 0 1 17 13h.1A5 5 0 0 1 22 18v.5a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1v-.5Z" />
         </svg>
     );
 }
 
 function TasksIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M9 7h11" />
-            <path d="M9 12h11" />
-            <path d="M9 17h11" />
-            <path d="m4 7 1.5 1.5L7.5 6.5" />
-            <path d="m4 12 1.5 1.5L7.5 11.5" />
-            <path d="m4 17 1.5 1.5L7.5 16.5" />
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="5" cy="7" r="1.6" />
+            <rect x="8" y="6.2" width="11" height="1.6" rx="0.8" />
+            <circle cx="5" cy="12" r="1.6" />
+            <rect x="8" y="11.2" width="11" height="1.6" rx="0.8" />
+            <circle cx="5" cy="17" r="1.6" />
+            <rect x="8" y="16.2" width="8.5" height="1.6" rx="0.8" />
         </svg>
     );
 }
@@ -190,7 +184,6 @@ export default function SideBar () {
                                 )}
                             </div>
 
-                            <button className="logout" onClick={handleLogout}>Log Out</button>
                         </div>
         </aside>
     );
