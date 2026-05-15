@@ -22,22 +22,12 @@ function formatStatus(name) {
     return String(name).replace(/_/g, " ").toUpperCase();
 }
 
- 
 function getCurrentUserDisplay(user) {
     if (!user) {
-        return {
-            name: "You",
-            initials: "",
-            avatar: "",
-        };
+        return { name: "You", initials: "", avatar: "" };
     }
 
-    const fullName = [user?.firstName, user?.lastName]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-
-    const displayName = "You";
+    const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
     const initialsSource = fullName || user?.email || "You";
     const initials = (initialsSource || "")
         .split(" ")
@@ -48,10 +38,20 @@ function getCurrentUserDisplay(user) {
         .toUpperCase();
 
     return {
-        name: displayName,
+        name: "You",
         initials,
         avatar: normalizeProfileImage(user?.profileImageBase64 || user?.profile_image_base64 || ""),
     };
+}
+
+/** Map a status name to a pill variant class */
+function statusPillClass(statusName) {
+    const key = String(statusName || "").toLowerCase().replace(/\s+/g, "_");
+    if (key === "done" || key === "completed") return "done";
+    if (key === "in_progress" || key === "in progress") return "in_progress";
+    if (key === "todo" || key === "to_do") return "todo";
+    if (key === "to_review" || key === "review") return "pending";
+    return "todo";
 }
 
 function MyTasks() {
@@ -88,14 +88,10 @@ function MyTasks() {
             hydrateUserFromToken().then((user) => {
                 if (!isMounted) return;
                 if (user) setCurrentUser(user);
-            }).catch(() => {
-                // Keep graceful fallback display when hydration fails.
-            });
+            }).catch(() => {});
         }
 
-        return () => {
-            isMounted = false;
-        };
+        return () => { isMounted = false; };
     }, [currentUser]);
 
     const currentUserDisplay = useMemo(() => getCurrentUserDisplay(currentUser), [currentUser]);
@@ -135,54 +131,45 @@ function MyTasks() {
         });
 
         return Array.from(projectMap.values())
-            .sort((left, right) => left.name.localeCompare(right.name))
+            .sort((a, b) => a.name.localeCompare(b.name))
             .map((project) => ({
                 ...project,
                 statuses: Array.from(project.statuses.values())
-                    .sort((left, right) => {
-                        if (left.position !== right.position) {
-                            return left.position - right.position;
-                        }
-
-                        return String(left.name).localeCompare(String(right.name));
+                    .sort((a, b) => {
+                        if (a.position !== b.position) return a.position - b.position;
+                        return String(a.name).localeCompare(String(b.name));
                     })
                     .map((status) => ({
                         ...status,
-                        tasks: [...status.tasks].sort((left, right) => {
-                            const leftPosition = Number.isFinite(Number(left?.position)) ? Number(left.position) : Number.MAX_SAFE_INTEGER;
-                            const rightPosition = Number.isFinite(Number(right?.position)) ? Number(right.position) : Number.MAX_SAFE_INTEGER;
-
-                            if (leftPosition !== rightPosition) {
-                                return leftPosition - rightPosition;
-                            }
-
-                            const leftCreated = new Date(left?.createdAt || left?.created_at || 0).getTime();
-                            const rightCreated = new Date(right?.createdAt || right?.created_at || 0).getTime();
-                            return leftCreated - rightCreated;
+                        tasks: [...status.tasks].sort((a, b) => {
+                            const ap = Number.isFinite(Number(a?.position)) ? Number(a.position) : Number.MAX_SAFE_INTEGER;
+                            const bp = Number.isFinite(Number(b?.position)) ? Number(b.position) : Number.MAX_SAFE_INTEGER;
+                            if (ap !== bp) return ap - bp;
+                            return new Date(a?.createdAt || a?.created_at || 0).getTime()
+                                 - new Date(b?.createdAt || b?.created_at || 0).getTime();
                         }),
                     })),
             }));
     }, [tasks]);
 
+    const totalTaskCount = useMemo(
+        () => groupedProjects.reduce((sum, p) => sum + p.statuses.reduce((s2, st) => s2 + st.tasks.length, 0), 0),
+        [groupedProjects]
+    );
+
     const openTask = (task) => {
         if (!task?.id) return;
-
-        navigate(`/main-page/kanban/task/${task.id}`, {
-            state: {
-                task,
-                project: task.project,
-            },
-        });
+        navigate(`/main-page/kanban/task/${task.id}`, { state: { task, project: task.project } });
     };
 
     const openProject = (project) => {
         if (!project?.id) return;
-
         navigate("/main-page/kanban", { state: { project } });
     };
 
     return (
         <section className="page-shell tasks-page">
+            {/* ── Hero header ── */}
             <header className="workspace-hero">
                 <div className="workspace-hero-content">
                     <div>
@@ -195,91 +182,151 @@ function MyTasks() {
                             <button type="button" className="btn btn-ghost">Filter</button>
                             <button type="button" className="btn btn-ghost">Sort</button>
                             <button type="button" className="btn btn-secondary" onClick={loadTasks}>Refresh</button>
-                            <button type="button" className="btn btn-primary" onClick={() => navigate("/main-page/projects") }>
+                            <button type="button" className="btn btn-primary" onClick={() => navigate("/main-page/projects")}>
                                 Browse Projects
                             </button>
                         </div>
                     </div>
                 </div>
-
             </header>
 
-            {loading && <p className="status-text">Loading tasks...</p>}
-            {error && <p className="status-text error">{error}</p>}
+            {/* ── Loading / error ── */}
+            {loading && <p className="status-text">Loading tasks…</p>}
+            {error   && <p className="status-text error">{error}</p>}
 
+            {/* ── Empty state ── */}
             {!loading && !error && groupedProjects.length === 0 && (
                 <div className="empty-state-card">
                     <h3>No assigned tasks yet</h3>
                     <p>Tasks assigned to you will appear here, grouped by project and status.</p>
                     <div className="empty-state-actions">
-                        <button type="button" className="btn btn-secondary" onClick={() => navigate("/main-page/projects") }>
+                        <button type="button" className="btn btn-secondary" onClick={() => navigate("/main-page/projects")}>
                             Browse Projects
                         </button>
                     </div>
                 </div>
             )}
 
-            {!loading && !error && groupedProjects.length > 0 && groupedProjects.map((project) => (
-                <section className="project-card" key={project.id}>
-                    <div className="project-card-header">
-                        <div className="project-card-title">
-                            <h2>{project.name}</h2>
-                        </div>
-
-                        <div className="project-card-meta">
-                            <div className="due-date">Oct 24, 2026</div>
-                        </div>
+            {/* ── Task groups ── */}
+            {!loading && !error && groupedProjects.length > 0 && (
+                <div className="project-section">
+                    {/* Section-level heading — mirrors "My Projects (3 total)" */}
+                    <div className="section-heading">
+                        <h2>All Tasks</h2>
+                        <p>{totalTaskCount} total</p>
                     </div>
 
-                    <div className="project-card-body">
-                        {project.statuses.map((status) => (
-                            <div className="status-block" key={`${project.id}-${status.id}`}>
-                                <div className="status-block-header">
-                                    <h3>{formatStatus(status.name)}</h3>
-                                    <span className="pill">{status.tasks.length}</span>
-                                </div>
-
-                                <div className="task-list">
-                                    {status.tasks.map((task) => {
-                                        const priorityLabel = (task.priority || "low").toUpperCase();
-                                        const commentCount = task.comments?.length ?? task.commentCount ?? 0;
-                                        const assigneeCount = task.assigneeCount ?? (task.assignees || []).length;
-
-                                        return (
-                                            <article key={task.id} className="task-row" role="button" tabIndex={0} onClick={() => openTask(task)}>
-                                                <div className="task-left">
-                                                    <div className="task-title">
-                                                        <h4>{task.title || "Untitled task"}</h4>
-                                                        <div className="task-sub">{task.project?.name || ""}</div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="task-right">
-                                                    <div className="assignee-count">
-                                                        <span className="avatar-small" aria-hidden="true">
-                                                            {currentUserDisplay.avatar ? (
-                                                                <img src={currentUserDisplay.avatar} alt="" />
-                                                            ) : (
-                                                                currentUserDisplay.initials
-                                                            )}
-                                                        </span>
-                                                        <span className="assignee-name">{currentUserDisplay.name}</span>
-                                                    </div>
-                                                    <div className="task-meta">
-                                                        <span className={`badge priority-${priorityLabel.toLowerCase()}`}>{priorityLabel}</span>
-                                                        <span className="status-badge">{formatStatus(status.name)}</span>
-                                                        <span className="icons" title={`Comments: ${commentCount} — Assignees: ${assigneeCount}`}>{`💬 ${commentCount} • 👥 ${assigneeCount}`}</span>
-                                                    </div>
-                                                </div>
-                                            </article>
-                                        );
-                                    })}
-                                </div>
+                    {groupedProjects.map((project) => (
+                        <div className="mytasks-project-group" key={project.id}>
+                            {/* Project sub-header */}
+                            <div className="mytasks-project-header">
+                                <button
+                                    type="button"
+                                    className="mytasks-project-name"
+                                    onClick={() => openProject(project)}
+                                    title={`Open ${project.name}`}
+                                >
+                                    {project.name}
+                                </button>
+                                <span className="mytasks-project-date">Oct 24, 2026</span>
                             </div>
-                        ))}
-                    </div>
-                </section>
-            ))}
+
+                            {/* Per-status table blocks */}
+                            {project.statuses.map((status) => (
+                                <div className="mytasks-status-block" key={`${project.id}-${status.id}`}>
+                                    {/* Status label row — mirrors "My Projects" / "Projects You Joined" dividers */}
+                                    <div className="mytasks-status-heading">
+                                        <span className={`pill ${statusPillClass(status.name)}`}>
+                                            {formatStatus(status.name)}
+                                        </span>
+                                        <span className="mytasks-status-count">{status.tasks.length}</span>
+                                    </div>
+
+                                    {/* Table */}
+                                    <div className="project-table-wrapper">
+                                        <table className="project-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style={{ width: "42%" }}>TASK</th>
+                                                    <th style={{ width: "18%" }}>ASSIGNEE</th>
+                                                    <th style={{ width: "13%" }}>PRIORITY</th>
+                                                    <th style={{ width: "15%" }}>STATUS</th>
+                                                    <th style={{ width: "12%", textAlign: "right" }}>ACTIVITY</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {status.tasks.map((task) => {
+                                                    const priorityLabel = (task.priority || "low").toUpperCase();
+                                                    const commentCount  = task.comments?.length ?? task.commentCount ?? 0;
+                                                    const assigneeCount = task.assigneeCount ?? (task.assignees || []).length;
+
+                                                    return (
+                                                        <tr
+                                                            key={task.id}
+                                                            className="project-table-row clickable"
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            onClick={() => openTask(task)}
+                                                            onKeyDown={(e) => e.key === "Enter" && openTask(task)}
+                                                        >
+                                                            {/* Task name + project sub-label */}
+                                                            <td>
+                                                                <div className="project-table-name-cell">
+                                                                    <span className="project-table-name">
+                                                                        {task.title || "Untitled task"}
+                                                                    </span>
+                                                                    <span className="project-table-desc">
+                                                                        {task.project?.name || ""}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+
+                                                            {/* Assignee */}
+                                                            <td>
+                                                                <div className="assignee-count">
+                                                                    <span className="avatar-small" aria-hidden="true">
+                                                                        {currentUserDisplay.avatar ? (
+                                                                            <img src={currentUserDisplay.avatar} alt="" />
+                                                                        ) : (
+                                                                            currentUserDisplay.initials
+                                                                        )}
+                                                                    </span>
+                                                                    <span className="assignee-name">{currentUserDisplay.name}</span>
+                                                                </div>
+                                                            </td>
+
+                                                            {/* Priority */}
+                                                            <td>
+                                                                <span className={`badge priority-${priorityLabel.toLowerCase()}`}>
+                                                                    {priorityLabel}
+                                                                </span>
+                                                            </td>
+
+                                                            {/* Status */}
+                                                            <td>
+                                                                <span className={`pill ${statusPillClass(status.name)}`}>
+                                                                    {formatStatus(status.name)}
+                                                                </span>
+                                                            </td>
+
+                                                            {/* Activity */}
+                                                            <td style={{ textAlign: "right" }}>
+                                                                <span className="icons">
+                                                                    💬 {commentCount} &bull; 👥 {assigneeCount}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            )}
         </section>
     );
 }

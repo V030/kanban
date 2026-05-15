@@ -83,56 +83,67 @@ function Projects() {
       navigate("/main-page/kanban", { state: { project } });
     };
 
-    const renderProjectCard = (project, type = "owner") => {
+    const formatDate = (dateStr) => {
+      if (!dateStr) return "—";
+      const d = new Date(dateStr);
+      return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    };
+
+    const renderProjectRow = (project, type = "owner") => {
       const isPending = !!project?.isPending;
       const canOpen = !isPending;
+      const dateLabel = isPending
+        ? "Creating…"
+        : type === "owner"
+        ? formatDate(project.created_at)
+        : formatDate(project.joined_at);
 
       return (
-        <article
+        <tr
           key={project.id}
-          className="project-card"
-          onClick={() => {
-            if (!canOpen) return;
-            openKanban(project);
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              if (!canOpen) return;
+          className={`project-table-row${canOpen ? " clickable" : ""}`}
+          onClick={() => { if (canOpen) openKanban(project); }}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === " ") && canOpen) {
+              e.preventDefault();
               openKanban(project);
             }
           }}
+          tabIndex={canOpen ? 0 : undefined}
+          role={canOpen ? "button" : undefined}
         >
-          <h3>{project.name}</h3>
-          <p>{project.description || "No description added yet."}</p>
-          <p className="meta-line">
-            {isPending
-              ? "Creating project..."
-              : (type === "owner"
-                ? `Created ${new Date(project.created_at).toLocaleString()}`
-                : `Joined ${new Date(project.joined_at).toLocaleString()}`)}
-          </p>
-          <div className="project-card-foot">
+          <td className="project-table-name-cell">
+            <span className="project-table-name">{project.name}</span>
+            <span className="project-table-desc">
+              {project.description || "No description added yet."}
+            </span>
+          </td>
+          <td>
             <span className={`pill ${type}`}>{type === "owner" ? "Owner" : "Member"}</span>
-            {isPending && <span className="pill pending">Pending</span>}
+            {isPending && <span className="pill pending" style={{ marginLeft: 6 }}>Pending</span>}
+          </td>
+          <td className="project-table-date">{dateLabel}</td>
+          <td className="project-table-action-cell">
             {type === "owner" && (
               <button
                 type="button"
-                className="btn btn-secondary"
-                onClick={(event) => {
-                  event.stopPropagation();
+                className="btn btn-secondary btn-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (!canOpen) return;
                   setSelectedProject(project);
                 }}
                 disabled={isPending}
               >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 1a4 4 0 1 1 0 8A4 4 0 0 1 8 1zm0 9c4.418 0 7 1.79 7 3v1H1v-1c0-1.21 2.582-3 7-3z" fill="currentColor"/>
+                  <path d="M13 6h2M14 5v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                </svg>
                 Add Member
               </button>
             )}
-          </div>
-        </article>
+          </td>
+        </tr>
       );
     };
 
@@ -196,7 +207,21 @@ function Projects() {
           )}
 
           {!loading && !error && projects.length > 0 && (
-            <div className="project-grid">{projects.map((project) => renderProjectCard(project, "owner"))}</div>
+            <div className="project-table-wrapper">
+              <table className="project-table">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projects.map((project) => renderProjectRow(project, "owner"))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
@@ -214,8 +239,20 @@ function Projects() {
           )}
 
           {!memberLoading && !memberError && memberProjects.length > 0 && (
-            <div className="project-grid">
-              {memberProjects.map((project) => renderProjectCard(project, "member"))}
+            <div className="project-table-wrapper">
+              <table className="project-table">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Role</th>
+                    <th>Joined</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memberProjects.map((project) => renderProjectRow(project, "member"))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

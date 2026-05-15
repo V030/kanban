@@ -1,77 +1,92 @@
 @import url('../../DesignSystem.css');
+
 .friends-page {
   width: min(1280px, 100%);
   margin: 0 auto;
 }
 
+/* ── Shell ───────────────────────────────────────────────── */
 .friends-shell {
   position: relative;
   overflow: hidden;
-
-  padding: 18px;
-  border-radius: 28px;
-
-  border: 1px solid rgba(176, 196, 216, 0.56);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
+  padding: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(176, 196, 216, 0.5);
+  background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(245,249,253,0.97) 100%);
   backdrop-filter: blur(2px);
   box-shadow: var(--shadow-md);
-
-  display: grid;
-  gap: 16px;
 }
 
+/* ── Tabs ─────────────────────────────────────────────────── */
 .friends-tabs {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 2px;
+  padding: 14px 18px 0;
   border-bottom: 1px solid var(--color-border-subtle);
-  padding-bottom: 6px;
+  background: transparent;
 }
 
 .friends-tab {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  border-radius: var(--radius-sm);
-  padding: 9px 12px;
+  position: relative;
+  background: none;
+  border: none;
+  padding: 10px 14px 12px;
   cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid transparent;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: color 160ms ease, border-color 160ms ease;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.friends-tab:hover {
+  color: var(--color-text-primary);
 }
 
 .friends-tab.active {
-  color: var(--color-primary-hover);
-  border-color: #b7d4d9;
-  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
-.friends-page .requests-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+/* count badge inside tab */
+.friends-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  background: rgba(20, 150, 168, 0.12);
+  color: var(--color-primary);
+  transition: background 160ms ease, color 160ms ease;
 }
 
-.friends-page .requests-grid > section {
-  /* use the same subtle hero background (inherited from .friends-shell) */
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 14px;
+.friends-tab:not(.active) .friends-tab-badge {
+  background: rgba(0,0,0,0.06);
+  color: var(--color-text-tertiary);
 }
 
-.request-section-title {
-  margin: 0 0 10px;
-  color: var(--color-text-primary);
-  font-size: 0.92rem;
-  font-family: var(--font-display);
-  letter-spacing: 0.01em;
+/* ── Tab content area ────────────────────────────────────── */
+.friends-tab-content {
+  padding: 6px 0 4px;
 }
 
+/* ── Friends list ─────────────────────────────────────────── */
 .friends-page .friends-list {
   display: grid;
   gap: 0;
-  margin-top: 2px;
-  border-top: 1px solid var(--color-border-subtle);
+  margin: 0;
+  border-top: none;
   border-bottom: 1px solid var(--color-border-subtle);
   border-left: none;
   border-right: none;
@@ -81,51 +96,106 @@
 .friends-shell .skeleton-list,
 .friends-shell .friends-list,
 .friends-shell .requests-grid {
-  margin-top: 2px;
+  margin-top: 0;
 }
 
+/* skeleton inside shell needs padding */
+.friends-shell .skeleton-list {
+  padding: 8px 18px 12px;
+}
+
+/* ── Friend row ───────────────────────────────────────────── */
 .friends-page .friends-row {
   border: none;
   border-radius: 0;
-  padding: 12px;
+  padding: 13px 20px;
   display: flex;
   align-items: center;
   gap: 12px;
   background: transparent;
   box-shadow: none;
+  transition: background 140ms ease;
 }
 
 .friends-page .friends-row:hover {
-  background: rgba(0,0,0,0.02);
+  background: rgba(20, 150, 168, 0.04);
 }
 
 .friends-page .friends-list .friends-row + .friends-row {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* left accent line on hover */
+.friends-page .friends-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primary);
+  transition: transform 160ms ease;
+}
+
+.friends-page .friends-list {
+  position: relative;
+}
+
+.friends-page .friends-row {
+  position: relative;
+}
+
+.friends-page .friends-row:hover::before {
+  transform: translateY(-50%) scaleY(1);
+}
+
+/* ── Row sub-layouts ──────────────────────────────────────── */
 .friends-page .friends-row-main {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .friends-page .friends-row-actions {
-  justify-content: space-between;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
+/* ── Avatar ───────────────────────────────────────────────── */
 .friends-page .friends-avatar {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-full);
   overflow: hidden;
+  flex-shrink: 0;
   background: linear-gradient(140deg, #1496a8 0%, #0f7f8f 100%);
-  color: var(--color-bg-surface);
-  border: 1px solid rgba(15, 127, 143, 0.18);
+  color: #fff;
+  border: 1.5px solid rgba(15, 127, 143, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--text-sm);
+  font-size: 0.8rem;
   font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 4px rgba(20, 150, 168, 0.18);
+}
+
+/* vary gradient by nth-child so not every avatar looks identical */
+.friends-page .friends-list .friends-row:nth-child(3n+2) .friends-avatar {
+  background: linear-gradient(140deg, #6366f1 0%, #4f46e5 100%);
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.18);
+}
+.friends-page .friends-list .friends-row:nth-child(3n+3) .friends-avatar {
+  background: linear-gradient(140deg, #0ea5e9 0%, #0284c7 100%);
+  border-color: rgba(14, 165, 233, 0.2);
+  box-shadow: 0 1px 4px rgba(14, 165, 233, 0.18);
 }
 
 .friends-page .friends-avatar img {
@@ -135,25 +205,34 @@
   object-fit: cover;
 }
 
+/* ── Meta text ────────────────────────────────────────────── */
 .friends-page .friends-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+  min-width: 0;
 }
 
 .friends-page .friends-name {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: var(--text-base);
+  font-size: 0.9rem;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .friends-page .friends-email {
   margin: 0;
   color: var(--color-text-tertiary);
-  font-size: var(--text-sm);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* ── Action buttons ───────────────────────────────────────── */
 .friends-page .request-actions {
   display: flex;
   gap: 8px;
@@ -162,14 +241,22 @@
 .friends-page .request-btn {
   border-radius: var(--radius-md);
   border: 1px solid #c7d5e4;
-  padding: 8px 12px;
+  padding: 7px 13px;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 0.82rem;
+  font-family: inherit;
+  transition: opacity 140ms ease, box-shadow 140ms ease;
+}
+
+.friends-page .request-btn:hover {
+  opacity: 0.88;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
 .friends-page .accept-btn {
   background: linear-gradient(160deg, #1496a8 0%, var(--color-primary) 100%);
-  color: var(--color-bg-surface);
+  color: #fff;
   border-color: #0f7582;
 }
 
@@ -178,42 +265,119 @@
   color: var(--color-text-secondary);
 }
 
+/* more (…) button */
 .friends-page .friend-more-btn {
-  border: 1px solid #c7d5e4;
-  background: var(--color-bg-surface);
-  color: var(--color-text-secondary);
-  border-radius: var(--radius-md);
-  padding: 7px 12px;
+  border: 1px solid rgba(176, 196, 216, 0.7);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  border-radius: 8px;
+  padding: 6px 10px;
   font-weight: 700;
   cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  letter-spacing: 0.06em;
 }
 
+.friends-page .friend-more-btn:hover {
+  background: rgba(20, 150, 168, 0.07);
+  color: var(--color-primary);
+  border-color: rgba(20, 150, 168, 0.35);
+}
+
+/* ── Status pill ──────────────────────────────────────────── */
 .friends-page .status-pill {
   border: 1px solid #cbd5e1;
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 3px 10px;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: 0.75rem;
   font-weight: 600;
+  background: rgba(203, 213, 225, 0.15);
 }
 
+/* ── Requests grid ────────────────────────────────────────── */
+.friends-page .requests-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 0;
+}
+
+.friends-page .requests-grid > section {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 18px 20px 14px;
+}
+
+.friends-page .requests-grid > section + section {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.request-section-title {
+  margin: 0 0 12px;
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* count chip next to section title */
+.request-section-title::after {
+  content: attr(data-count);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(20, 150, 168, 0.1);
+  color: var(--color-primary);
+}
+
+/* ── Empty / error states ─────────────────────────────────── */
 .friends-page .friends-empty {
-  margin: 10px 0;
+  margin: 20px 20px;
   color: var(--color-text-tertiary);
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.friends-empty-icon {
+  font-size: 2rem;
+  opacity: 0.35;
+  margin-bottom: 4px;
 }
 
 .friends-page .friends-error {
-  margin: 8px 0;
+  margin: 8px 20px;
   color: var(--color-danger);
+  font-size: 0.875rem;
 }
 
+/* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 760px) {
   .friends-page .requests-grid {
     grid-template-columns: 1fr;
   }
 
   .friends-tab {
-    font-size: var(--text-base);
+    font-size: 0.875rem;
   }
 
   .friends-page .friends-row,
@@ -230,5 +394,3 @@
     flex: 1;
   }
 }
-
-

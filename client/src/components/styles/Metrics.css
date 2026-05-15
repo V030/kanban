@@ -9,19 +9,23 @@
   font-family: var(--font-base);
   color: var(--ink-700);
   width: min(1280px, 100%);
+  
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* ═══════════════════════════════════════════════════════════════
    HEADER
 ═══════════════════════════════════════════════════════════════ */
 .metrics-header {
-  padding: 22px;
+  padding: 24px;
   max-width: none;
-  margin: 0 0 18px 0;
+  margin: 0;
   /* make hero the same white as the sidebar */
   background: #ffffff;
-  border: 1px solid rgba(0,0,0,0.04);
-  border-radius: 14px;
+  border: 1px solid rgba(176, 196, 216, 0.56);
+  border-radius: 28px;
   box-shadow: 0 1px 6px rgba(15,23,42,0.04);
 }
 
@@ -131,35 +135,19 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MAIN BODY
-═══════════════════════════════════════════════════════════════ */
-/* When no dedicated .metrics-body wrapper is present, give the page shell
-   a small padding and consistent spacing between the top-level sections. */
-.page-shell.metrics-page {
-  padding: 14px;
-}
-
-.page-shell.metrics-page > .kpi-row,
-.page-shell.metrics-page > .metrics-panel,
-.page-shell.metrics-page > .metrics-grid,
-.page-shell.metrics-page > .review-panel {
-  margin-top: 12px;
-}
-
-/* ═══════════════════════════════════════════════════════════════
    KPI ROW
 ═══════════════════════════════════════════════════════════════ */
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 16px;
 }
 
 .kpi-card {
   background: #ffffff;
-  border-radius: 14px;
-  padding: 20px 22px;
-  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 20px;
+  border: 1px solid rgba(176, 196, 216, 0.56);
   box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.04);
   display: flex;
   flex-direction: column;
@@ -230,10 +218,10 @@
 .metrics-card,
 .review-panel {
   background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid var(--border);
+  border-radius: 28px;
+  border: 1px solid rgba(176, 196, 216, 0.56);
   box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.04);
-  padding: 22px;
+  padding: 24px;
   overflow: hidden;
   background-clip: padding-box;
   transition: box-shadow 180ms ease;
@@ -248,8 +236,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding-bottom: 16px;
-  margin-bottom: 16px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -271,31 +259,39 @@
 /* ═══════════════════════════════════════════════════════════════
    CYCLE TIME CHART
 ═══════════════════════════════════════════════════════════════ */
-.cycle-panel-body {
+.cycle-panel {
+  overflow: visible;
+}
+
+.cycle-chart-shell {
   display: grid;
-  grid-template-columns: 1fr 130px;
-  gap: 8px;
-  align-items: stretch;
+  gap: 14px;
 }
 
-.chart-area {
-  min-width: 0;
-  padding-right: 8px;
+.cycle-chart-frame {
+  display: grid;
+  gap: 12px;
 }
 
-.chart-stat-col {
+.cycle-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cycle-summary-chip {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 12px;
-  padding-left: 12px;
-  border-left: 1px solid var(--border);
+  gap: 3px;
+  min-width: 112px;
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: linear-gradient(to bottom, #ffffff 35%, rgba(79,70,229,.05) 100%);
 }
 
-.stat-block { display: flex; flex-direction: column; gap: 2px; }
-
-.stat-label {
+.cycle-summary-label,
+.cycle-stat-label {
   font-size: 0.7rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -303,12 +299,99 @@
   color: var(--ink-300);
 }
 
-.stat-value {
-  font-family: var(--font-mono);
-  font-size: 1.3rem;
-  font-weight: 600;
+.cycle-summary-value,
+.cycle-stat-value {
+  font-size: 1.15rem;
+  font-weight: 800;
   color: var(--ink-900);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+}
+
+.cycle-chart-viewport {
+  position: relative;
+  min-height: 240px;
+  height: clamp(240px, 24vw, 280px);
+  border-radius: 20px;
+  border: 1px solid rgba(79,70,229,.10);
+  background:
+    radial-gradient(circle at top left, rgba(79,70,229,.08), transparent 42%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  overflow: visible;
+}
+
+.cycle-chart-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cycle-chart-grid line {
+  stroke: rgba(148,163,184,.38);
+  stroke-dasharray: 5 7;
+}
+
+.cycle-chart-grid text,
+.cycle-chart-reference text,
+.cycle-chart-label {
+  fill: var(--ink-300);
+  font-family: var(--font-base);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cycle-chart-reference line {
+  stroke: var(--brand);
+  stroke-dasharray: 7 6;
+  stroke-width: 1.5;
+  opacity: 0.7;
+}
+
+.cycle-chart-reference text {
+  fill: var(--brand);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cycle-chart-line {
+  filter: drop-shadow(0 6px 18px rgba(79,70,229,.18));
+}
+
+.cycle-chart-area {
+  opacity: 1;
+}
+
+.cycle-chart-label {
+  font-size: 11px;
+}
+
+.cycle-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cycle-stat-card {
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.03);
+}
+
+.cycle-stat-meta {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--ink-300);
+}
+
+.cycle-chart-shell .chart-empty {
+  min-height: 280px;
+  border-radius: 16px;
+  border: 1px dashed var(--border);
+  background: #ffffff;
+  justify-content: center;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -460,6 +543,193 @@
 ═══════════════════════════════════════════════════════════════ */
 .review-panel { padding: 22px; }
 
+.review-activity-panel {
+  overflow: visible;
+}
+
+.review-activity-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.review-activity-feed {
+  display: grid;
+  gap: 16px;
+}
+
+.review-activity-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.review-stat-card,
+.review-rail-card {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: linear-gradient(to bottom, #ffffff 35%, rgba(79,70,229,.04) 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,.03);
+}
+
+.review-stat-card {
+  padding: 16px;
+}
+
+.review-stat-label,
+.review-rail-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-300);
+}
+
+.review-stat-value {
+  margin-top: 4px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--ink-900);
+  letter-spacing: -0.03em;
+}
+
+.review-stat-meta {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--ink-300);
+}
+
+.review-activity-list {
+  display: grid;
+  gap: 12px;
+}
+
+.review-activity-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.review-activity-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+
+.review-activity-left {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+
+.review-activity-copy {
+  min-width: 0;
+}
+
+.review-activity-meta-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.review-activity-index {
+  align-self: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ink-300);
+  letter-spacing: 0.06em;
+}
+
+.review-card-approved {
+  border-left-color: #22c55e;
+  box-shadow: inset 3px 0 0 #22c55e;
+}
+
+.review-card-rejected {
+  border-left-color: #ef4444;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+
+.review-card-pending {
+  border-left-color: #f59e0b;
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+.review-activity-rail {
+  display: grid;
+  gap: 16px;
+}
+
+.review-rail-card {
+  padding: 18px;
+}
+
+.review-rail-copy {
+  margin-top: 8px;
+  color: var(--ink-500);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.review-rail-bars {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.review-rail-bar-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.review-rail-bar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink-700);
+}
+
+.review-rail-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.review-rail-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.06);
+  overflow: hidden;
+}
+
+.review-rail-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 500ms cubic-bezier(.4,0,.2,1);
+}
+
+.review-rail-bar-value {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--ink-500);
+  min-width: 34px;
+  text-align: right;
+}
+
 .btn-tertiary {
   font-family: var(--font-base);
   font-size: 0.82rem;
@@ -584,24 +854,22 @@
 @media (max-width: 1024px) {
   .kpi-row              { grid-template-columns: 1fr 1fr; }
   .metrics-grid         { grid-template-columns: 1fr; }
-  .review-cards         { grid-template-columns: 1fr 1fr; }
-  .cycle-panel-body     { grid-template-columns: 1fr; }
-  .chart-stat-col {
-    flex-direction: row;
-    border-left: none;
-    border-top: 1px solid var(--border);
-    padding-left: 0;
-    padding-top: 14px;
-    margin-top: 8px;
-    gap: 24px;
-  }
+  .cycle-stat-grid      { grid-template-columns: 1fr 1fr; }
+  .review-activity-shell { grid-template-columns: 1fr; }
+  .review-activity-stats { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 768px) {
   .metrics-title-row    { flex-direction: column; align-items: flex-start; }
   .kpi-row              { grid-template-columns: 1fr; }
-  .review-cards         { grid-template-columns: 1fr; }
   .donut-wrap           { grid-template-columns: 1fr; justify-items: center; }
+  .cycle-chart-summary  { flex-direction: column; }
+  .cycle-chart-viewport { min-height: 220px; height: 240px; }
+  .cycle-stat-grid      { grid-template-columns: 1fr; }
+  .review-activity-stats { grid-template-columns: 1fr; }
+  .review-activity-item  { grid-template-columns: 1fr; }
+  .review-activity-meta-row { flex-direction: column; }
+  .review-activity-index { text-align: left; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -609,5 +877,6 @@
   .metrics-panel,
   .metrics-card,
   .review-card,
+  .review-activity-item,
   .simple-bar-fill { transition: none; }
 }

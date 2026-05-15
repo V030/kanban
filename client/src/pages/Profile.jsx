@@ -50,7 +50,7 @@ function toBase64(file) {
 function Profile() {
     const user = getCurrentUser();
     const avatarInputRef = useRef(null);
-    const [activeTab, setActiveTab] = useState("profile");
+    const [activeTab, setActiveTab] = useState("account");
     const [editFormData, setEditFormData] = useState({
         firstName: user?.firstName || "",
         lastName: user?.lastName || "",
@@ -68,6 +68,9 @@ function Profile() {
 
     const fullName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "User";
     const initials = `${(user?.firstName || "").charAt(0)}${(user?.lastName || "").charAt(0)}`.toUpperCase() || "U";
+    const accountImageSource = normalizeProfileImage(
+        editFormData.profileImageBase64 || user?.profileImageBase64 || user?.profile_image_base64 || ""
+    );
 
     const handleProfileUpdate = useCallback(
         async (e) => {
@@ -204,26 +207,36 @@ function Profile() {
 
     return (
         <section className="page-shell profile-page">
-            <header className="profile-header">
-                <div className="profile-header-top">
-                    <div>
-                        <h1 className="page-title">Account Settings</h1>
-                        <p className="page-subtitle">Manage your profile and preferences</p>
+            <header className="profile-header workspace-hero">
+                <div className="profile-hero-content">
+                    <div className="profile-hero-main">
+                        <div className="profile-hero-avatar-wrap">
+                            {accountImageSource ? (
+                                <img src={accountImageSource} alt={fullName} className="profile-avatar-lg" />
+                            ) : (
+                                <div className="profile-avatar-lg">{initials}</div>
+                            )}
+                        </div>
+
+                        <div>
+                            <p className="profile-hero-eyebrow">Account Center</p>
+                            <h1 className="page-title">Account Settings</h1>
+                            <p className="page-subtitle">Manage your profile details, password, and communication preferences.</p>
+                        </div>
+                    </div>
+
+                    <div className="profile-hero-meta" aria-hidden="true">
+                        <div className="profile-hero-chip">Secure workspace</div>
+                        <div className="profile-hero-chip">Member profile</div>
                     </div>
                 </div>
 
                 <nav className="profile-tabs">
                     <button
-                        className={`profile-tab ${activeTab === "profile" ? "active" : ""}`}
-                        onClick={() => setActiveTab("profile")}
+                        className={`profile-tab ${activeTab === "account" ? "active" : ""}`}
+                        onClick={() => setActiveTab("account")}
                     >
-                        Profile
-                    </button>
-                    <button
-                        className={`profile-tab ${activeTab === "security" ? "active" : ""}`}
-                        onClick={() => setActiveTab("security")}
-                    >
-                        Security
+                        Account
                     </button>
                     <button
                         className={`profile-tab ${activeTab === "notifications" ? "active" : ""}`}
@@ -246,19 +259,16 @@ function Profile() {
                 </div>
             )}
 
-            {activeTab === "profile" && (
+            {activeTab === "account" && (
                 <div className="profile-content">
                     <div className="profile-photo-section">
                         <div className="section-title">PROFILE PHOTO</div>
                         <div className="photo-preview">
-                            {(() => {
-                                const src = normalizeProfileImage(user?.profileImageBase64 || user?.profile_image_base64);
-                                return src ? (
-                                    <img src={src} alt="Profile" className="preview-img" />
-                                ) : (
-                                    <div className="preview-placeholder">{initials}</div>
-                                );
-                            })()}
+                            {accountImageSource ? (
+                                <img src={accountImageSource} alt={fullName} className="preview-img" />
+                            ) : (
+                                <div className="preview-placeholder">{initials}</div>
+                            )}
                         </div>
                         <div className="photo-size-hint">JPG, PNG or GIF. 1MB max.</div>
                         <div className="photo-actions">
@@ -292,7 +302,7 @@ function Profile() {
                                         setLoading(false);
                                     }
                                 }}
-                                disabled={loading || !user?.profileImageBase64}
+                                disabled={loading || !accountImageSource}
                             >
                                 Remove
                             </button>
@@ -363,11 +373,7 @@ function Profile() {
                             </div>
                         </form>
                     </div>
-                </div>
-            )}
 
-            {activeTab === "security" && (
-                <div className="profile-content">
                     <div className="profile-details-section full-width">
                         <div className="section-title">CHANGE PASSWORD</div>
                         <form onSubmit={handlePasswordChange} className="profile-form">
