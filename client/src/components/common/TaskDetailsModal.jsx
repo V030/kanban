@@ -1174,26 +1174,32 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                   <div className="task-dropdown" ref={dropdownRef} role="dialog" aria-label="Task actions">
                     <div className="dropdown-section">
                       <p className="dropdown-label">Target Date</p>
-                      <input
-                        type="date"
-                        className="tdm-input tdm-target-input"
-                        value={toDateInputValue(targetDate)}
-                        onChange={(event) => {
-                          const next = event.target.value || null;
-                          handleUpdateTargetDate(next);
-                          // keep dropdown open for quick edits
-                        }}
-                        disabled={targetDateSubmitting}
-                      />
+                      <div className="tdm-target-row">
+                        <input
+                          type="date"
+                          className="tdm-input tdm-target-input"
+                          value={toDateInputValue(targetDate)}
+                          onChange={(event) => {
+                            const next = event.target.value || null;
+                            handleUpdateTargetDate(next);
+                            // keep dropdown open for quick edits
+                          }}
+                          disabled={targetDateSubmitting}
+                        />
 
-                      <button
-                        type="button"
-                        className="tdm-target-clear"
-                        onClick={() => handleUpdateTargetDate(null)}
-                        disabled={targetDateSubmitting || !targetDate}
-                      >
-                        Clear
-                      </button>
+                        <button
+                          type="button"
+                          className="tdm-target-clear"
+                          onClick={() => handleUpdateTargetDate(null)}
+                          disabled={targetDateSubmitting || !targetDate}
+                          aria-label="Clear date"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                            <path d="M21 12a9 9 0 1 0-3.56 6.56" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M21 3v6h-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="dropdown-section">
@@ -1460,7 +1466,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
             <article className="tdm-section-card tdm-subtasks-shell">
               <div className="tdm-subtasks-header">
-                <h3>Subtasks (Optional)</h3>
+                <h3>Subtasks</h3>
                 <button type="button" className="tdm-add-subtask-toggle" onClick={() => setShowAddSubtask((prev) => !prev)} aria-label="Add subtask">
                   +
                 </button>
@@ -1478,20 +1484,13 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
                     return (
                       <li key={st.id || `${idx}-${st.title || st}` } className="tdm-subtask-row">
-                        <div className="tdm-subtask-left">
-                          <input
-                            type="checkbox"
-                            className="tdm-subtask-checkbox"
-                            defaultChecked={isCompleted}
-                            disabled
-                            aria-disabled="true"
-                            title="Subtask completion is not available yet."
-                            aria-label={`Mark ${st.title || 'subtask'} completed`}
-                          />
-                        </div>
+                        <div className="tdm-subtask-left" />
 
                         <div className="tdm-subtask-main">
-                          <div className="tdm-subtask-title">{st.title || String(st)}</div>
+                          <div className="tdm-subtask-title-row">
+                            <span className="tdm-subtask-index">{idx + 1}.</span>
+                            <div className="tdm-subtask-title">{st.title || String(st)}</div>
+                          </div>
                           {isPending && <div className="tdm-subtask-pending">Saving...</div>}
                           <div className="tdm-subtask-meta">
                             <span className="tdm-subtask-created-label">Created by: </span>
@@ -1741,26 +1740,22 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
             <div className="tdm-suggestions-array" aria-live="polite">
               <div className="tdm-suggestions-label">Project suggestions</div>
-              <div className="tdm-suggestions-content">
-                [
+              <div className="tdm-suggestions-content tdm-suggestions-pills">
                 {(projectTagSuggestions || []).map((s, i) => {
                   const name = s?.tagName || s?.tag_name || s?.name || String(s);
                   const key = s?.id || name + "-" + i;
                   return (
-                    <span key={key} className="tdm-sugg-item">
-                      <button
-                        type="button"
-                        className="tdm-suggestion-in-array"
-                        onClick={() => handleAddTag(name)}
-                        title={`Add tag ${name}`}
-                      >
-                        {name}
-                      </button>
-                      {i < (projectTagSuggestions || []).length - 1 && <span className="tdm-sugg-sep">, </span>}
-                    </span>
+                    <button
+                      key={key}
+                      type="button"
+                      className="tdm-suggestion-pill"
+                      onClick={() => handleAddTag(name)}
+                      title={`Add tag ${name}`}
+                    >
+                      {name}
+                    </button>
                   );
                 })}
-                ]
               </div>
             </div>
 

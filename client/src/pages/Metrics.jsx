@@ -380,8 +380,6 @@ export default function Metrics() {
       </div>
 
       {/* ── Body ───────────────────────────────────────────────── */}
-      <div className="metrics-body">
-
         {/* KPI cards */}
         <div className="kpi-row">
           <KpiCard
@@ -504,7 +502,7 @@ export default function Metrics() {
             )}
           </div>
         </section>
-      </div>
+
     </section>
   );
 }

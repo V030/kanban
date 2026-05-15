@@ -93,6 +93,14 @@
   position: relative; /* anchor absolute controls like the ellipsis dropdown */
 }
 
+/* Remove visible container for the focus/header card so it appears flush */
+.tdm-focus-card {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
 .tdm-section-header {
   display: flex;
   flex-direction: row;
@@ -510,12 +518,14 @@
   border: 1px solid var(--color-border-subtle);
   background: transparent;
   color: var(--color-text-secondary);
-  padding: 6px 10px;
+  padding: 0;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  width: 100%;
 }
 
 .tdm-target-clear:disabled {
@@ -523,19 +533,41 @@
   cursor: not-allowed;
 }
 
-.tdm-target-error {
-  margin-top: 6px;
-  color: #b42318;
-  font-size: 0.78rem;
+.tdm-target-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-.tdm-member-chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0;
+.tdm-target-row .tdm-target-input {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: #fff;
+}
+
+.tdm-target-clear {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
   padding: 0;
-  list-style: none;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tdm-target-clear svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.tdm-target-clear:hover {
+  color: var(--color-primary-hover);
 }
 
 .tdm-member-chip {
@@ -665,7 +697,7 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
+  gap: 0;
   max-height: 320px;
   overflow: auto;
   padding-right: 2px;
@@ -673,21 +705,20 @@
 
 .tdm-subtask-row {
   display: grid;
-  grid-template-columns: 44px 1fr auto;
+  grid-template-columns: 12px 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 10px 0;
   min-height: 70px;
-  border: 1px solid #e7f0f7;
-  border-radius: 12px;
-  background: #ffffff;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  transition: background-color var(--transition-fast);
 }
 
 .tdm-subtask-row:hover {
-  background: #fbfdff;
-  border-color: #d7eaf6;
-  transform: translateY(-1px);
+  background: #f3f6f8;
+  transform: none;
 }
 
 .tdm-subtask-left {
@@ -696,11 +727,15 @@
   justify-content: center;
 }
 
-.tdm-subtask-checkbox {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--color-primary, #2b9bf4);
-  cursor: pointer;
+.tdm-subtask-index {
+  display: inline-block;
+  vertical-align: middle;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  background: transparent;
+  margin-right: 6px;
+  font-size: 0.78rem;
+  line-height: 1.15;
 }
 
 .tdm-subtask-main {
@@ -708,6 +743,12 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+}
+
+.tdm-subtask-title-row {
+  display: flex;
+  align-items: flex-start; /* align index with first line of title */
+  gap: 4px;
 }
 
 .tdm-subtask-title {
@@ -1111,13 +1152,38 @@
 }
 
 .tdm-suggestions-content {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
-  background: #fbfdff;
-  border: 1px solid #eef6ff;
-  padding: 10px;
-  border-radius: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
   color: var(--color-text-primary);
   font-size: 0.9rem;
+}
+
+.tdm-suggestions-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 0 0 0;
+}
+
+.tdm-suggestion-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f1f8ff;
+  color: var(--color-primary-hover);
+  border: 1px solid #d7eafc;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.tdm-suggestion-pill:hover {
+  background: #e6f3ff;
+  transform: translateY(-1px);
 }
 
 .tdm-suggestion-in-array {
@@ -1159,7 +1225,8 @@
 .tdm-tags-controls {
   margin-top: 12px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .tdm-tag-error {
@@ -1222,7 +1289,7 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tdm-comments-list {
@@ -1233,7 +1300,7 @@
 
 .tdm-comment-item {
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
   background: #ffffff;
   display: flex;
   flex-direction: column;
@@ -1345,15 +1412,28 @@
   font-size: 0.82rem;
 }
 
+.tdm-target-row .tdm-target-input {
+  width: 120px;
+  height: 36px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: #fff;
+  box-sizing: border-box;
+}
+
 .tdm-reply-submit {
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  background: var(--color-primary-subtle);
+  padding: 0 12px;
   color: var(--color-primary-hover);
   padding: 6px 12px;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
 }
 
 .tdm-reply-submit:disabled {
@@ -1367,13 +1447,13 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   border-left: 2px solid #e6eef7;
 }
 
 .tdm-reply-item {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: flex-start;
 }
 
@@ -1495,10 +1575,13 @@
 }
 
 .tdm-subtasks-shell {
-  border: 1px solid rgba(176, 196, 216, 0.56);
-  border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
+  /* make subtasks appear flush like the header */
+  border: none;
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .tdm-subtasks-header {
