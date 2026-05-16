@@ -1159,6 +1159,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
               <div className="tdm-section-header">
                 <h3 className="tdm-task-title-label">Task</h3>
                 <div className="task-actions-wrap" ref={menuButtonRef}>
+                
                 <button
                   className="task-more-btn"
                   onClick={() => setMenuOpen(prev => !prev)}
@@ -1341,14 +1342,26 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 <div className="tdm-inline-edit-actions">
                   <button
                     type="button"
-                    className="tdm-inline-edit-save"
+                    className="tdm-inline-edit-action-btn tdm-inline-edit-save"
                     onClick={saveTaskTitle}
                     disabled={taskTitleSaving}
+                    title="Save task name"
+                    aria-label="Save task name"
                   >
-                    {taskTitleSaving ? "Saving..." : "Save"}
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M9 16.2l-3.5-3.5 1.4-1.4L9 13.4l8.1-8.1 1.4 1.4z" />
+                    </svg>
                   </button>
-                  <button type="button" className="tdm-inline-edit-cancel" onClick={cancelEditTaskTitle}>
-                    Cancel
+                  <button
+                    type="button"
+                    className="tdm-inline-edit-action-btn tdm-inline-edit-cancel"
+                    onClick={cancelEditTaskTitle}
+                    title="Cancel editing task name"
+                    aria-label="Cancel editing task name"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" />
+                    </svg>
                   </button>
                 </div>
               )}
@@ -1384,14 +1397,26 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 <div className="tdm-inline-edit-actions">
                   <button
                     type="button"
-                    className="tdm-inline-edit-save"
+                    className="tdm-inline-edit-action-btn tdm-inline-edit-save"
                     onClick={saveTaskDesc}
                     disabled={taskDescSaving}
+                    title="Save task description"
+                    aria-label="Save task description"
                   >
-                    {taskDescSaving ? "Saving..." : "Save"}
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M9 16.2l-3.5-3.5 1.4-1.4L9 13.4l8.1-8.1 1.4 1.4z" />
+                    </svg>
                   </button>
-                  <button type="button" className="tdm-inline-edit-cancel" onClick={cancelEditTaskDesc}>
-                    Cancel
+                  <button
+                    type="button"
+                    className="tdm-inline-edit-action-btn tdm-inline-edit-cancel"
+                    onClick={cancelEditTaskDesc}
+                    title="Cancel editing task description"
+                    aria-label="Cancel editing task description"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" />
+                    </svg>
                   </button>
                 </div>
               )}
@@ -1689,6 +1714,14 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
           }}
         >
           <div className="tdm-manage-content">
+            <button
+              type="button"
+              className="tdm-close-btn tdm-manage-close"
+              onClick={() => setShowTagsModal(false)}
+              aria-label="Close manage tags"
+            >
+              ×
+            </button>
             <h3>Manage Tags</h3>
             <p className="tdm-manage-desc">
               Tags help categorize and filter tasks across the project. Add new tags or choose
@@ -1760,7 +1793,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
             </div>
 
             <div className="tdm-tags-controls">
-              <button type="button" onClick={() => setShowTagsModal(false)} className="tdm-cancel-btn">
+              <button type="button" onClick={() => setShowTagsModal(false)} className="tdm-close-btn tdm-manage-close-bottom">
                 Close
               </button>
             </div>

@@ -1,25 +1,22 @@
 import "../styles/ProjectSettingsModal.css";
-import "../styles/SkeletonLoading.css";
+import { useState } from "react";
 
 function ToggleRow({ id, label, description, checked, onChange, disabled = false, pending = false }) {
   return (
     <div className="ps-toggle-row">
       <div className="ps-toggle-text">
-        <label htmlFor={id} className="ps-toggle-label">
-          {label}
-        </label>
+        <label htmlFor={id} className="ps-toggle-label">{label}</label>
         <p className="ps-toggle-description">
           {description}
           {pending ? " (Updating...)" : ""}
         </p>
       </div>
-
       <label className={`ps-switch ${disabled || pending ? "is-disabled" : ""}`} htmlFor={id}>
         <input
           id={id}
           type="checkbox"
           checked={checked}
-          onChange={(event) => onChange(event.target.checked)}
+          onChange={(e) => onChange(e.target.checked)}
           disabled={disabled || pending}
         />
         <span className="ps-slider" aria-hidden="true" />
@@ -27,6 +24,12 @@ function ToggleRow({ id, label, description, checked, onChange, disabled = false
     </div>
   );
 }
+
+const TABS = [
+  { id: "owner",  label: "Owner" },
+  { id: "admin",  label: "Admin" },
+  { id: "member", label: "Member" },
+];
 
 export default function ProjectSettingsModal({
   isOpen,
@@ -38,15 +41,22 @@ export default function ProjectSettingsModal({
   canEditPermissions = false,
   pendingSettings = {},
   deleteProjectPending = false,
+  activeTab,
+  setActiveTab,
 }) {
+  const [localTab, setLocalTab] = useState("owner");
+  const tab = typeof setActiveTab === "function" ? activeTab : localTab;
+  const setTab = typeof setActiveTab === "function" ? setActiveTab : setLocalTab;
+
   if (!isOpen) return null;
 
   return (
     <div className="ps-overlay" role="dialog" aria-modal="true" aria-label="Project settings">
       <div className="ps-modal">
+
         <header className="ps-header">
           <div>
-            <h2>Project Settings</h2>
+            <h2>Project settings</h2>
             <p>Configure collaboration rules for this project.</p>
           </div>
           <button type="button" className="ps-close-btn" onClick={onClose} aria-label="Close project settings">
@@ -55,186 +65,228 @@ export default function ProjectSettingsModal({
         </header>
 
         {!canEditPermissions && (
-          <div className="ps-section">
-            <p className="ps-readonly-note">
-              Note: Only owners and admins can change these settings. They are read-only for members.
-            </p>
+          <div className="ps-readonly-banner">
+            Only owners and admins can change these settings.
           </div>
         )}
 
-        <section className="ps-section">
-          <h3>Owner Controls</h3>
-          <p className="ps-role-note">Owners have full control over project settings and can delete the project.</p>
-          {projectRole === "owner" && onDeleteProject && (
-            <button
-              type="button"
-              className="ps-delete-project-btn"
-              onClick={onDeleteProject}
-              disabled={deleteProjectPending}
-            >
-              {deleteProjectPending ? "Deleting..." : "Delete Project"}
-            </button>
-          )}
-        </section>
+        <div className="ps-body">
 
-        <section className="ps-section">
-          <h3>Admin Permissions</h3>
+          <nav className="ps-nav" aria-label="Settings sections">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`ps-nav-btn ${tab === t.id ? "is-active" : ""}`}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
 
-          <ToggleRow
-            id="allow-admin-add-member"
-            label="Add Members"
-            description="Allow admins to invite people to the project."
-            checked={settings.allow_admin_add_member}
-            onChange={(nextValue) => onSettingChange("allow_admin_add_member", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_admin_add_member}
-          />
+          <div className="ps-panel">
 
-          <ToggleRow
-            id="allow-admin-remove-member"
-            label="Remove Members"
-            description="Allow admins to remove members from the project."
-            checked={settings.allow_admin_remove_member}
-            onChange={(nextValue) => onSettingChange("allow_admin_remove_member", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_admin_remove_member}
-          />
+            {tab === "owner" && (
+              <>
+                <p className="ps-panel-title">Owner controls</p>
+                <p className="ps-panel-desc">
+                  Owners have full control over project settings.
+                </p>
 
-          <ToggleRow
-            id="allow-admin-add-board"
-            label="Add Boards/Columns"
-            description="Allow admins to add and manage boards & columns."
-            checked={settings.allow_admin_add_board}
-            onChange={(nextValue) => onSettingChange("allow_admin_add_board", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_admin_add_board}
-          />
+                <div className="ps-toggle-list">
+                  <ToggleRow
+                    id="owner-transfer"
+                    label="Transfer ownership"
+                    description="Assign a new owner to this project."
+                    checked={settings.allow_owner_transfer ?? false}
+                    onChange={(v) => onSettingChange("allow_owner_transfer", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_owner_transfer}
+                  />
+                  <ToggleRow
+                    id="owner-archive"
+                    label="Archive project"
+                    description="Hide the project without permanently deleting it."
+                    checked={settings.allow_owner_archive ?? false}
+                    onChange={(v) => onSettingChange("allow_owner_archive", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_owner_archive}
+                  />
+                </div>
 
-          <ToggleRow
-            id="allow-admin-manage-tasks"
-            label="Manage Tasks"
-            description="Allow admins to create, edit, move, and delete tasks."
-            checked={settings.allow_admin_manage_tasks}
-            onChange={(nextValue) => onSettingChange("allow_admin_manage_tasks", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_admin_manage_tasks}
-          />
+                {projectRole === "owner" && onDeleteProject && (
+                  <div className="ps-danger-zone">
+                    <p className="ps-danger-title">Danger zone</p>
+                    <p className="ps-danger-desc">Permanently delete this project and all its data. This cannot be undone.</p>
+                    <button
+                      type="button"
+                      className="ps-delete-btn"
+                      onClick={onDeleteProject}
+                      disabled={deleteProjectPending}
+                    >
+                      {deleteProjectPending ? "Deleting..." : "Delete project"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
 
-          <ToggleRow
-            id="allow-admin-create-tag"
-            label="Create Tags"
-            description="Allow admins to create tags on tasks."
-            checked={settings.allow_admin_create_tag}
-            onChange={(nextValue) => onSettingChange("allow_admin_create_tag", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_admin_create_tag}
-          />
-        </section>
+            {tab === "admin" && (
+              <>
+                <p className="ps-panel-title">Admin permissions</p>
+                <p className="ps-panel-desc">Control what admins are allowed to do in this project.</p>
+                <div className="ps-toggle-list">
+                  <ToggleRow
+                    id="allow-admin-add-member"
+                    label="Add members"
+                    description="Allow admins to invite people to the project."
+                    checked={settings.allow_admin_add_member}
+                    onChange={(v) => onSettingChange("allow_admin_add_member", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_admin_add_member}
+                  />
+                  <ToggleRow
+                    id="allow-admin-remove-member"
+                    label="Remove members"
+                    description="Allow admins to remove members from the project."
+                    checked={settings.allow_admin_remove_member}
+                    onChange={(v) => onSettingChange("allow_admin_remove_member", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_admin_remove_member}
+                  />
+                  <ToggleRow
+                    id="allow-admin-add-board"
+                    label="Add boards & columns"
+                    description="Allow admins to add and manage boards & columns."
+                    checked={settings.allow_admin_add_board}
+                    onChange={(v) => onSettingChange("allow_admin_add_board", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_admin_add_board}
+                  />
+                  <ToggleRow
+                    id="allow-admin-manage-tasks"
+                    label="Manage tasks"
+                    description="Allow admins to create, edit, move, and delete tasks."
+                    checked={settings.allow_admin_manage_tasks}
+                    onChange={(v) => onSettingChange("allow_admin_manage_tasks", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_admin_manage_tasks}
+                  />
+                  <ToggleRow
+                    id="allow-admin-create-tag"
+                    label="Create tags"
+                    description="Allow admins to create tags on tasks."
+                    checked={settings.allow_admin_create_tag}
+                    onChange={(v) => onSettingChange("allow_admin_create_tag", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_admin_create_tag}
+                  />
+                </div>
+              </>
+            )}
 
-        <section className="ps-section">
-          <h3>Member Permissions</h3>
+            {tab === "member" && (
+              <>
+                <p className="ps-panel-title">Member permissions</p>
+                <p className="ps-panel-desc">Control what regular members are allowed to do.</p>
+                <div className="ps-toggle-list">
+                  <ToggleRow
+                    id="allow-create"
+                    label="Create tasks"
+                    description="Allow project members to create new tasks."
+                    checked={settings.allow_member_create_task}
+                    onChange={(v) => onSettingChange("allow_member_create_task", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_create_task}
+                  />
+                  <ToggleRow
+                    id="allow-take"
+                    label="Take tasks"
+                    description="Allow members to assign themselves to unassigned tasks."
+                    checked={settings.allow_member_take_task}
+                    onChange={(v) => onSettingChange("allow_member_take_task", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_take_task}
+                  />
+                  <ToggleRow
+                    id="allow-edit"
+                    label="Edit tasks"
+                    description="Allow members to edit task details."
+                    checked={settings.allow_member_edit_task}
+                    onChange={(v) => onSettingChange("allow_member_edit_task", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_edit_task}
+                  />
+                  <ToggleRow
+                    id="allow-delete"
+                    label="Delete tasks"
+                    description="Allow members to delete tasks."
+                    checked={settings.allow_member_delete_task}
+                    onChange={(v) => onSettingChange("allow_member_delete_task", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_delete_task}
+                  />
+                  <ToggleRow
+                    id="allow-add-board"
+                    label="Add boards & columns"
+                    description="Allow project members to add and manage boards & columns."
+                    checked={settings.allow_member_add_board}
+                    onChange={(v) => onSettingChange("allow_member_add_board", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_add_board}
+                  />
+                  <ToggleRow
+                    id="allow-add-member"
+                    label="Add members"
+                    description="Allow project members to invite other people to the project."
+                    checked={settings.allow_member_add_member}
+                    onChange={(v) => onSettingChange("allow_member_add_member", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_add_member}
+                  />
+                  <ToggleRow
+                    id="allow-member-review"
+                    label="Review tasks"
+                    description="Allow project members to approve or reject tasks in review."
+                    checked={settings.allow_member_review}
+                    onChange={(v) => onSettingChange("allow_member_review", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_review}
+                  />
+                  <ToggleRow
+                    id="allow-member-move-task-to-done"
+                    label="Move assigned tasks to done"
+                    description="Allow an assignee to mark their own task as done."
+                    checked={settings.allow_member_move_task_to_done}
+                    onChange={(v) => onSettingChange("allow_member_move_task_to_done", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_move_task_to_done}
+                  />
+                  <ToggleRow
+                    id="allow-assign-task-to-member"
+                    label="Assign tasks to others"
+                    description="Allow project members to assign tasks to other members."
+                    checked={settings.allow_assign_task_to_member}
+                    onChange={(v) => onSettingChange("allow_assign_task_to_member", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_assign_task_to_member}
+                  />
+                </div>
+                <p className="ps-member-note">
+                  Members can create tags only when they created the task or are assigned to it. Admins and owners can create tags normally.
+                </p>
+              </>
+            )}
 
-          <ToggleRow
-            id="allow-create"
-            label="Create tasks"
-            description="Allow project members to create new tasks."
-            checked={settings.allow_member_create_task}
-            onChange={(nextValue) => onSettingChange("allow_member_create_task", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_member_create_task}
-          />
-
-          <ToggleRow
-            id="allow-take"
-            label="Take tasks"
-            description="Allow members to assign themselves to unassigned tasks."
-            checked={settings.allow_member_take_task}
-            onChange={(nextValue) => onSettingChange("allow_member_take_task", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_member_take_task}
-          />
-
-          <ToggleRow
-            id="allow-edit"
-            label="Edit tasks"
-            description="Allow members to edit task details."
-            checked={settings.allow_member_edit_task}
-            onChange={(nextValue) => onSettingChange("allow_member_edit_task", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_member_edit_task}
-          />
-
-          <ToggleRow
-            id="allow-delete"
-            label="Delete tasks"
-            description="Allow members to delete tasks."
-            checked={settings.allow_member_delete_task}
-            onChange={(nextValue) => onSettingChange("allow_member_delete_task", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_member_delete_task}
-          />
-
-          <ToggleRow
-            id="allow-add-board"
-            label="Add Boards/Columns"
-            description="Allow project members to add and manage boards & columns."
-            checked={settings.allow_member_add_board}
-            onChange={(nextValue) => onSettingChange("allow_member_add_board", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_member_add_board}
-          />
-
-          <ToggleRow
-            id="allow-add-member"
-            label="Add Members"
-            description="Allow project members to invite other people to the project."
-            checked={settings.allow_member_add_member}
-            onChange={(nextValue) => onSettingChange("allow_member_add_member", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_member_add_member}
-          />
-
-          <ToggleRow
-            id="allow-member-review"
-            label="Review tasks"
-            description="Allow project members to approve or reject tasks in review."
-            checked={settings.allow_member_review}
-            onChange={(nextValue) => onSettingChange("allow_member_review", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_member_review}
-          />
-
-          <ToggleRow
-            id="allow-member-move-task-to-done"
-            label="Move assigned tasks to Done"
-            description="Allow an assignee to mark their own task as Done."
-            checked={settings.allow_member_move_task_to_done}
-            onChange={(nextValue) => onSettingChange("allow_member_move_task_to_done", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_member_move_task_to_done}
-          />
-
-          <ToggleRow
-            id="allow-assign-task-to-member"
-            label="Allow members to assign task to others"
-            description="This allows the project members to assign task to other members in this project."
-            checked={settings.allow_assign_task_to_member}
-            onChange={(nextValue) => onSettingChange("allow_assign_task_to_member", nextValue)}
-            disabled={!canEditPermissions}
-            pending={!!pendingSettings.allow_assign_task_to_member}
-          />
-
-          <p className="ps-member-note">
-            Members can create tags only when they created the task or are assigned to it. Review and Done actions are controlled separately. Admins and owners can create tags normally.
-          </p>
-        </section>
+          </div>
+        </div>
 
         <footer className="ps-footer">
-          <p>Signed in as role: {projectRole}</p>
-          <button type="button" className="ps-done-btn" onClick={onClose}>
-            Done
-          </button>
+          <span className="ps-footer-role">Role: {projectRole}</span>
+          <button type="button" className="ps-done-btn" onClick={onClose}>Done</button>
         </footer>
+
       </div>
     </div>
   );

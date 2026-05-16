@@ -1009,14 +1009,30 @@ function KanbanPage() {
 							<div className="kanban-inline-edit-actions">
 								<button
 									type="button"
-									className="btn btn-primary"
+									className="kanban-inline-edit-action-btn kanban-inline-save-btn"
 									onClick={saveProjectName}
 									disabled={projectNameSaving}
+									title="Save project name"
+									aria-label="Save project name"
 								>
-									{projectNameSaving ? "Saving..." : "Save"}
+									{projectNameSaving ? (
+										<span className="kanban-inline-btn-spinner" aria-hidden="true" />
+									) : (
+										<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+											<path d="M9 16.2l-3.5-3.5 1.4-1.4L9 13.4l8.1-8.1 1.4 1.4z" />
+										</svg>
+									)}
 								</button>
-								<button type="button" className="btn btn-secondary" onClick={cancelEditProjectName}>
-									Cancel
+								<button
+									type="button"
+									className="kanban-inline-edit-action-btn kanban-inline-cancel-btn"
+									onClick={cancelEditProjectName}
+									title="Cancel editing project name"
+									aria-label="Cancel editing project name"
+								>
+									<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+										<path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" />
+									</svg>
 								</button>
 							</div>
 						)}
@@ -1052,14 +1068,30 @@ function KanbanPage() {
 							<div className="kanban-inline-edit-actions">
 								<button
 									type="button"
-									className="btn btn-primary"
+									className="kanban-inline-edit-action-btn kanban-inline-save-btn"
 									onClick={saveProjectDesc}
 									disabled={projectDescSaving}
+									title="Save project description"
+									aria-label="Save project description"
 								>
-									{projectDescSaving ? "Saving..." : "Save"}
+									{projectDescSaving ? (
+										<span className="kanban-inline-btn-spinner" aria-hidden="true" />
+									) : (
+										<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+											<path d="M9 16.2l-3.5-3.5 1.4-1.4L9 13.4l8.1-8.1 1.4 1.4z" />
+										</svg>
+									)}
 								</button>
-								<button type="button" className="btn btn-secondary" onClick={cancelEditProjectDesc}>
-									Cancel
+								<button
+									type="button"
+									className="kanban-inline-edit-action-btn kanban-inline-cancel-btn"
+									onClick={cancelEditProjectDesc}
+									title="Cancel editing project description"
+									aria-label="Cancel editing project description"
+								>
+									<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+										<path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" />
+									</svg>
 								</button>
 							</div>
 						)}

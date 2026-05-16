@@ -4,6 +4,8 @@ import {
 	register,
 	requestPasswordResetController,
 	resetPasswordController,
+	verifyPasswordResetController,
+	completePasswordResetController,
 	testEmailController,
 } from "../controllers/authController.js";
 import {
@@ -79,6 +81,8 @@ const router = express.Router();
 router.post("/login", authLimiter, login);
 router.post("/register", authLimiter, register);
 router.post("/forgot-password/request-otp", passwordResetRequestLimiter, requestPasswordResetController);
+router.post("/forgot-password/verify-otp", passwordResetConfirmLimiter, verifyPasswordResetController);
+router.post("/forgot-password/complete", passwordResetConfirmLimiter, completePasswordResetController);
 router.post("/forgot-password/reset-password", passwordResetConfirmLimiter, resetPasswordController);
 router.post("/test-email", authLimiter, testEmailController);
 router.post("/create-project", authenticateToken, projectActionLimiter, createProject);

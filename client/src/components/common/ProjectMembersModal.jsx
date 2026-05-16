@@ -1,5 +1,4 @@
 import "../styles/ProjectMembersModal.css";
-import "./CreateProjectModal.css";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
 import ProjectMembersList from "./ProjectMembersList";
 import { getFriends } from "../../services/friendService";
@@ -16,6 +15,22 @@ function getProfileImageSrc(user) {
     user?.profileImage ||
     null
   );
+}
+
+function FriendAvatar({ friend }) {
+  const src = getProfileImageSrc(friend);
+  const initials = (
+    (friend.firstName || "").charAt(0) + (friend.lastName || "").charAt(0)
+  ).toUpperCase();
+
+  if (src) {
+    return (
+      <div className="pmv-friend-avatar">
+        <img src={src} alt={`${friend.firstName || ""} ${friend.lastName || ""}`.trim() || friend.email} />
+      </div>
+    );
+  }
+  return <div className="pmv-friend-initials">{initials}</div>;
 }
 
 export default function ProjectMembersModal({
@@ -36,7 +51,6 @@ export default function ProjectMembersModal({
   memberActionError = "",
   onAdded,
 }) {
-
   const [email, setEmail] = useState("");
   const [inviteError, setInviteError] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -47,6 +61,10 @@ export default function ProjectMembersModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    setEmail("");
+    setInviteError("");
+    setFriendSearch("");
+    setPendingFriendId("");
     loadFriends();
   }, [isOpen]);
 
@@ -62,19 +80,13 @@ export default function ProjectMembersModal({
     }
   }
 
-  const handleSelectFriend = async (friend, project) => {
+  const handleSelectFriend = async (friendId, projectId) => {
     setInviteLoading(true);
     setInviteError("");
-    setPendingFriendId(String(friend));
-
+    setPendingFriendId(String(friendId));
     try {
-      await inviteMemberToProject ({
-        projectId: project,
-        friendId: friend,
-      });
-      if (onAdded) {
-        await onAdded();
-      }
+      await inviteMemberToProject({ projectId, friendId });
+      if (onAdded) await onAdded();
     } catch (err) {
       setInviteError(err?.message || "Failed to send an invite.");
     } finally {
@@ -88,25 +100,16 @@ export default function ProjectMembersModal({
     setInviteError("");
 
     if (!email || !email.trim()) {
-      setInviteError("Please enter an email");
+      setInviteError("Please enter an email.");
       return;
     }
 
     setInviteLoading(true);
     try {
-      if (!project?.id) {
-        throw new Error("Project is missing");
-      }
-
-      await inviteMemberToProject({
-        projectId: project.id,
-        email: email.trim(), 
-      });
-
+      if (!project?.id) throw new Error("Project is missing.");
+      await inviteMemberToProject({ projectId: project.id, email: email.trim() });
       setEmail("");
-      if (onAdded) {
-        await onAdded();
-      }
+      if (onAdded) await onAdded();
       onClose();
     } catch (err) {
       setInviteError(err?.message || "Failed to send an invite.");
@@ -115,8 +118,9 @@ export default function ProjectMembersModal({
     }
   };
 
-  
   if (!isOpen) return null;
+
+  const projectName = project?.name || "Project";
 
   const normalizedSearch = friendSearch.trim().toLowerCase();
   const filteredFriends = normalizedSearch
@@ -130,123 +134,132 @@ export default function ProjectMembersModal({
   return (
     <div className="pmv-overlay" role="dialog" aria-modal="true" aria-label="Project members">
       <div className="pmv-modal">
+
+        {/* Modal header */}
         <header className="pmv-header">
           <div>
-            <h2>Project Members</h2>
-            <p>{project?.name ? `People currently collaborating in ${project?.name}.` : "People currently collaborating in this project."}</p>
+            <h2 className="pmv-title">Project Members</h2>
+            <p className="pmv-subtitle">
+              {project?.name
+                ? `People currently collaborating in ${projectName}.`
+                : "People currently collaborating in this project."}
+              
+            </p>
           </div>
-          <button type="button" className="pmv-close-btn" onClick={onClose} aria-label="Close project members">
+          <button type="button" className="pmv-close-btn" onClick={onClose} aria-label="Close">
             &times;
           </button>
         </header>
 
-        <ProjectMembersList
-          members={members}
-          loading={loading}
-          error={error}
-          currentUserId={currentUserId}
-          currentUserRole={currentUserRole}
-          canRemoveMembers={canRemoveMembers}
-          canUpdateRoles={canUpdateRoles}
-          onRemoveMember={onRemoveMember}
-          onUpdateRole={onUpdateRole}
-          removePending={removePending}
-          updateRolePending={updateRolePending}
-          compact
-        />
+        {/* Two-column body */}
+        <div className="pmv-columns">
 
-        {memberActionError && <p className="error-message">{memberActionError}</p>}
+          {/* Left: current members (2/3) */}
+          <div className="pmv-col-members">
+            <div className="pmv-col-label">
+              <span>Members</span>
+              {members.length > 0 && (
+                <span className="pmv-member-count">{members.length}</span>
+              )}
+            </div>
 
-        <div className="modal-header">
-          <h2>Add Someone to "{project?.name || 'Project'}"</h2>
-          <button className="close-btn" onClick={onClose} aria-label="Close">&times;</button>
+            <ProjectMembersList
+              members={members}
+              loading={loading}
+              error={error}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
+              canRemoveMembers={canRemoveMembers}
+              canUpdateRoles={canUpdateRoles}
+              onRemoveMember={onRemoveMember}
+              onUpdateRole={onUpdateRole}
+              removePending={removePending}
+              updateRolePending={updateRolePending}
+              compact
+            />
+
+            {memberActionError && (
+              <p className="pmv-error">{memberActionError}</p>
+            )}
+          </div>
+
+          {/* Right: invite panel (1/3) */}
+          <aside className="pmv-col-invite">
+
+            {/* Email invite */}
+            <div className="pmv-invite-section">
+              <span className="pmv-col-label">Invite by email</span>
+              <form onSubmit={handleSubmit} className="pmv-email-form">
+                <input
+                  id="memberEmail"
+                  name="email"
+                  type="email"
+                  className="pmv-input"
+                  placeholder="person@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <button
+                  type="submit"
+                  className="pmv-send-btn"
+                  disabled={inviteLoading}
+                >
+                  {inviteLoading ? "Sending…" : "Send invite"}
+                </button>
+              </form>
+              {inviteError && <p className="pmv-error">{inviteError}</p>}
+            </div>
+
+            {/* Friends list */}
+            <div className="pmv-friends-section">
+              <span className="pmv-col-label">Your friends</span>
+              <input
+                id="projectMemberSearch"
+                name="projectMemberSearch"
+                type="text"
+                className="pmv-input"
+                placeholder="Search by name or email…"
+                value={friendSearch}
+                onChange={(e) => setFriendSearch(e.target.value)}
+              />
+
+              <div className="pmv-friends-list">
+                {friendsLoading && (
+                  <p className="pmv-muted">Loading friends…</p>
+                )}
+                {!friendsLoading && friends.length === 0 && (
+                  <p className="pmv-muted">You have no friends yet.</p>
+                )}
+                {!friendsLoading && friends.length > 0 && filteredFriends.length === 0 && (
+                  <p className="pmv-muted">No matches found.</p>
+                )}
+                {!friendsLoading && filteredFriends.map((f) => (
+                  <div key={f.id} className="pmv-friend-item">
+                    <FriendAvatar friend={f} />
+                    <div className="pmv-friend-meta">
+                      <span className="pmv-friend-name">
+                        {`${f.firstName || ""} ${f.lastName || ""}`.trim() || f.email}
+                      </span>
+                      <span className="pmv-friend-email">{f.email}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="pmv-add-btn"
+                      onClick={() => handleSelectFriend(f.id, project.id)}
+                      disabled={pendingFriendId === String(f.id)}
+                    >
+                      {pendingFriendId === String(f.id) ? "…" : "Add"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </aside>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            <div className="form-group">
-              <label htmlFor="memberEmail">Email <span className="required">*</span></label>
-              <input
-                id="memberEmail"
-                name="email"
-                type="email"
-                placeholder="person@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <small>We'll send someone an invitation to this project.</small>
-            </div>
-
-            <div className="modal-subsection">
-              <strong>Your Friends</strong>
-              <div className="form-group" style={{ marginTop: 10 }}>
-                <label htmlFor="projectMemberSearch">Search</label>
-                <input
-                  id="projectMemberSearch"
-                  name="projectMemberSearch"
-                  type="text"
-                  placeholder="Search by name or email"
-                  value={friendSearch}
-                  onChange={(e) => setFriendSearch(e.target.value)}
-                />
-              </div>
-              {friendsLoading && <p>Loading friends...</p>}
-              {!friendsLoading && friends.length === 0 && <p className="modal-muted">You have no friends yet.</p>}
-              {!friendsLoading && friends.length > 0 && filteredFriends.length === 0 && (
-                <p className="modal-muted">No matches found.</p>
-              )}
-              {!friendsLoading && filteredFriends.length > 0 && (
-                <div className="friends-list">
-                  {filteredFriends.map((f) => (
-                    <div key={f.id} className="friend-item">
-                          <div className="friend-item-main">
-                            {(() => {
-                              const src = getProfileImageSrc(f);
-                              return src ? (
-                                <div className="friend-avatar"><img src={src} alt={`${f.firstName || ''} ${f.lastName || ''}`.trim() || f.email} /></div>
-                              ) : (
-                                <div className="friend-initials">{((f.firstName||'').charAt(0) + (f.lastName||'').charAt(0)).toUpperCase()}</div>
-                              );
-                            })()}
-                            <div className="friend-meta">
-                              <div className="friend-name">{`${f.firstName || ''} ${f.lastName || ''}`.trim() || f.email}</div>
-                              <div className="friend-email">{f.email}</div>
-                            </div>
-                          </div>
-                      <div className="friend-item-action">
-                        <button
-                          type="button"
-                          className="friend-add-btn"
-                          onClick={() => handleSelectFriend(f.id, project.id)}
-                          disabled={pendingFriendId === String(f.id)}
-                        >
-                          {pendingFriendId === String(f.id) ? "Sending..." : "Add"}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="modal-footer">
-            <button type="button" className="cancel-btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="submit-btn" disabled={inviteLoading}>{inviteLoading ? 'Sending...' : 'Send Invite'}</button>
-          </div>
-        </form>
-
-        {inviteError && <p className="error-message">{inviteError}</p>}
-
-        <footer className="pmv-footer">
-          <button type="button" className="pmv-done-btn" onClick={onClose}>
-            Done
-          </button>
-        </footer>
       </div>
-
-
     </div>
   );
 }

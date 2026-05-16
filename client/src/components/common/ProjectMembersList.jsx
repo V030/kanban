@@ -1,3 +1,4 @@
+import React, { useState, useRef, useEffect } from "react";
 import "../styles/ProjectMembersList.css";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
 
@@ -43,13 +44,63 @@ export default function ProjectMembersList({
   removePending = {},
   updateRolePending = {},
 }) {
+  function RoleSelector({ member, disabled, onChange, pending }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+      function onDoc(e) {
+        if (!ref.current) return;
+        if (!ref.current.contains(e.target)) setOpen(false);
+      }
+      document.addEventListener("click", onDoc);
+      return () => document.removeEventListener("click", onDoc);
+    }, []);
+
+    const current = (member.role || "member").toLowerCase();
+    // Only allow switching between admin and member via this dropdown.
+    const options = [
+      { key: "admin", label: "Admin" },
+      { key: "member", label: "Member" },
+    ];
+
+    return (
+      <div className="pm-role-selector" ref={ref}>
+        <button
+          type="button"
+          className={`pm-role selector ${disabled ? "disabled" : ""}`}
+          onClick={() => !disabled && setOpen((s) => !s)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          title={`Role: ${member.role || "member"}`}
+        >
+          {pending ? "…" : (member.role || "member")}
+        </button>
+
+        {open && (
+          <ul className="pm-role-options" role="listbox">
+            {options.map((opt) => (
+              <li key={opt.key} role="option">
+                <button
+                  type="button"
+                  className={`pm-role-option ${opt.key === current ? "active" : ""}`}
+                  onClick={() => {
+                    setOpen(false);
+                    if (opt.key !== current) onChange(opt.key);
+                  }}
+                  disabled={disabled || opt.key === current}
+                >
+                  {opt.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
   return (
     <section className={`pm-section ${compact ? "pm-section-compact" : ""}`} aria-live="polite">
-      <header className="pm-header">
-        <h3>Project Members</h3>
-        <span className="pm-count">{members.length}</span>
-      </header>
-
       {loading && <p className="pm-empty">Loading members...</p>}
       {!loading && error && <p className="pm-error">{error}</p>}
 
@@ -85,42 +136,33 @@ export default function ProjectMembersList({
                   </div>
                 </div>
                 <div className="pm-actions-container">
-                  <span className={getRoleClassName(member.role)}>{member.role || "member"}</span>
-                  {(canRemove || canPromote || canDemote) && (
+                  {((member.role||"").toLowerCase() === "owner") ? (
+                    <span className={getRoleClassName(member.role)}>{member.role}</span>
+                  ) : (
+                    <RoleSelector
+                      member={member}
+                      disabled={!(canPromote || canDemote)}
+                      pending={updateRolePending?.[member.id]}
+                      onChange={(newRole) => onUpdateRole?.(member.id, newRole)}
+                    />
+                  )}
+
+                  {(canRemove) && (
                     <div className="pm-actions">
-                      {canPromote && (
-                        <button
-                          type="button"
-                          className="pm-action-btn pm-promote-btn"
-                          onClick={() => onUpdateRole?.(member.id, "admin")}
-                          disabled={updateRolePending?.[member.id]}
-                          title="Promote to Admin"
-                        >
-                          ▲
-                        </button>
-                      )}
-                      {canDemote && (
-                        <button
-                          type="button"
-                          className="pm-action-btn pm-demote-btn"
-                          onClick={() => onUpdateRole?.(member.id, "member")}
-                          disabled={updateRolePending?.[member.id]}
-                          title="Demote to Member"
-                        >
-                          ▼
-                        </button>
-                      )}
-                      {canRemove && (
-                        <button
-                          type="button"
-                          className="pm-action-btn pm-remove-btn"
-                          onClick={() => onRemoveMember?.(member.id)}
-                          disabled={removePending?.[member.id]}
-                          title="Remove from Project"
-                        >
-                          ✕
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="pm-remove-icon"
+                        onClick={() => onRemoveMember?.(member.id)}
+                        disabled={removePending?.[member.id]}
+                        aria-label="Remove from project"
+                        title="Remove"
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none">
+                          <path d="M12 11a3 3 0 100-6 3 3 0 000 6z" fill="currentColor" />
+                          <path d="M4 20a8 8 0 0116 0H4z" fill="currentColor" />
+                          <rect x="17" y="10" width="5" height="2" rx="1" fill="currentColor" />
+                        </svg>
+                      </button>
                     </div>
                   )}
                 </div>

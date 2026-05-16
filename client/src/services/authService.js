@@ -125,6 +125,36 @@ export async function requestPasswordResetOtp(email) {
   return response.json();
 }
 
+export async function verifyPasswordResetOtp(email, otp) {
+  const response = await fetch(`${API_URL}/auth/forgot-password/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to verify OTP");
+  }
+
+  return response.json();
+}
+
+export async function completePasswordResetWithToken(resetToken, newPassword) {
+  const response = await fetch(`${API_URL}/auth/forgot-password/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resetToken, newPassword }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to complete password reset");
+  }
+
+  return response.json();
+}
+
 export async function resetPasswordWithOtp(email, otp, newPassword) {
   const response = await fetch(`${API_URL}/auth/forgot-password/reset-password`, {
     method: "POST",

@@ -10,9 +10,46 @@ import {
   updateUserProfile,
   requestPasswordResetOtp,
   resetPasswordWithOtp,
+  verifyPasswordResetOtp,
+  completePasswordReset,
 } from "../models/authModel.js";  
 import { generateToken } from "../utils/jwt.js";
 import { sendPasswordResetOtpEmail } from "../utils/mailer.js";
+
+function sanitizeErrorForClient(err, fallback) {
+  const msg = err && (err.message || String(err)) || "";
+
+  // Known business errors — pass through
+  const business = [
+    "Invalid OTP",
+    "Invalid or expired OTP",
+    "New password must be different from the current password",
+    "Current password is incorrect",
+    "User not found",
+    "Invalid or expired reset token",
+    "Invalid reset token",
+  ];
+  if (business.includes(msg)) return msg;
+
+  // Common SQL / PG driver technical errors — map to friendly text
+  const technicalPatterns = [
+    "inconsistent types",
+    "parameter $",
+    "syntax error",
+    "invalid input",
+    "duplicate key",
+    "relation \"",
+  ];
+
+  for (const p of technicalPatterns) {
+    if (msg.toLowerCase().includes(p)) {
+      return fallback || "Invalid or expired reset code. Please request a new one.";
+    }
+  }
+
+  // Default: if fallback provided use it, otherwise expose a generic message
+  return fallback || "Server error";
+}
 
 
 export async function login(req, res) {
@@ -199,6 +236,27 @@ export async function requestPasswordResetController(req, res) {
   }
 }
 
+export async function verifyPasswordResetController(req, res) {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ message: "Email and OTP are required" });
+  }
+
+  try {
+    const result = await verifyPasswordResetOtp(email.trim(), otp.trim());
+    return res.status(200).json({ message: "OTP verified", resetToken: result.resetToken });
+  } catch (err) {
+    console.error("❌ Verify OTP error:", {
+      email: (email || "").replace(/(^.{2})(.*)(@.*$)/, (m, a, b, c) => a + "***" + c),
+      message: err && (err.message || String(err)),
+      stack: err && err.stack,
+    });
+    const clientMsg = sanitizeErrorForClient(err, "Invalid or expired OTP");
+    return res.status(400).json({ message: clientMsg });
+  }
+}
+
 export async function resetPasswordController(req, res) {
   const { email, otp, newPassword } = req.body;
 
@@ -226,6 +284,30 @@ export async function resetPasswordController(req, res) {
     }
 
     return res.status(500).json({ message: "Server error" });
+  }
+}
+
+export async function completePasswordResetController(req, res) {
+  const { resetToken, newPassword } = req.body;
+
+  if (!resetToken || !newPassword) {
+    return res.status(400).json({ message: "Reset token and new password are required" });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: "New password must be at least 6 characters" });
+  }
+
+  try {
+    await completePasswordReset(resetToken, newPassword);
+    return res.status(200).json({ message: "Password reset successfully" });
+  } catch (err) {
+    console.error("❌ Complete password reset error:", {
+      message: err && (err.message || String(err)),
+      stack: err && err.stack,
+    });
+    const clientMsg = sanitizeErrorForClient(err, "Failed to reset password");
+    return res.status(400).json({ message: clientMsg });
   }
 }
 

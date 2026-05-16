@@ -46,7 +46,7 @@ function TasksIcon() {
 const navItems = [
     { to: "/main-page/dashboard", label: "Dashboard", icon: <DashboardIcon /> },
     { to: "/main-page/projects", label: "Projects", icon: <ProjectsIcon /> },
-    { to: "/main-page/friends", label: "Connections", icon: <TeamIcon /> },
+    { to: "/main-page/friends", label: "Network", icon: <TeamIcon /> },
     { to: "/main-page/my-tasks", label: "My Tasks", icon: <TasksIcon /> },
 ];
 

@@ -1,6 +1,7 @@
 import { pool } from "../config/db.js";
 import bcrypt from "bcrypt";
 import { randomInt } from "node:crypto";
+import jwt from "jsonwebtoken";
 
 // Find user by email
 export async function findByEmail(email) {
@@ -127,7 +128,7 @@ export async function resetPasswordWithOtp(email, otp, newPassword) {
     `
       SELECT user_id, otp_hash, expires_at, attempts, consumed_at
       FROM password_reset_otps
-      WHERE user_id = $1
+      WHERE user_id = $1::uuid
     `,
     [user.id]
   );
@@ -151,9 +152,9 @@ export async function resetPasswordWithOtp(email, otp, newPassword) {
     await pool.query(
       `
         UPDATE password_reset_otps
-        SET attempts = $2,
-            consumed_at = CASE WHEN $2 >= $3 THEN NOW() ELSE consumed_at END
-        WHERE user_id = $1
+        SET attempts = $2::int,
+            consumed_at = CASE WHEN $2::int >= $3::int THEN NOW() ELSE consumed_at END
+        WHERE user_id = $1::uuid
       `,
       [user.id, nextAttempts, maxAttempts]
     );
@@ -169,7 +170,7 @@ export async function resetPasswordWithOtp(email, otp, newPassword) {
     `
       UPDATE password_reset_otps
       SET consumed_at = NOW()
-      WHERE user_id = $1
+      WHERE user_id = $1::uuid
     `,
     [user.id]
   );
@@ -212,4 +213,93 @@ export async function updateUserProfile(userId, firstName, lastName, email, prof
   }
 
   return result.rows[0];
+}
+
+export async function verifyPasswordResetOtp(email, otp) {
+  const user = await findByEmail(email);
+
+  if (!user) {
+    throw new Error("Invalid OTP");
+  }
+
+  const resetResult = await pool.query(
+    `
+      SELECT user_id, otp_hash, expires_at, attempts, consumed_at
+      FROM password_reset_otps
+      WHERE user_id = $1
+    `,
+    [user.id]
+  );
+
+  if (resetResult.rows.length === 0) {
+    throw new Error("Invalid OTP");
+  }
+
+  const resetRow = resetResult.rows[0];
+  const maxAttempts = 5;
+
+  if (resetRow.consumed_at || new Date(resetRow.expires_at).getTime() < Date.now() || resetRow.attempts >= maxAttempts) {
+    throw new Error("Invalid or expired OTP");
+  }
+
+  const otpMatches = await bcrypt.compare(otp, resetRow.otp_hash);
+
+  if (!otpMatches) {
+    const nextAttempts = resetRow.attempts + 1;
+
+    await pool.query(
+      `
+        UPDATE password_reset_otps
+        SET attempts = $2,
+            consumed_at = CASE WHEN $2 >= $3 THEN NOW() ELSE consumed_at END
+        WHERE user_id = $1
+      `,
+      [user.id, nextAttempts, maxAttempts]
+    );
+
+    throw new Error("Invalid OTP");
+  }
+
+  // OTP is valid — issue a short-lived reset token (JWT)
+  const payload = { userId: user.id, email: user.email, purpose: "password_reset" };
+  const token = jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: process.env.PASSWORD_RESET_TOKEN_EXPIRES_IN || "15m",
+  });
+
+  return { resetToken: token };
+}
+
+export async function completePasswordReset(resetToken, newPassword) {
+  let decoded;
+  try {
+    decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+  } catch (err) {
+    throw new Error("Invalid or expired reset token");
+  }
+
+  if (!decoded || decoded.purpose !== "password_reset") {
+    throw new Error("Invalid reset token");
+  }
+
+  const userQuery = await pool.query("SELECT id, password_hash FROM users WHERE id = $1", [decoded.userId]);
+  if (userQuery.rows.length === 0) {
+    throw new Error("User not found");
+  }
+
+  const user = userQuery.rows[0];
+
+  await assertPasswordIsDifferent(user.password_hash, newPassword);
+
+  const updatedUser = await updateUserPassword(user.id, newPassword);
+
+  await pool.query(
+    `
+      UPDATE password_reset_otps
+      SET consumed_at = NOW()
+      WHERE user_id = $1
+    `,
+    [user.id]
+  );
+
+  return updatedUser;
 }

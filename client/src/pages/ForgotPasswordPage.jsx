@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { requestPasswordResetOtp, resetPasswordWithOtp } from "../services/authService";
+import { requestPasswordResetOtp, verifyPasswordResetOtp, completePasswordResetWithToken } from "../services/authService";
 import "../components/styles/WorkspacePages.css";
 
 function ForgotPasswordPage() {
@@ -10,6 +10,7 @@ function ForgotPasswordPage() {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -27,7 +28,7 @@ function ForgotPasswordPage() {
     setLoading(true);
     try {
       await requestPasswordResetOtp(email.trim());
-      setStep("reset");
+      setStep("verify");
       setMessage("If the email exists, a reset code has been sent.");
     } catch (requestError) {
       setError(requestError.message || "Failed to request password reset code");
@@ -36,7 +37,7 @@ function ForgotPasswordPage() {
     }
   };
 
-  const handleResetPassword = async (event) => {
+  const handleVerifyOtp = async (event) => {
     event.preventDefault();
     setError("");
     setMessage("");
@@ -50,6 +51,24 @@ function ForgotPasswordPage() {
       setError("OTP is required");
       return;
     }
+
+    setLoading(true);
+    try {
+      const res = await verifyPasswordResetOtp(email.trim(), otp.trim());
+      setResetToken(res.resetToken);
+      setStep("setPassword");
+      setMessage("OTP verified. Please enter your new password.");
+    } catch (verifyError) {
+      setError(verifyError.message || "Failed to verify OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetPassword = async (event) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
 
     if (!newPassword) {
       setError("New password is required");
@@ -68,11 +87,11 @@ function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      await resetPasswordWithOtp(email.trim(), otp.trim(), newPassword);
+      await completePasswordResetWithToken(resetToken, newPassword);
       setMessage("Password reset successfully. Redirecting to login...");
       setTimeout(() => navigate("/login"), 1400);
-    } catch (resetError) {
-      setError(resetError.message || "Failed to reset password");
+    } catch (err) {
+      setError(err.message || "Failed to reset password");
     } finally {
       setLoading(false);
     }
@@ -99,10 +118,28 @@ function ForgotPasswordPage() {
           <h2>Forgot Password</h2>
           <p>{step === "request" ? "Enter your email to receive a reset code." : "Enter the code and choose a new password."}</p>
 
-          {message && <p className="auth-error" style={{ color: "var(--color-success)" }}>{message}</p>}
-          {error && <p className="auth-error">{error}</p>}
+          {message && (
+            <div role="status" aria-live="polite" className="notice notice--success">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                <path d="M9 12.5l2 2 4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.25" />
+              </svg>
+              <p className="notice__text">{message}</p>
+            </div>
+          )}
 
-          {step === "request" ? (
+          {error && (
+            <div role="alert" className="notice notice--error">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                <path d="M12 8v4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M12 16h.01" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.25" />
+              </svg>
+              <p className="notice__text">{error}</p>
+            </div>
+          )}
+
+          {step === "request" && (
             <form className="auth-form" onSubmit={handleRequestOtp}>
               <div className="auth-field">
                 <label htmlFor="forgot-email">Email</label>
@@ -124,8 +161,10 @@ function ForgotPasswordPage() {
                 </Link>
               </div>
             </form>
-          ) : (
-            <form className="auth-form" onSubmit={handleResetPassword}>
+          )}
+
+          {step === "verify" && (
+            <form className="auth-form" onSubmit={handleVerifyOtp}>
               <div className="auth-field">
                 <label htmlFor="forgot-email-confirm">Email</label>
                 <input
@@ -148,6 +187,19 @@ function ForgotPasswordPage() {
                 />
               </div>
 
+              <div className="auth-actions">
+                <button className="btn btn-primary" type="submit" disabled={loading}>
+                  {loading ? "Verifying..." : "Verify Code"}
+                </button>
+                <button className="btn btn-secondary" type="button" onClick={() => setStep("request")}>
+                  Change Email
+                </button>
+              </div>
+            </form>
+          )}
+
+          {step === "setPassword" && (
+            <form className="auth-form" onSubmit={handleSetPassword}>
               <div className="auth-field">
                 <label htmlFor="forgot-new-password">New Password</label>
                 <input
@@ -175,7 +227,7 @@ function ForgotPasswordPage() {
                   {loading ? "Resetting..." : "Reset Password"}
                 </button>
                 <button className="btn btn-secondary" type="button" onClick={() => setStep("request")}>
-                  Change Email
+                  Start Over
                 </button>
               </div>
             </form>

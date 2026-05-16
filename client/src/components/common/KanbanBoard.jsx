@@ -65,6 +65,7 @@ export default function KanbanBoard({
         <section 
           key={column.id} 
           className="tf-column"
+          data-column={String(column?.title || column?.name || "").toLowerCase().replace(/\s+/g, "_")}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             const taskId = e.dataTransfer.getData("taskId");

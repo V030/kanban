@@ -115,8 +115,8 @@ function Friends() {
       <header className="workspace-hero">
         <div className="workspace-hero-content">
           <div>
-            <h1 className="page-title">Team Network</h1>
-            <p className="page-subtitle">Manage collaborators, incoming requests, and outgoing invitations.</p>
+            <h1 className="page-title">Your Network</h1>
+            <p className="page-subtitle">Manage network, incoming requests, and outgoing invitations.</p>
           </div>
 
           <button type="button" className="btn btn-primary" onClick={() => setIsAddFriendOpen(true)}>

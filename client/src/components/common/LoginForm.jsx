@@ -47,12 +47,14 @@ function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        <Link className="auth-inline-link" to="/forgot-password">
+          Forgot Password?
+        </Link>
       </div>
 
       <div className="auth-actions">
         <button className="btn btn-primary" type="submit">Log In</button>
         <button className="btn btn-secondary" type="button" onClick={ toRegister }>Create Account</button>
-        <Link className="btn btn-ghost" to="/forgot-password">Forgot Password?</Link>
       </div>
 
       {error && <p className="auth-error">{error}</p>}

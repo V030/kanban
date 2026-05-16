@@ -43,6 +43,22 @@
   background: transparent;
 }
 
+/* Column header color-coding */
+.tf-column[data-column="todo"] .tf-column-title {
+  color: var(--color-text-muted);
+}
+.tf-column[data-column="in_progress"] .tf-column-title {
+  /* blue for In Progress */
+  color: #2563eb;
+}
+.tf-column[data-column="to_review"] .tf-column-title {
+  color: var(--color-warning);
+}
+.tf-column[data-column="done"] .tf-column-title {
+  /* use primary teal for Done */
+  color: var(--color-primary);
+}
+
 /* Column Title Wrapper */
 .tf-column-title-wrap {
   display: flex;
@@ -67,7 +83,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.85rem; /* slightly larger for better readability */
   font-weight: 700;
   color: var(--color-primary);
   background: transparent;
@@ -142,7 +158,7 @@
   cursor: pointer;
 }
 
-.tf-task-card:not(.tf-task-card--locked):hover {
+.tf-task-card:hover {
   transform: translateY(-4px);
   border-color: #8fd9d2;
   box-shadow: none;

@@ -1,7 +1,7 @@
 @import url('../../DesignSystem.css');
 .pm-section {
   border-top: 1px solid var(--color-border-subtle);
-  padding: 18px 22px;
+  padding: 0px 0 18px;
 }
 
 .pm-section.pm-section-compact {
@@ -12,7 +12,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 0px;
+  padding-left: 20px;
 }
 
 .pm-header h3 {
@@ -47,34 +48,37 @@
 
 .pm-item {
   border: 1px solid var(--color-border-subtle);
-  background: #fbfdff;
-  border-radius: var(--radius-md);
-  padding: 11px;
+  background: var(--color-bg-surface);
+  border-radius: 12px;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  box-shadow: var(--shadow-sm);
+  gap: 16px;
+  box-shadow: 0 1px 0 rgba(16,24,32,0.02), 0 6px 18px rgba(9, 30, 36, 0.04);
 }
 
 .pm-info {
   min-width: 0;
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .pm-avatar {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 10px;
+  margin-right: 8px;
   background: linear-gradient(140deg, #1496a8 0%, var(--color-primary) 100%);
   color: #ffffff;
-  border: 1px solid rgba(15, 127, 143, 0.18);
-  flex: 0 0 36px;
+  border: 1px solid rgba(15, 127, 143, 0.12);
+  flex: 0 0 40px;
 }
 
 .pm-avatar img {
@@ -122,13 +126,17 @@
 }
 
 .pm-role {
-  border: 1px solid #d2dce8;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.74rem;
+  padding: 6px 12px;
+  font-size: 0.75rem;
   font-weight: 700;
-  text-transform: capitalize;
+  text-transform: none;
   white-space: nowrap;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 0 rgba(9,30,66,0.02);
 }
 
 .pm-role.owner {
@@ -137,33 +145,48 @@
   border-color: #fed7aa;
 }
 
-.pm-role.admin {
-  color: var(--color-primary-hover);
-  background: var(--color-primary-subtle);
-  border-color: #bbd6de;
-}
-
-.pm-role.member {
-  color: var(--color-text-secondary);
-  background: #f7fafc;
-  border-color: #d2dce8;
-}
-
-.pm-actions {
-  display: flex;
-  gap: 4px;
-  flex-wrap: nowrap;
-}
-
-.pm-action-btn {
-  border: 1px solid;
-  border-radius: var(--radius-sm);
-  padding: 4px 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
+.pm-role.selector {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  min-width: 110px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
   cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  position: relative;
+  box-shadow: inset 0 -1px 0 rgba(16,24,32,0.02);
+}
+
+.pm-role.selector::after {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--color-text-secondary);
+  margin-left: 8px;
+  transform: translateY(1px);
+}
+
+.pm-role.selector:hover {
+  border-color: var(--color-border);
+  box-shadow: 0 4px 10px rgba(9,30,66,0.04);
+}
+
+.pm-role.selector:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(6,95,70,0.06);
+}
+
+
+.pm-action-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .pm-action-btn:disabled {
@@ -171,38 +194,119 @@
   cursor: not-allowed;
 }
 
-.pm-promote-btn {
-  color: #2563eb;
-  border-color: #93c5fd;
-  background: #eff6ff;
+.pm-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(9,30,66,0.06);
 }
 
-.pm-promote-btn:hover:not(:disabled) {
-  background: #dbeafe;
-  border-color: #60a5fa;
+.pm-promote-btn {
+  color: var(--color-primary-hover);
+  background: var(--color-primary-soft);
+  border-color: transparent;
 }
 
 .pm-demote-btn {
-  color: #9333ea;
-  border-color: #d8b4fe;
-  background: #faf5ff;
-}
-
-.pm-demote-btn:hover:not(:disabled) {
-  background: #f3e8ff;
-  border-color: #c084fc;
+  color: #6b21a8;
+  background: #f6f0ff;
+  border-color: transparent;
 }
 
 .pm-remove-btn {
-  color: #b91c1c;
-  border-color: #fca5a5;
-  background: #fef2f2;
+  color: var(--color-danger);
+  background: #fff5f5;
+  border-color: transparent;
+}
+
+.pm-promote-btn:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.pm-demote-btn:hover:not(:disabled) {
+  filter: brightness(0.96);
 }
 
 .pm-remove-btn:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: #f87171;
+  filter: brightness(0.98);
 }
+
+/* Role selector dropdown */
+.pm-role.selector {
+  cursor: pointer;
+  user-select: none;
+}
+
+.pm-role-selector {
+  position: relative;
+  display: inline-block;
+}
+
+.pm-role-options {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 120px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(9,30,66,0.12);
+  z-index: 40;
+  list-style: none;
+  margin: 0;
+}
+
+.pm-role-option {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.pm-role-option.active {
+  background: var(--color-primary-soft);
+}
+
+.pm-role-option:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Icon-only remove button */
+.pm-remove-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.pm-remove-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.pm-remove-icon:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: #ffffff;
+  box-shadow: 0 6px 12px rgba(9,30,66,0.06);
+  border-color: rgba(0,0,0,0.04);
+}
+
+.pm-role.owner { color: #065f46; background: #dff6f0; border-color: #8edfc7; }
+.pm-role.admin { color: #0b5cff; background: #e6f0ff; border-color: #bcd4ff; }
+.pm-role.member { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
 
 .pm-empty {
   margin: 0;
@@ -217,9 +321,17 @@
 }
 
 @media (max-width: 760px) {
+  .pm-header {
+    padding-left: 16px;
+  }
+
   .pm-item {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .pm-info {
+    width: 100%;
   }
 
   .pm-actions-container {
