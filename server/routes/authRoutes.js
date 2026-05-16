@@ -1,5 +1,11 @@
 import express from "express";
-import { login, register } from "../controllers/authController.js";
+import {
+	login,
+	register,
+	requestPasswordResetController,
+	resetPasswordController,
+	testEmailController,
+} from "../controllers/authController.js";
 import {
 	createProject,
 	getProjects,
@@ -59,6 +65,8 @@ import {
 import { authenticateToken } from "../middleware/authMiddleware.js";
 import {
 	authLimiter,
+	passwordResetRequestLimiter,
+	passwordResetConfirmLimiter,
 	authenticatedLimiter,
 	inviteLimiter,
 	projectActionLimiter,
@@ -70,6 +78,9 @@ const router = express.Router();
 
 router.post("/login", authLimiter, login);
 router.post("/register", authLimiter, register);
+router.post("/forgot-password/request-otp", passwordResetRequestLimiter, requestPasswordResetController);
+router.post("/forgot-password/reset-password", passwordResetConfirmLimiter, resetPasswordController);
+router.post("/test-email", authLimiter, testEmailController);
 router.post("/create-project", authenticateToken, projectActionLimiter, createProject);
 router.get("/projects/my-projects", authenticateToken, authenticatedLimiter, getProjects);
 router.get("/projects/other-projects", authenticateToken, authenticatedLimiter, getMemberProjects);

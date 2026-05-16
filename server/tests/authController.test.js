@@ -1,0 +1,116 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const {
+  requestPasswordResetOtpMock,
+  resetPasswordWithOtpMock,
+  sendPasswordResetOtpEmailMock,
+} = vi.hoisted(() => ({
+  requestPasswordResetOtpMock: vi.fn(),
+  resetPasswordWithOtpMock: vi.fn(),
+  sendPasswordResetOtpEmailMock: vi.fn(),
+}));
+
+vi.mock("../models/authModel.js", () => ({
+  requestPasswordResetOtp: requestPasswordResetOtpMock,
+  resetPasswordWithOtp: resetPasswordWithOtpMock,
+}));
+
+vi.mock("../utils/mailer.js", () => ({
+  sendPasswordResetOtpEmail: sendPasswordResetOtpEmailMock,
+}));
+
+import {
+  requestPasswordResetController,
+  resetPasswordController,
+} from "../controllers/authController.js";
+
+function createMockRes() {
+  const res = {
+    status: vi.fn(),
+    json: vi.fn(),
+  };
+
+  res.status.mockReturnValue(res);
+  return res;
+}
+
+describe("authController forgot password", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 400 when forgot-password email is missing", async () => {
+    const req = { body: {} };
+    const res = createMockRes();
+
+    await requestPasswordResetController(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: "Email is required" });
+  });
+
+  it("returns a generic success response even when the email is not found", async () => {
+    requestPasswordResetOtpMock.mockResolvedValueOnce(null);
+
+    const req = { body: { email: "missing@example.com" } };
+    const res = createMockRes();
+
+    await requestPasswordResetController(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "If the email exists, a password reset code has been sent.",
+    });
+    expect(sendPasswordResetOtpEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("sends a reset code when the email exists", async () => {
+    requestPasswordResetOtpMock.mockResolvedValueOnce({
+      email: "maya@example.com",
+      otp: "123456",
+      expiresAt: new Date("2026-05-15T12:00:00.000Z"),
+    });
+
+    const req = { body: { email: "maya@example.com" } };
+    const res = createMockRes();
+
+    await requestPasswordResetController(req, res);
+
+    expect(sendPasswordResetOtpEmailMock).toHaveBeenCalledWith({
+      to: "maya@example.com",
+      otp: "123456",
+      expiresAt: new Date("2026-05-15T12:00:00.000Z"),
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("returns 400 when the reset password payload is incomplete", async () => {
+    const req = { body: { email: "maya@example.com" } };
+    const res = createMockRes();
+
+    await resetPasswordController(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: "Email, OTP, and new password are required" });
+  });
+
+  it("returns 400 when the new password matches the current password during reset", async () => {
+    resetPasswordWithOtpMock.mockRejectedValueOnce(new Error("New password must be different from the current password"));
+
+    const req = {
+      body: {
+        email: "maya@example.com",
+        otp: "123456",
+        newPassword: "old-secret",
+      },
+    };
+    const res = createMockRes();
+
+    await resetPasswordController(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "New password must be different from the current password",
+    });
+  });
+});

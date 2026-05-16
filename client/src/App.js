@@ -6,6 +6,7 @@ import { isAuthenticated } from './services/authService';
 
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import MainPage from "./pages/MainPage";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
@@ -35,6 +36,12 @@ function App() {
           <Route path="/register" element={
             <PublicRoute>
               <RegisterPage/>
+            </PublicRoute>
+          } />
+
+          <Route path="/forgot-password" element={
+            <PublicRoute>
+              <ForgotPasswordPage />
             </PublicRoute>
           } />
 

@@ -2,8 +2,17 @@
 import { pool } from "../config/db.js";
 import bcrypt from "bcrypt";
 
-import { createUser, logUser, findByEmail, changePassword, updateUserProfile } from "../models/authModel.js";  
+import {
+  createUser,
+  logUser,
+  findByEmail,
+  changePassword,
+  updateUserProfile,
+  requestPasswordResetOtp,
+  resetPasswordWithOtp,
+} from "../models/authModel.js";  
 import { generateToken } from "../utils/jwt.js";
+import { sendPasswordResetOtpEmail } from "../utils/mailer.js";
 
 
 export async function login(req, res) {
@@ -147,6 +156,79 @@ export async function changePasswordController(req, res) {
   }
 }
 
+export async function requestPasswordResetController(req, res) {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  try {
+    const resetRequest = await requestPasswordResetOtp(email);
+
+    if (resetRequest) {
+      try {
+        await sendPasswordResetOtpEmail({
+          to: resetRequest.email,
+          otp: resetRequest.otp,
+          expiresAt: resetRequest.expiresAt,
+        });
+      } catch (mailErr) {
+        const masked = (email || "").replace(/(^.{2})(.*)(@.*$)/, (m, a, b, c) => a + "***" + c);
+        console.error("❌ Failed to send password reset email", {
+          email: masked,
+          mailError: mailErr && (mailErr.message || String(mailErr)),
+          stack: mailErr && mailErr.stack,
+        });
+        // Re-throw so outer catch will return 500 and we capture DB vs mail issues together
+        throw mailErr;
+      }
+    }
+
+    return res.status(200).json({
+      message: "If the email exists, a password reset code has been sent.",
+    });
+  } catch (err) {
+    const masked = (email || "").replace(/(^.{2})(.*)(@.*$)/, (m, a, b, c) => a + "***" + c);
+    console.error("❌ Password reset OTP request error:", {
+      email: masked,
+      message: err && (err.message || String(err)),
+      stack: err && err.stack,
+    });
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
+export async function resetPasswordController(req, res) {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ message: "Email, OTP, and new password are required" });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: "New password must be at least 6 characters" });
+  }
+
+  try {
+    await resetPasswordWithOtp(email, otp, newPassword);
+
+    return res.status(200).json({ message: "Password reset successfully" });
+  } catch (err) {
+    console.error("❌ Password reset error:", err);
+
+    if (err.message === "New password must be different from the current password") {
+      return res.status(400).json({ message: err.message });
+    }
+
+    if (err.message === "Invalid OTP" || err.message === "Invalid or expired OTP") {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
 export async function updateProfileController(req, res) {
   const { firstName, lastName, email, profileImageBase64 } = req.body;
   const userId = req.user?.userId;
@@ -184,5 +266,52 @@ export async function updateProfileController(req, res) {
     }
 
     return res.status(500).json({ message: "Server error" });
+  }
+}
+
+export async function testEmailController(req, res) {
+  const { to, subject, text } = req.body;
+
+  if (!to) {
+    return res.status(400).json({ message: "Recipient email is required" });
+  }
+
+  try {
+    import("nodemailer").then(async (nodemailerModule) => {
+      const nodemailer = nodemailerModule.default;
+      const testAccount = await nodemailer.createTestAccount();
+      const transporter = nodemailer.createTransport({
+        host: testAccount.smtp.host,
+        port: testAccount.smtp.port,
+        secure: testAccount.smtp.secure,
+        auth: { user: testAccount.user, pass: testAccount.pass },
+      });
+
+      const info = await transporter.sendMail({
+        from: '"Test" <test@example.com>',
+        to,
+        subject: subject || "Test Email",
+        text: text || "This is a test email",
+        html: `<p>${(text || "This is a test email").replace(/\n/g, "<br>")}</p>`,
+      });
+
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      console.info("[test-email] Email sent", { to, messageId: info.messageId, previewUrl });
+
+      return res.status(200).json({
+        message: "Test email sent successfully",
+        previewUrl,
+        messageId: info.messageId,
+      });
+    }).catch((err) => {
+      console.error("❌ Test email failed:", {
+        message: err && (err.message || String(err)),
+        stack: err && err.stack,
+      });
+      res.status(500).json({ message: "Failed to send test email" });
+    });
+  } catch (err) {
+    console.error("❌ Test email error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 }

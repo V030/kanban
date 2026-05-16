@@ -110,6 +110,36 @@ export async function register(
   return data;
 }
 
+export async function requestPasswordResetOtp(email) {
+  const response = await fetch(`${API_URL}/auth/forgot-password/request-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to request password reset code");
+  }
+
+  return response.json();
+}
+
+export async function resetPasswordWithOtp(email, otp, newPassword) {
+  const response = await fetch(`${API_URL}/auth/forgot-password/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp, newPassword }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to reset password");
+  }
+
+  return response.json();
+}
+
 export function logout() {
   console.log("Logging out...");
   localStorage.removeItem("token");

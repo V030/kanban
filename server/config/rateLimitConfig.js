@@ -16,6 +16,7 @@ const defaultLimits = relaxedRateLimits
   ? {
       general: { windowMs: 15 * 60 * 1000, max: 5000 },
       auth: { windowMs: 15 * 60 * 1000, max: 20 },
+      passwordReset: { windowMs: 15 * 60 * 1000, max: 12 },
       authenticated: { windowMs: 15 * 60 * 1000, max: 5000 },
       invite: { windowMs: 15 * 60 * 1000, max: 120 },
       projectAction: { windowMs: 15 * 60 * 1000, max: 120 },
@@ -24,6 +25,7 @@ const defaultLimits = relaxedRateLimits
   : {
       general: { windowMs: 15 * 60 * 1000, max: 600 },
       auth: { windowMs: 15 * 60 * 1000, max: 5 },
+      passwordReset: { windowMs: 15 * 60 * 1000, max: 5 },
       authenticated: { windowMs: 15 * 60 * 1000, max: 300 },
       invite: { windowMs: 15 * 60 * 1000, max: 30 },
       projectAction: { windowMs: 15 * 60 * 1000, max: 10 },
@@ -96,6 +98,10 @@ export const rateLimitConfig = {
   auth: {
     windowMs: parsePositiveInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS, defaultLimits.auth.windowMs),
     max: parsePositiveInt(process.env.RATE_LIMIT_AUTH_MAX, defaultLimits.auth.max),
+  },
+  passwordReset: {
+    windowMs: parsePositiveInt(process.env.RATE_LIMIT_PASSWORD_RESET_WINDOW_MS, defaultLimits.passwordReset.windowMs),
+    max: parsePositiveInt(process.env.RATE_LIMIT_PASSWORD_RESET_MAX, defaultLimits.passwordReset.max),
   },
   authenticated: {
     windowMs: parsePositiveInt(process.env.RATE_LIMIT_AUTHENTICATED_WINDOW_MS, defaultLimits.authenticated.windowMs),

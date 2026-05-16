@@ -74,6 +74,22 @@ export const authLimiter = createLimiter({
   prefix: "rl:auth:",
 });
 
+export const passwordResetRequestLimiter = createLimiter({
+  windowMs: rateLimitConfig.passwordReset.windowMs,
+  max: rateLimitConfig.passwordReset.max,
+  keyGenerator: keyByIpAndEmail,
+  message: "Too many password reset requests. Please try again later.",
+  prefix: "rl:password-reset-request:",
+});
+
+export const passwordResetConfirmLimiter = createLimiter({
+  windowMs: rateLimitConfig.passwordReset.windowMs,
+  max: rateLimitConfig.passwordReset.max,
+  keyGenerator: keyByIpAndEmail,
+  message: "Too many password reset attempts. Please try again later.",
+  prefix: "rl:password-reset-confirm:",
+});
+
 export const authenticatedLimiter = createLimiter({
   windowMs: rateLimitConfig.authenticated.windowMs,
   max: rateLimitConfig.authenticated.max,
