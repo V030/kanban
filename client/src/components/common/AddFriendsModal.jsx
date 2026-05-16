@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useToast } from "../../hooks/useToast";
 import { addFriend } from "../../services/friendService";
 import "./CreateProjectModal.css";
 
@@ -10,20 +11,19 @@ export default function AddFriendModal({
   onCreateResolved,
   onCreateFailed,
 }) {
+  const toast = useToast();
   const [friendData, setFriendData] = useState({
     email: "",
   });
 
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
 
     const trimmedEmail = friendData.email.trim();
     if (!trimmedEmail) {
-      setError("E-Mail is required.");
+      toast.showValidationError("Email is required");
       return;
     }
 
@@ -53,11 +53,12 @@ export default function AddFriendModal({
         await onCreated();
       }
 
+      toast.showSuccess("Friend request sent!");
       onClose();
     } catch (err) {
       console.error(err);
       onCreateFailed?.(tempId, err);
-      setError(err.message || "Failed Adding Friend.");
+      toast.showError(err.message || "Failed to send friend request");
     } finally {
       setSubmitting(false);
     }
@@ -107,7 +108,7 @@ export default function AddFriendModal({
 
           {/* Footer */}
           <div className="modal-footer">
-            <button type="button" className="cancel-btn" onClick={onClose}>
+            <button type="button" className="cancel-btn" onClick={onClose} disabled={submitting}>
               Cancel
             </button>
             <button type="submit" className="submit-btn" disabled={submitting}>
@@ -115,9 +116,6 @@ export default function AddFriendModal({
             </button>
           </div>
         </form>
-
-        {/* Error message */}
-        {error && <p className="error-message">{error}</p>}
       </div>
     </div>
   );

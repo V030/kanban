@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { useToast } from "../hooks/useToast";
 import { getCurrentUser, changePassword, updateProfile } from "../services/authService";
 import "../components/styles/WorkspacePages.css";
 import "../components/styles/SkeletonLoading.css";
@@ -48,6 +49,7 @@ function toBase64(file) {
 }
 
 function Profile() {
+    const toast = useToast();
     const user = getCurrentUser();
     const avatarInputRef = useRef(null);
     const [activeTab, setActiveTab] = useState("account");
@@ -64,7 +66,6 @@ function Profile() {
         confirmPassword: "",
     });
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState({ type: "", text: "" });
 
     const fullName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "User";
     const initials = `${(user?.firstName || "").charAt(0)}${(user?.lastName || "").charAt(0)}`.toUpperCase() || "U";
@@ -75,18 +76,17 @@ function Profile() {
     const handleProfileUpdate = useCallback(
         async (e) => {
             e.preventDefault();
-            setMessage({ type: "", text: "" });
 
             if (!editFormData.firstName.trim()) {
-                setMessage({ type: "error", text: "First name is required" });
+                toast.showValidationError("First name is required");
                 return;
             }
             if (!editFormData.lastName.trim()) {
-                setMessage({ type: "error", text: "Last name is required" });
+                toast.showValidationError("Last name is required");
                 return;
             }
             if (!editFormData.email.trim()) {
-                setMessage({ type: "error", text: "Email is required" });
+                toast.showValidationError("Email is required");
                 return;
             }
 
@@ -98,52 +98,50 @@ function Profile() {
                     editFormData.email,
                     editFormData.profileImageBase64
                 );
-                setMessage({ type: "success", text: "Profile updated successfully!" });
-                setTimeout(() => setMessage({ type: "", text: "" }), 2000);
+                toast.showSuccess("Profile updated successfully!");
             } catch (error) {
-                setMessage({ type: "error", text: error.message || "Failed to update profile" });
+                toast.showError(error?.message || "Failed to update profile");
             } finally {
                 setLoading(false);
             }
         },
-        [editFormData]
+        [editFormData, toast]
     );
 
     const handlePasswordChange = useCallback(
         async (e) => {
             e.preventDefault();
-            setMessage({ type: "", text: "" });
 
             // Validation
             if (!passwordFormData.currentPassword) {
-                setMessage({ type: "error", text: "Current password is required" });
+                toast.showValidationError("Current password is required");
                 return;
             }
             if (!passwordFormData.newPassword) {
-                setMessage({ type: "error", text: "New password is required" });
+                toast.showValidationError("New password is required");
                 return;
             }
             if (passwordFormData.newPassword.length < 6) {
-                setMessage({ type: "error", text: "New password must be at least 6 characters" });
+                toast.showValidationError("New password must be at least 6 characters");
                 return;
             }
             if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
-                setMessage({ type: "error", text: "Passwords do not match" });
+                toast.showValidationError("Passwords do not match");
                 return;
             }
 
             setLoading(true);
             try {
                 await changePassword(passwordFormData.currentPassword, passwordFormData.newPassword);
-                setMessage({ type: "success", text: "Password changed successfully!" });
+                toast.showSuccess("Password changed successfully!");
                 setPasswordFormData({ currentPassword: "", newPassword: "", confirmPassword: "" });
             } catch (error) {
-                setMessage({ type: "error", text: error.message || "Failed to change password" });
+                toast.showError(error?.message || "Failed to change password");
             } finally {
                 setLoading(false);
             }
         },
-        [passwordFormData]
+        [passwordFormData, toast]
     );
 
     const handleEditInputChange = (e) => {
@@ -156,7 +154,7 @@ function Profile() {
         if (!file) return;
 
         if (!file.type.startsWith("image/")) {
-            setMessage({ type: "error", text: "Please select a valid image file" });
+            toast.showValidationError("Please select a valid image file");
             return;
         }
 
@@ -164,7 +162,7 @@ function Profile() {
             const base64 = await toBase64(file);
             setEditFormData((prev) => ({ ...prev, profileImageBase64: base64 }));
         } catch (error) {
-            setMessage({ type: "error", text: error.message || "Failed to process selected image" });
+            toast.showError(error?.message || "Failed to process selected image");
         }
     };
 
@@ -178,25 +176,24 @@ function Profile() {
         if (!file) return;
 
         if (!file.type.startsWith("image/")) {
-            setMessage({ type: "error", text: "Please choose a valid image file." });
+            toast.showValidationError("Please choose a valid image file.");
             return;
         }
 
         if (file.size > 5 * 1024 * 1024) {
-            setMessage({ type: "error", text: "Please choose an image smaller than 5MB." });
+            toast.showValidationError("Please choose an image smaller than 5MB.");
             return;
         }
 
         setLoading(true);
-        setMessage({ type: "", text: "" });
 
         try {
             const profileImageBase64 = await toBase64(file);
             await updateProfile(undefined, undefined, undefined, profileImageBase64);
             setEditFormData((prev) => ({ ...prev, profileImageBase64 }));
-            setMessage({ type: "success", text: "Profile picture updated successfully!" });
+            toast.showSuccess("Profile picture updated successfully!");
         } catch (error) {
-            setMessage({ type: "error", text: error.message || "Failed to update profile picture" });
+            toast.showError(error?.message || "Failed to update profile picture");
         } finally {
             setLoading(false);
             if (avatarInputRef.current) {
@@ -253,12 +250,6 @@ function Profile() {
                 </nav>
             </header>
 
-            {message.text && (
-                <div className={`message message-${message.type}`}>
-                    {message.text}
-                </div>
-            )}
-
             {activeTab === "account" && (
                 <div className="profile-content">
                     <div className="profile-photo-section">
@@ -295,9 +286,9 @@ function Profile() {
                                     try {
                                         await updateProfile(undefined, undefined, undefined, "");
                                         setEditFormData((prev) => ({ ...prev, profileImageBase64: "" }));
-                                        setMessage({ type: "success", text: "Profile picture removed" });
+                                        toast.showSuccess("Profile picture removed");
                                     } catch (error) {
-                                        setMessage({ type: "error", text: "Failed to remove profile picture" });
+                                        toast.showError("Failed to remove profile picture");
                                     } finally {
                                         setLoading(false);
                                     }

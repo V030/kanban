@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "../hooks/useToast";
 import KanbanBoard from "../components/common/KanbanBoard";
 import AddTaskModal from "../components/common/AddTaskModal";
 import ColumnsReorderModal from "../components/common/ColumnsReorderModal";
@@ -118,10 +119,10 @@ const demoColumns = [
 function KanbanPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
+	const toast = useToast();
 	const [project, setProject] = useState(location.state?.project || null);
 	const [taskCategories, setTaskCategories] = useState([]);
 	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState("");
 	const [reorderOpen, setReorderOpen] = useState(false);
 	const [addTaskOpen, setAddTaskOpen] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
@@ -131,24 +132,18 @@ function KanbanPage() {
 	const [localTaskAssignees, setLocalTaskAssignees] = useState({});
 	const [projectMembers, setProjectMembers] = useState([]);
 	const [membersLoading, setMembersLoading] = useState(false);
-	const [membersError, setMembersError] = useState("");
 	const [isEditingProjectName, setIsEditingProjectName] = useState(false);
 	const [projectNameDraft, setProjectNameDraft] = useState("");
 	const [projectNameOriginal, setProjectNameOriginal] = useState("");
 	const [projectNameSaving, setProjectNameSaving] = useState(false);
-	const [projectNameError, setProjectNameError] = useState("");
 	const projectNameRef = useRef(null);
 	const [isEditingProjectDesc, setIsEditingProjectDesc] = useState(false);
 	const [projectDescDraft, setProjectDescDraft] = useState("");
 	const [projectDescOriginal, setProjectDescOriginal] = useState("");
 	const [projectDescSaving, setProjectDescSaving] = useState(false);
-	const [projectDescError, setProjectDescError] = useState("");
 	const projectDescRef = useRef(null);
 	const [pendingTaskActions, setPendingTaskActions] = useState({});
-	const [taskActionError, setTaskActionError] = useState("");
-	const [settingsError, setSettingsError] = useState("");
 	const [settingsPending, setSettingsPending] = useState({});
-	const [memberActionError, setMemberActionError] = useState("");
 	const [memberActionPending, setMemberActionPending] = useState({});
 	const [deleteProjectPending, setDeleteProjectPending] = useState(false);
 	const [dragReviewModal, setDragReviewModal] = useState({ isOpen: false, taskId: null, targetColumn: null, action: null });
@@ -204,34 +199,32 @@ function KanbanPage() {
 	const loadTaskCategories = useCallback(async () => {
 		if (!project?.id) return;
 		setLoading(true);
-		setError("");
 
 		try {
 			const data = await getTaskCategories(project.id);
 			setTaskCategories(data.categories || []);
 		} catch (err) {
-			setError(err?.message || "Error fetching task categories for this project.");
+			toast.showError(err?.message || "Error fetching task categories for this project.");
 		} finally {
 			setLoading(false);
 		}
-	}, [project?.id]);
+	}, [project?.id, toast]);
 
 	const loadProjectMembers = useCallback(async () => {
 		if (!project?.id) return;
 
 		setMembersLoading(true);
-		setMembersError("");
 
 		try {
 			const data = await getProjectMembers(project.id);
 			setProjectMembers(data.members || []);
 		} catch (membersRequestError) {
-			setMembersError(membersRequestError?.message || "Unable to load project members.");
+			toast.showError(membersRequestError?.message || "Unable to load project members.");
 			setProjectMembers([]);
 		} finally {
 			setMembersLoading(false);
 		}
-	}, [project?.id]);
+	}, [project?.id, toast]);
 
 	const loadProjectSettings = useCallback(async () => {
 		if (!project?.id) return;
@@ -240,7 +233,7 @@ function KanbanPage() {
 			const settings = await getProjectSettings(project.id);
 			setTaskPermissions({ ...DEFAULT_TASK_PERMISSIONS, ...settings });
 		} catch (settingsError) {
-			console.error("Unable to load project settings:", settingsError);
+			toast.showError(settingsError?.message || "Unable to load project settings.");
 			setTaskPermissions(DEFAULT_TASK_PERMISSIONS);
 		}
 	}, [project?.id]);
@@ -258,6 +251,7 @@ function KanbanPage() {
 				const myProjects = data.projects || [];
 				if (myProjects.length > 0) setProject(myProjects[0]);
 			} catch (err) {
+				// Fallback load failed - show cached data or empty state
 				console.error("Unable to load projects for Kanban fallback:", err);
 			}
 		})();
@@ -279,12 +273,8 @@ function KanbanPage() {
 			setTaskPermissions(DEFAULT_TASK_PERMISSIONS);
 			setLocalTaskAssignees({});
 			setProjectMembers([]);
-			setMembersError("");
 			setPendingTaskActions({});
-			setTaskActionError("");
-			setSettingsError("");
 			setSettingsPending({});
-			setMemberActionError("");
 			setMemberActionPending({});
 			return;
 		}
@@ -373,7 +363,6 @@ function KanbanPage() {
 			const currentLocation = findTaskLocation(taskCategoriesRef.current, taskId);
 			if (!currentLocation) return;
 
-			setTaskActionError("");
 			setTaskCategories((prev) => {
 				const updated = (prev || []).map((category) => {
 					if (String(category?.id) !== String(currentLocation.categoryId)) return category;
@@ -393,6 +382,8 @@ function KanbanPage() {
 				await deleteTask(taskId);
 				await loadTaskCategories();
 			} catch (err) {
+				toast.showError(err?.message || "Unable to create task.");
+				toast.showError(err?.message || "Unable to delete task.");
 				setTaskCategories((prev) => {
 					const updated = (prev || []).map((category) => {
 						if (String(category?.id) !== String(currentLocation.categoryId)) return category;
@@ -406,7 +397,6 @@ function KanbanPage() {
 					});
 					return updated;
 				});
-				setTaskActionError(err?.message || "Failed to remove task.");
 			} finally {
 				clearTaskPending(taskId);
 			}
@@ -422,14 +412,13 @@ function KanbanPage() {
 			setTaskPermissions((prev) => {
 				return { ...prev, [settingName]: nextValue };
 			});
-			setSettingsError("");
 			setSettingsPending((prev) => ({ ...prev, [settingName]: true }));
 
 			try {
 				await updateProjectSettings(project.id, settingName, nextValue);
 			} catch (err) {
 				setTaskPermissions((prev) => ({ ...prev, [settingName]: previousValue }));
-				setSettingsError(err?.message || "Unable to update project settings.");
+				toast.showError(err?.message || "Unable to update project settings.");
 				loadProjectSettings();
 			} finally {
 				setSettingsPending((prev) => {
@@ -447,14 +436,14 @@ function KanbanPage() {
 			if (!project?.id || projectRole !== "owner") return;
 
 			setDeleteProjectPending(true);
-			setSettingsError("");
 
 			try {
 				await deleteProject(project.id);
+				toast.showSuccess("Project deleted successfully!");
 				setSettingsOpen(false);
 				navigate("/main-page/projects");
 			} catch (err) {
-				setSettingsError(err?.message || "Unable to delete project.");
+				toast.showError(err?.message || "Unable to delete project.");
 			} finally {
 				setDeleteProjectPending(false);
 			}
@@ -477,14 +466,13 @@ function KanbanPage() {
 			const confirmed = window.confirm(`Remove ${getDisplayName(member)} from this project?`);
 			if (!confirmed) return;
 
-			setMemberActionError("");
 			setMemberActionPending((prev) => ({ ...prev, [memberId]: "remove" }));
 
 			try {
 				await removeMemberFromProject(project.id, memberId);
 				await handleReloadMembers();
 			} catch (err) {
-				setMemberActionError(err?.message || "Unable to remove member.");
+				toast.showError(err?.message || "Unable to remove member from project.");
 			} finally {
 				setMemberActionPending((prev) => {
 					const next = { ...prev };
@@ -504,14 +492,13 @@ function KanbanPage() {
 			const member = projectMembers.find((entry) => entry.id === memberId);
 			if (!member) return;
 
-			setMemberActionError("");
 			setMemberActionPending((prev) => ({ ...prev, [memberId]: nextRole }));
 
 			try {
 				await updateMemberRole(project.id, memberId, nextRole);
 				await handleReloadMembers();
 			} catch (err) {
-				setMemberActionError(err?.message || "Unable to update member role.");
+				toast.showError(err?.message || "Unable to update member role.");
 			} finally {
 				setMemberActionPending((prev) => {
 					const next = { ...prev };
@@ -595,7 +582,6 @@ function KanbanPage() {
 				email: currentUser.email,
 			};
 
-			setTaskActionError("");
 			setTaskPending(taskId, "take");
 			setLocalTaskAssignees((prev) => ({
 				...prev,
@@ -606,6 +592,7 @@ function KanbanPage() {
 				await takeTask(taskId);
 				await loadTaskCategories();
 			} catch (err) {
+				toast.showError(err?.message || "Unable to create task.");
 				setLocalTaskAssignees((prev) => {
 					const next = { ...prev };
 					if (previousAssignee) {
@@ -615,7 +602,6 @@ function KanbanPage() {
 					}
 					return next;
 				});
-				setTaskActionError(err?.message || "Failed to take task.");
 			} finally {
 				clearTaskPending(taskId);
 			}
@@ -629,7 +615,6 @@ function KanbanPage() {
 			if (!taskId || !targetColumn || !action) return;
 
 			setDragReviewSubmitting(true);
-			setTaskActionError("");
 			const reason = String(dragReviewReason || "").trim() || `${capitalizeFirst(action)} via drag`;
 
 			try {
@@ -646,7 +631,6 @@ function KanbanPage() {
 					await rejectTaskReview(taskId, reason);
 				}
 
-				setError("");
 				await loadTaskCategories();
 				setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null });
 				setDragReviewReason("");
@@ -657,7 +641,6 @@ function KanbanPage() {
 					const reverted = moveTaskToCategory(prev, taskId, currentLoc.categoryId, currentLoc.task);
 					return reverted.next;
 				});
-				setTaskActionError(err?.message || "Unable to process review action.");
 			} finally {
 				setDragReviewSubmitting(false);
 				clearTaskPending(taskId);
@@ -681,7 +664,6 @@ function KanbanPage() {
 		// Prevent tasks in Done from being moved
 		const sourceColumnName = String(currentLocation.categoryName || "").trim().toLowerCase();
 		if (sourceColumnName === "done") {
-			setTaskActionError("Tasks in Done cannot be moved.");
 			return;
 		}
 		
@@ -705,12 +687,10 @@ function KanbanPage() {
 		if (targetCategoryName === "done" && !isAdminOrOwner && projectRole !== "manager") {
 			const canMoveAssignedTaskToDone = canMembersMoveTaskToDone && isTaskAssignedToMe(currentLocation.task);
 			if (!canMoveAssignedTaskToDone) {
-				setTaskActionError("Only admins, owners, or assigned members with this project setting can move tasks to Done.");
 				return;
 			}
 		}
 
-		setTaskActionError("");
 		const moved = moveTaskToCategory(taskCategoriesRef.current, taskId, column.id, {
 			categoryId: column.id,
 			isPending: true,
@@ -728,15 +708,13 @@ function KanbanPage() {
 			} else {
 				await updateTaskStatus(taskId, column.id);
 			}
-			setError("");
 			await loadTaskCategories();
 		} catch (dropError) {
+			toast.showError(dropError?.message || "Unable to move task to this category.");
 			setTaskCategories((prev) => {
 				const reverted = moveTaskToCategory(prev, taskId, currentLocation.categoryId, currentLocation.task);
 				return reverted.next;
 			});
-			setTaskActionError(dropError?.message || "Unable to move task.");
-			setError(dropError?.message || "Unable to move task.");
 		} finally {
 			clearTaskPending(taskId);
 		}
@@ -751,7 +729,6 @@ function KanbanPage() {
 			const taskId = task.id;
 			const previousAssignee = localTaskAssignees[taskId];
 
-			setTaskActionError("");
 			setTaskPending(taskId, "unassign");
 			setLocalTaskAssignees((prev) => {
 				const next = { ...prev };
@@ -763,6 +740,8 @@ function KanbanPage() {
 				await unassignTask(taskId);
 				await loadTaskCategories();
 			} catch (err) {
+				toast.showError(err?.message || "Unable to create task.");
+				toast.showError(err?.message || "Unable to unassign task.");
 				setLocalTaskAssignees((prev) => {
 					const next = { ...prev };
 					if (previousAssignee) {
@@ -770,7 +749,6 @@ function KanbanPage() {
 					}
 					return next;
 				});
-				setTaskActionError(err?.message || "Failed to unassign task.");
 			} finally {
 				clearTaskPending(taskId);
 			}
@@ -816,7 +794,6 @@ function KanbanPage() {
 		if (!project?.name) return;
 		setProjectNameOriginal(project.name);
 		setProjectNameDraft(project.name);
-		setProjectNameError("");
 		setIsEditingProjectName(true);
 		requestAnimationFrame(() => {
 			const el = projectNameRef.current;
@@ -835,7 +812,6 @@ function KanbanPage() {
 
 	function cancelEditProjectName() {
 		setProjectNameDraft(projectNameOriginal);
-		setProjectNameError("");
 		setIsEditingProjectName(false);
 		if (projectNameRef.current) {
 			projectNameRef.current.textContent = projectNameOriginal;
@@ -846,7 +822,6 @@ function KanbanPage() {
 		const currentDesc = project?.description || "";
 		setProjectDescOriginal(currentDesc);
 		setProjectDescDraft(currentDesc);
-		setProjectDescError("");
 		setIsEditingProjectDesc(true);
 		requestAnimationFrame(() => {
 			const el = projectDescRef.current;
@@ -865,7 +840,6 @@ function KanbanPage() {
 
 	function cancelEditProjectDesc() {
 		setProjectDescDraft(projectDescOriginal);
-		setProjectDescError("");
 		setIsEditingProjectDesc(false);
 		if (projectDescRef.current) {
 			projectDescRef.current.textContent = projectDescOriginal;
@@ -875,7 +849,6 @@ function KanbanPage() {
 	async function saveProjectName() {
 		const trimmed = projectNameDraft.replace(/[\r\n]+/g, " ").trim();
 		if (!trimmed) {
-			setProjectNameError("Project name cannot be empty.");
 			return;
 		}
 
@@ -885,15 +858,14 @@ function KanbanPage() {
 		setProject(optimisticProject);
 		// keep project state in React only; do not persist to localStorage
 		setProjectNameSaving(true);
-		setProjectNameError("");
 		try {
 			const data = await updateProjectName(project.id, trimmed);
 			const updatedName = data?.project?.name || data?.name || trimmed;
 			setProject((prev) => (prev ? { ...prev, name: updatedName } : prev));
 			setIsEditingProjectName(false);
 		} catch (err) {
+			toast.showError(err?.message || "Unable to update project name.");
 			setProject(previousProject);
-			setProjectNameError(err?.message || "Unable to update project name.");
 		} finally {
 			setProjectNameSaving(false);
 		}
@@ -902,7 +874,6 @@ function KanbanPage() {
 	async function saveProjectDesc() {
 		const trimmed = projectDescDraft.replace(/[\r\n]+/g, " ").trim();
 		if (!trimmed) {
-			setProjectDescError("Project description cannot be empty.");
 			return;
 		}
 
@@ -912,15 +883,14 @@ function KanbanPage() {
 		setProject(optimisticProject);
 		// keep project state in React only; do not persist to localStorage
 		setProjectDescSaving(true);
-		setProjectDescError("");
 		try {
 			const data = await updateProjectDescription(project.id, trimmed);
 			const updatedDesc = data?.project?.description || data?.description || trimmed;
 			setProject((prev) => (prev ? { ...prev, description: updatedDesc } : prev));
 			setIsEditingProjectDesc(false);
 		} catch (err) {
+			toast.showError(err?.message || "Unable to update project description.");
 			setProject(previousProject);
-			setProjectDescError(err?.message || "Unable to update project description.");
 		} finally {
 			setProjectDescSaving(false);
 		}
@@ -1031,7 +1001,6 @@ function KanbanPage() {
 							</div>
 						)}
 					</div>
-					{projectNameError && <p className="error-message">{projectNameError}</p>}
 					<div className="kanban-desc-row">
 						<p
 							ref={projectDescRef}
@@ -1090,7 +1059,6 @@ function KanbanPage() {
 							</div>
 						)}
 					</div>
-					{projectDescError && <p className="error-message">{projectDescError}</p>}
 				</div>
 
 				<div className="kanban-actions">
@@ -1137,7 +1105,6 @@ function KanbanPage() {
 				</div>
 			</div>
 		</header>
-			{settingsError && <p className="error-message">{settingsError}</p>}
 
 			{/* <div className="permission-summary" role="status" aria-live="polite">
 				<p>
@@ -1159,8 +1126,6 @@ function KanbanPage() {
 				)}
 				{!loading && (
 					<>
-						{error && <p className="error-message">{error}</p>}
-						{taskActionError && <p className="error-message">{taskActionError}</p>}
 						<KanbanBoard
 							columns={columnsForBoard}
 							isTaskAssignedToMe={isTaskAssignedToMe}
@@ -1345,7 +1310,6 @@ function KanbanPage() {
 							taskName: payload.title,
 							taskDescription: payload.description,
 						};
-						setTaskActionError("");
 						setTaskPending(tempId, "create");
 						setTaskCategories((prev) => insertTaskIntoCategory(prev, resolvedCategoryId, optimisticTask));
 
@@ -1361,8 +1325,8 @@ function KanbanPage() {
 							}
 							await loadTaskCategories();
 						} catch (err) {
+						toast.showError(err?.message || "Unable to create task.");
 							setTaskCategories((prev) => removeTaskById(prev, tempId).next);
-							setTaskActionError(err?.message || "Unable to create task.");
 							throw err;
 						} finally {
 							clearTaskPending(tempId);
@@ -1389,7 +1353,6 @@ function KanbanPage() {
 					project={project || ""}
 					members={projectMembers}
 					loading={membersLoading}
-					error={membersError}
 					currentUserId={currentUser?.id || ""}
 					currentUserRole={projectRole}
 					canRemoveMembers={projectRole === "owner" || projectRole === "admin"}
@@ -1398,7 +1361,6 @@ function KanbanPage() {
 					onUpdateRole={handleUpdateMemberRole}
 					removePending={memberActionPending}
 					updateRolePending={memberActionPending}
-					memberActionError={memberActionError}
 					onAdded={handleReloadMembers}
 				/>
 
@@ -1472,3 +1434,4 @@ function KanbanPage() {
 }
 
 export default KanbanPage;
+

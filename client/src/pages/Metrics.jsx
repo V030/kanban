@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useToast } from "../hooks/useToast";
 import "../components/styles/Metrics.css";
 import "../components/styles/SkeletonLoading.css";
 import { getProjectMetrics, getProjects } from "../services/projectService";
@@ -258,6 +259,7 @@ function KpiCard({ title, value, trend, trendTone = "neutral", meta }) {
 
 export default function Metrics() {
   const location = useLocation();
+  const toast = useToast();
   const isMountedRef = useRef(true);
 
   const [projectId, setProjectId] = useState(location.state?.project?.id || null);
@@ -265,11 +267,9 @@ export default function Metrics() {
   const [windowDays, setWindowDays] = useState(30);
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [, setError] = useState(null);
 
   const loadMetrics = useCallback(async () => {
     setLoading(true);
-    setError(null);
 
     try {
       let pid = projectId;
@@ -282,17 +282,17 @@ export default function Metrics() {
         }
       }
       if (!pid) {
-        setError("No project available");
+        toast.showWarning("No project available");
         return;
       }
       const data = await getProjectMetrics(pid, windowDays);
       if (isMountedRef.current) setMetrics(data);
     } catch (err) {
-      if (isMountedRef.current) setError(err?.message || "Unable to load metrics");
+      if (isMountedRef.current) toast.showError(err?.message || "Unable to load metrics");
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
-  }, [projectId, windowDays]);
+  }, [projectId, windowDays, toast]);
 
   useEffect(() => {
     isMountedRef.current = true;

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useToast } from "../../hooks/useToast";
 import {
   getProjectInvitations,
   acceptProjectInvitation,
@@ -7,9 +8,9 @@ import {
 import "./CreateProjectModal.css";
 
 export default function ProjectInvitesModal({ isOpen, onClose }) {
+  const toast = useToast();
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [pendingInviteIds, setPendingInviteIds] = useState({});
 
   useEffect(() => {
@@ -20,30 +21,29 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
 
   async function loadInvites() {
     setLoading(true);
-    setError("");
 
     try {
       const data = await getProjectInvitations();
       setInvites(data.projectInvitations || []);
     } catch (err) {
-      setError(err?.message || "Failed to load invitations");
+      toast.showError(err?.message || "Failed to load invitations");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleAccept(requestId) {
-    setError("");
     const previousInvites = Array.isArray(invites) ? [...invites] : [];
     setInvites((prev) => (prev || []).filter((inv) => String(inv.id) !== String(requestId)));
     setPendingInviteIds((prev) => ({ ...prev, [String(requestId)]: "accept" }));
 
     try {
       await acceptProjectInvitation(requestId);
+      toast.showSuccess("Invitation accepted!");
       await loadInvites();
     } catch (err) {
       setInvites(previousInvites);
-      setError(err?.message || "Failed to accept invitation");
+      toast.showError(err?.message || "Failed to accept invitation");
     } finally {
       setPendingInviteIds((prev) => {
         const next = { ...prev };
@@ -54,17 +54,17 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
   }
 
   async function handleDecline(requestId) {
-    setError("");
     const previousInvites = Array.isArray(invites) ? [...invites] : [];
     setInvites((prev) => (prev || []).filter((inv) => String(inv.id) !== String(requestId)));
     setPendingInviteIds((prev) => ({ ...prev, [String(requestId)]: "decline" }));
 
     try {
       await declineProjectInvitation(requestId);
+      toast.showSuccess("Invitation declined!");
       await loadInvites();
     } catch (err) {
       setInvites(previousInvites);
-      setError(err?.message || "Failed to decline invitation");
+      toast.showError(err?.message || "Failed to decline invitation");
     } finally {
       setPendingInviteIds((prev) => {
         const next = { ...prev };
@@ -88,10 +88,9 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
           <p className="modal-description">You have pending invitations to collaborate on these projects. Review the invite details below and accept or decline when ready.</p>
 
           {loading && <p>Loading invitations...</p>}
-          {error && <p className="error-message">{error}</p>}
-          {!loading && !error && invites.length === 0 && <p>No pending invitations right now.</p>}
+          {!loading && invites.length === 0 && <p>No pending invitations right now.</p>}
 
-          {!loading && !error && invites.length > 0 && (
+          {!loading && invites.length > 0 && (
           <div className="invite-list">
             {invites.map((inv) => {
               const pendingAction = pendingInviteIds[String(inv.id)];

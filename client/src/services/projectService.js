@@ -1,4 +1,5 @@
 import { fetchWithAuth } from "./authService";
+import { transformErrorMessage } from "../utils/errorTransformer";
 
 const API_URL = "http://localhost:5000";
 
@@ -22,7 +23,7 @@ export async function getMemberProjects() {
 }
 
 export async function getProjectMembers(projectId) {
-  if (!projectId) throw new Error("projectId is required");
+  if (!projectId) throw new Error("Unable to load team members. Please select a project.");
 
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/members`, {
     method: "GET",
@@ -55,7 +56,7 @@ export async function declineProjectInvitation(requestId) {
 }
 
 export async function getTaskCategories(projectId) {
-  if (!projectId) throw new Error('projectId is required');
+  if (!projectId) throw new Error('Unable to load task categories. Please select a project.');
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/get-task-categories`, {
     method: 'GET',
     cache: 'no-cache',
@@ -64,7 +65,7 @@ export async function getTaskCategories(projectId) {
 }
 
 export async function getTaskById(taskId) {
-  if (!taskId) throw new Error("taskId is required");
+  if (!taskId) throw new Error("Unable to load task details. Please select a task.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}`, {
     method: "GET",
@@ -74,7 +75,7 @@ export async function getTaskById(taskId) {
 }
 
 export async function getProjectTasks(projectId) {
-  if (!projectId) throw new Error("projectId is required");
+  if (!projectId) throw new Error("Unable to load tasks. Please select a project.");
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/tasks`, {
     method: "GET",
   });
@@ -115,8 +116,8 @@ export async function getProjectSettings(projectId) {
 }
 
 export async function updateProjectSettings(projectId, setting, value) {
-  if (!projectId) throw new Error("projectId is required");
-  if (!setting) throw new Error("setting is required");
+  if (!projectId) throw new Error("Unable to update settings. Please select a project.");
+  if (!setting) throw new Error("Unable to update settings. Please select a setting.");
 
   return fetchWithAuth(`${API_URL}/auth/project-settings`, {
     method: "PATCH",
@@ -129,9 +130,9 @@ export async function updateProjectSettings(projectId, setting, value) {
 }
 
 export async function updateProjectName(projectId, name) {
-  if (!projectId) throw new Error("projectId is required");
+  if (!projectId) throw new Error("Unable to update project name. Please select a project.");
   const trimmed = String(name || "").trim();
-  if (!trimmed) throw new Error("name is required");
+  if (!trimmed) throw new Error("Please enter a project name.");
 
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/name`, {
     method: "PATCH",
@@ -140,9 +141,9 @@ export async function updateProjectName(projectId, name) {
 }
 
 export async function updateProjectDescription(projectId, description) {
-  if (!projectId) throw new Error("projectId is required");
+  if (!projectId) throw new Error("Unable to update project description. Please select a project.");
   const trimmed = String(description || "").trim();
-  if (!trimmed) throw new Error("description is required");
+  if (!trimmed) throw new Error("Please enter a project description.");
 
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/description`, {
     method: "PATCH",
@@ -151,7 +152,7 @@ export async function updateProjectDescription(projectId, description) {
 }
 
 export async function takeTask(taskId) {
-  if (!taskId) throw new Error("task id is required");
+  if (!taskId) throw new Error("Unable to assign task. Please select a task.");
 
   return fetchWithAuth(`${API_URL}/auth/project/take-task/${taskId}`, {
     method: "POST",
@@ -160,7 +161,7 @@ export async function takeTask(taskId) {
 }
 
 export async function updateTaskStatus(taskId, columnStatus) {
-  if (!taskId) throw new Error("taskId is required");
+  if (!taskId) throw new Error("Unable to move task. Please select a task.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/status`, {
     method: "PATCH",
@@ -169,8 +170,8 @@ export async function updateTaskStatus(taskId, columnStatus) {
 }
 
 export async function updateTaskPriority(taskId, priority) {
-  if (!taskId) throw new Error("taskId is required");
-  if (!priority) throw new Error("priority is required");
+  if (!taskId) throw new Error("Unable to update priority. Please select a task.");
+  if (!priority) throw new Error("Please select a priority level.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/priority`, {
     method: "PATCH",
@@ -179,9 +180,9 @@ export async function updateTaskPriority(taskId, priority) {
 }
 
 export async function updateTaskName(taskId, name) {
-  if (!taskId) throw new Error("taskId is required");
+  if (!taskId) throw new Error("Unable to update task name. Please select a task.");
   const trimmed = String(name || "").trim();
-  if (!trimmed) throw new Error("name is required");
+  if (!trimmed) throw new Error("Please enter a task name.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/name`, {
     method: "PATCH",
@@ -190,9 +191,9 @@ export async function updateTaskName(taskId, name) {
 }
 
 export async function updateTaskDescription(taskId, description) {
-  if (!taskId) throw new Error("taskId is required");
+  if (!taskId) throw new Error("Unable to update task description. Please select a task.");
   const trimmed = String(description || "").trim();
-  if (!trimmed) throw new Error("description is required");
+  if (!trimmed) throw new Error("Please enter a task description.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/description`, {
     method: "PATCH",
@@ -201,7 +202,7 @@ export async function updateTaskDescription(taskId, description) {
 }
 
 export async function updateTaskTargetDate(taskId, targetDate) {
-  if (!taskId) throw new Error("taskId is required");
+  if (!taskId) throw new Error("Unable to update due date. Please select a task.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/target-date`, {
     method: "PATCH",
@@ -210,8 +211,8 @@ export async function updateTaskTargetDate(taskId, targetDate) {
 }
 
 export async function assignTaskToOthers(taskId, memberId) {
-  if (!taskId) throw new Error("task id is required");
-  if (!memberId) throw new Error("member id is required");
+  if (!taskId) throw new Error("Unable to assign task. Please select a task.");
+  if (!memberId) throw new Error("Please select a team member.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/assign-task/${memberId}/${taskId}`, {
     method: "POST",
@@ -220,8 +221,8 @@ export async function assignTaskToOthers(taskId, memberId) {
 }
 
 export async function unassignTaskFromMember(taskId, memberId) {
-  if (!taskId) throw new Error("task id is required");
-  if (!memberId) throw new Error("member id is required");
+  if (!taskId) throw new Error("Unable to unassign task. Please select a task.");
+  if (!memberId) throw new Error("Please select a team member.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/assign-task/${memberId}/${taskId}`, {
     method: "DELETE",
@@ -229,7 +230,7 @@ export async function unassignTaskFromMember(taskId, memberId) {
 }
 
 export async function unassignTask(taskId) {
-  if (!taskId) throw new Error("task id is required");
+  if (!taskId) throw new Error("Unable to unassign task. Please select a task.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/unassign-task/${taskId}`, {
     method: "DELETE",
@@ -237,7 +238,7 @@ export async function unassignTask(taskId) {
 }
 
 export async function deleteTask(taskId) {
-  if (!taskId) throw new Error("task id is required");
+  if (!taskId) throw new Error("Unable to delete task. Please select a task.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}`, {
     method: "DELETE",
@@ -245,7 +246,7 @@ export async function deleteTask(taskId) {
 }
 
 export async function createSubtask(subtaskData) {
-  if (!subtaskData) throw new Error("subtask data is required");
+  if (!subtaskData) throw new Error("Unable to create subtask. Please provide subtask details.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${subtaskData.taskId}/subtasks`, {
     method: "POST",
@@ -256,8 +257,8 @@ export async function createSubtask(subtaskData) {
 
 
 export async function updateSubtask(taskId, subtaskId, payload) {
-  if (!taskId) throw new Error("task id is required");
-  if (!subtaskId) throw new Error("subtask id is required");
+  if (!taskId) throw new Error("Unable to update subtask. Please select a task.");
+  if (!subtaskId) throw new Error("Please select a subtask.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/subtasks/${subtaskId}`, {
     method: "PATCH",
@@ -266,8 +267,8 @@ export async function updateSubtask(taskId, subtaskId, payload) {
 }
 
 export async function deleteSubtask(taskId, subtaskId) {
-  if (!taskId) throw new Error("task id is required");
-  if (!subtaskId) throw new Error("subtask id is required");
+  if (!taskId) throw new Error("Unable to delete subtask. Please select a task.");
+  if (!subtaskId) throw new Error("Please select a subtask.");
 
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/subtasks/${subtaskId}`, {
     method: "DELETE",
@@ -275,7 +276,7 @@ export async function deleteSubtask(taskId, subtaskId) {
 }
 
 export async function getTaskComments(taskId) {
-  if (!taskId) throw new Error("task id is required");
+  if (!taskId) throw new Error("Unable to load comments. Please select a task.");
 
   return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/comments`, {
     method: "GET",
@@ -283,9 +284,9 @@ export async function getTaskComments(taskId) {
 }
 
 export async function createTaskComment(taskId, userId, comment) {
-  if (!taskId) throw new Error("task id is required");
-  if (!userId) throw new Error("user id is required");
-  if (!comment) throw new Error("comment is required");
+  if (!taskId) throw new Error("Unable to add comment. Please select a task.");
+  if (!userId) throw new Error("Unable to add comment. Please log in again.");
+  if (!comment) throw new Error("Please enter a comment.");
 
   return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/comments/${userId}`, {
     method: "POST",
@@ -294,10 +295,10 @@ export async function createTaskComment(taskId, userId, comment) {
 }
 
 export async function createTaskCommentReply(taskId, commentId, userId, commentReply) {
-  if (!taskId) throw new Error("task id is required");
-  if (!commentId) throw new Error("comment id is required");
-  if (!userId) throw new Error("user id is required");
-  if (!commentReply) throw new Error("comment reply is required");
+  if (!taskId) throw new Error("Unable to add reply. Please select a task.");
+  if (!commentId) throw new Error("Unable to add reply. Please select a comment.");
+  if (!userId) throw new Error("Unable to add reply. Please log in again.");
+  if (!commentReply) throw new Error("Please enter a reply.");
 
   return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/comments/${commentId}/${userId}`, {
     method: "POST",
@@ -306,12 +307,12 @@ export async function createTaskCommentReply(taskId, commentId, userId, commentR
 }
 
 export async function getProjectTags(projectId) {
-  if (!projectId) throw new Error("projectId is required");
+  if (!projectId) throw new Error("Unable to load tags. Please select a project.");
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/tags`, { method: "GET" });
 }
 
 export async function getProjectMetrics(projectId, days = 30) {
-  if (!projectId) throw new Error("projectId is required");
+  if (!projectId) throw new Error("Unable to load metrics. Please select a project.");
   const safeDays = Number.isFinite(Number(days)) ? Number(days) : 30;
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/metrics?days=${safeDays}`, {
     method: "GET",
@@ -321,14 +322,14 @@ export async function getProjectMetrics(projectId, days = 30) {
 }
 
 export async function getTaskTags(taskId) {
-  if (!taskId) throw new Error("taskId is required");
+  if (!taskId) throw new Error("Unable to load tags. Please select a task.");
   return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/tags`, { method: "GET" });
 }
 
 export async function createTaskTag(taskId, projectId, tagName) {
-  if (!taskId) throw new Error("taskId is required");
-  if (!projectId) throw new Error("projectId is required");
-  if (!tagName) throw new Error("tagName is required");
+  if (!taskId) throw new Error("Unable to create tag. Please select a task.");
+  if (!projectId) throw new Error("Unable to create tag. Please select a project.");
+  if (!tagName) throw new Error("Please enter a tag name.");
 
   return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/tags`, {
     method: "POST",
@@ -337,8 +338,8 @@ export async function createTaskTag(taskId, projectId, tagName) {
 }
 
 export async function deleteTaskTag(taskId, tagId) {
-  if (!taskId) throw new Error("taskId is required");
-  if (!tagId) throw new Error("tagId is required");
+  if (!taskId) throw new Error("Unable to delete tag. Please select a task.");
+  if (!tagId) throw new Error("Please select a tag.");
 
   return fetchWithAuth(`${API_URL}/auth/api/tasks/${taskId}/tags/${tagId}`, {
     method: "DELETE",
@@ -346,7 +347,7 @@ export async function deleteTaskTag(taskId, tagId) {
 }
 
 export async function deleteProject(projectId) {
-  if (!projectId) throw new Error("projectId is required");
+  if (!projectId) throw new Error("Unable to delete project. Please select a project.");
 
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}`, {
     method: "DELETE",
@@ -354,8 +355,8 @@ export async function deleteProject(projectId) {
 }
 
 export async function removeMemberFromProject(projectId, memberId) {
-  if (!projectId) throw new Error("projectId is required");
-  if (!memberId) throw new Error("memberId is required");
+  if (!projectId) throw new Error("Unable to remove member. Please select a project.");
+  if (!memberId) throw new Error("Please select a team member.");
 
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/members/${memberId}`, {
     method: "DELETE",
@@ -363,9 +364,9 @@ export async function removeMemberFromProject(projectId, memberId) {
 }
 
 export async function updateMemberRole(projectId, memberId, role) {
-  if (!projectId) throw new Error("projectId is required");
-  if (!memberId) throw new Error("memberId is required");
-  if (!role) throw new Error("role is required");
+  if (!projectId) throw new Error("Unable to update role. Please select a project.");
+  if (!memberId) throw new Error("Please select a team member.");
+  if (!role) throw new Error("Please select a role.");
 
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/members/${memberId}/role`, {
     method: "PATCH",
@@ -374,7 +375,7 @@ export async function updateMemberRole(projectId, memberId, role) {
 }
 
 export async function getTaskReviews(taskId) {
-  if (!taskId) throw new Error("taskId is required");
+  if (!taskId) throw new Error("Unable to load reviews. Please select a task.");
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/reviews`, {
     method: "GET",
     cache: "no-cache",
@@ -383,7 +384,7 @@ export async function getTaskReviews(taskId) {
 }
 
 export async function approveTaskReview(taskId, reason) {
-  if (!taskId) throw new Error("taskId is required");
+  if (!taskId) throw new Error("Unable to approve task. Please select a task.");
   const trimmed = String(reason ?? "").trim();
   // Keep `review` canonical while preserving `reason` compatibility on older handlers.
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/review/approve`, {
@@ -393,8 +394,8 @@ export async function approveTaskReview(taskId, reason) {
 }
 
 export async function rejectTaskReview(taskId, reason) {
-  if (!taskId) throw new Error("taskId is required");
-  if (!reason || String(reason).trim() === "") throw new Error("reason is required");
+  if (!taskId) throw new Error("Unable to return task. Please select a task.");
+  if (!reason || String(reason).trim() === "") throw new Error("Please provide a reason for returning the task.");
   const trimmed = String(reason).trim();
   return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/review/reject`, {
     method: "POST",

@@ -4,6 +4,7 @@ import ProjectMembersList from "./ProjectMembersList";
 import { getFriends } from "../../services/friendService";
 import { inviteMemberToProject } from "../../services/projectService";
 import { useState, useEffect } from "react";
+import { useToast } from "../../hooks/useToast";
 
 function getProfileImageSrc(user) {
   return normalizeProfileImage(
@@ -39,7 +40,6 @@ export default function ProjectMembersModal({
   project,
   members = [],
   loading = false,
-  error = "",
   currentUserId = "",
   currentUserRole = "member",
   canRemoveMembers = false,
@@ -48,11 +48,10 @@ export default function ProjectMembersModal({
   onUpdateRole,
   removePending = {},
   updateRolePending = {},
-  memberActionError = "",
   onAdded,
 }) {
+  const toast = useToast();
   const [email, setEmail] = useState("");
-  const [inviteError, setInviteError] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [friends, setFriends] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
@@ -62,7 +61,6 @@ export default function ProjectMembersModal({
   useEffect(() => {
     if (!isOpen) return;
     setEmail("");
-    setInviteError("");
     setFriendSearch("");
     setPendingFriendId("");
     loadFriends();
@@ -82,13 +80,13 @@ export default function ProjectMembersModal({
 
   const handleSelectFriend = async (friendId, projectId) => {
     setInviteLoading(true);
-    setInviteError("");
     setPendingFriendId(String(friendId));
     try {
       await inviteMemberToProject({ projectId, friendId });
+      toast.showSuccess("Invitation sent successfully!");
       if (onAdded) await onAdded();
     } catch (err) {
-      setInviteError(err?.message || "Failed to send an invite.");
+      toast.showError(err?.message || "Failed to send an invite.");
     } finally {
       setInviteLoading(false);
       setPendingFriendId("");
@@ -97,10 +95,9 @@ export default function ProjectMembersModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setInviteError("");
 
     if (!email || !email.trim()) {
-      setInviteError("Please enter an email.");
+      toast.showValidationError("Please enter an email.");
       return;
     }
 
@@ -108,11 +105,12 @@ export default function ProjectMembersModal({
     try {
       if (!project?.id) throw new Error("Project is missing.");
       await inviteMemberToProject({ projectId: project.id, email: email.trim() });
+      toast.showSuccess("Invitation sent successfully!");
       setEmail("");
       if (onAdded) await onAdded();
       onClose();
     } catch (err) {
-      setInviteError(err?.message || "Failed to send an invite.");
+      toast.showError(err?.message || "Failed to send an invite.");
     } finally {
       setInviteLoading(false);
     }
@@ -166,7 +164,6 @@ export default function ProjectMembersModal({
             <ProjectMembersList
               members={members}
               loading={loading}
-              error={error}
               currentUserId={currentUserId}
               currentUserRole={currentUserRole}
               canRemoveMembers={canRemoveMembers}
@@ -178,9 +175,6 @@ export default function ProjectMembersModal({
               compact
             />
 
-            {memberActionError && (
-              <p className="pmv-error">{memberActionError}</p>
-            )}
           </div>
 
           {/* Right: invite panel (1/3) */}
@@ -208,7 +202,6 @@ export default function ProjectMembersModal({
                   {inviteLoading ? "Sending…" : "Send invite"}
                 </button>
               </form>
-              {inviteError && <p className="pmv-error">{inviteError}</p>}
             </div>
 
             {/* Friends list */}

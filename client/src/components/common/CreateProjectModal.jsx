@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useToast } from "../../hooks/useToast";
 import { createProject } from "../../services/projectService";
 import "./CreateProjectModal.css";
 
@@ -10,23 +11,22 @@ export default function CreateProjectModal({
   onCreateResolved,
   onCreateFailed,
 }) {
+  const toast = useToast();
   const [projectData, setProjectData] = useState({
     name: "",
     description: "",
   });
 
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
 
     const trimmedName = projectData.name.trim();
     const trimmedDescription = projectData.description.trim();
 
     if (!trimmedName) {
-      setError("Project name is required");
+      toast.showValidationError("Project name is required");
       return;
     }
 
@@ -61,7 +61,7 @@ export default function CreateProjectModal({
     } catch (err) {
       console.error(err);
       onCreateFailed?.(tempId, err);
-      setError(err.message || "Project creation failed");
+      toast.showError(err.message || "Project creation failed");
     } finally {
       setSubmitting(false);
     }
@@ -130,9 +130,6 @@ export default function CreateProjectModal({
             </button>
           </div>
         </form>
-
-        {/* Error message */}
-        {error && <p className="error-message">{error}</p>}
       </div>
     </div>
   );

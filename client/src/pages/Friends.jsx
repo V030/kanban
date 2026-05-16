@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useToast } from "../hooks/useToast";
 import FriendsList from "../components/common/FriendsList";
 import IncomingFriendRequests from "../components/common/IncomingFriendRequests";
 import SentFriendRequests from "../components/common/SentFriendRequests";
@@ -9,6 +10,7 @@ import "../components/styles/FriendsPage.css";
 import "../components/styles/SkeletonLoading.css";
 
 function Friends() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState("friends");
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
   const [friends, setFriends] = useState([]);
@@ -16,11 +18,9 @@ function Friends() {
   const [myFriendRequests, setMyFriendRequests] = useState([]);
 
   const [friendsLoading, setFriendsLoading] = useState(false);
-  const [friendsError, setFriendsError] = useState("");
 
   const loadFriends = async () => {
     setFriendsLoading(true);
-    setFriendsError("");
 
     try {
       const data = await getFriends();
@@ -33,7 +33,7 @@ function Friends() {
       }));
       setFriends(mappedFriends);
     } catch (err) {
-      setFriendsError(err.message || "Failed to load friends");
+      toast.showError(err.message || "Failed to load friends");
     } finally {
       setFriendsLoading(false);
     }
@@ -46,7 +46,7 @@ function Friends() {
       const data = await getSentFriendRequests();
       setSentFriendRequests(data.sentFriendRequests || []);
     } catch (err) {
-      console.error(err.message || "Failed to load sent requests");
+      toast.showError(err.message || "Failed to load sent requests");
     }
   };
 
@@ -57,7 +57,7 @@ function Friends() {
       const data = await getFriendRequests();
       setMyFriendRequests(data.myFriendRequests || []);
     } catch (err) {
-      console.error(err.message || "Failed to load friend requests");
+      toast.showError(err.message || "Failed to load friend requests");
     }
   };
 
@@ -116,11 +116,11 @@ function Friends() {
         <div className="workspace-hero-content">
           <div>
             <h1 className="page-title">Your Network</h1>
-            <p className="page-subtitle">Manage network, incoming requests, and outgoing invitations.</p>
+            <p className="page-subtitle">Manage network, requests, and outgoing invitations.</p>
           </div>
 
           <button type="button" className="btn btn-primary" onClick={() => setIsAddFriendOpen(true)}>
-            Add Member
+            Add Friend
           </button>
         </div>
       </header>
@@ -159,8 +159,6 @@ function Friends() {
                 <SkeletonAvatarWithText />
                 <SkeletonAvatarWithText />
               </div>
-            ) : friendsError ? (
-              <p className="friends-error">{friendsError}</p>
             ) : (
               <FriendsList friends={friends} />
             )

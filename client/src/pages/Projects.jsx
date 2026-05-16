@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "../hooks/useToast";
 import CreateProjectModal from "../components/common/CreateProjectModal";
 import AddMemberModal from "../components/common/AddMemberModal";
 import ProjectInvitesModal from "../components/common/ProjectInvitesModal";
@@ -9,6 +10,7 @@ import { getProjects, getMemberProjects } from "../services/projectService";
 
 function Projects() {
   const navigate = useNavigate();
+  const toast = useToast();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [projects, setProjects] = useState([]);
     const [memberProjects, setMemberProjects] = useState([]);
@@ -16,20 +18,16 @@ function Projects() {
     const [isInvitesOpen, setIsInvitesOpen] = useState(false);
 
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
     const [memberLoading, setMemberLoading] = useState(true);
-    const [memberError, setMemberError] = useState("");
-    const [projectActionError, setProjectActionError] = useState("");
 
     const loadProjects = async () => {
         setLoading(true);
-        setError("");
 
         try {
           const data = await getProjects();
           setProjects(data.projects || []);
         } catch (err) {
-          setError(err.message || "Failed to load projects");
+          toast.showError(err.message || "Failed to load projects");
         } finally {
             setLoading(false);
         }
@@ -37,13 +35,12 @@ function Projects() {
 
     const loadOtherProjects = async () => {
         setMemberLoading(true);
-        setMemberError("");
 
         try {
           const data = await getMemberProjects();
           setMemberProjects(data.projects || []);
         } catch (err) {
-          setMemberError(err.message || "Failed to load member projects");
+          toast.showError(err.message || "Failed to load member projects");
         } finally {
             setMemberLoading(false);
         }
@@ -55,13 +52,13 @@ function Projects() {
     }, []);
 
     const handleOptimisticCreate = (optimisticProject) => {
-      setProjectActionError("");
       setProjects((prev) => [optimisticProject, ...(prev || [])]);
     };
 
     const handleCreateResolved = (tempId, createdProject) => {
       if (!tempId) return;
       if (createdProject) {
+        toast.showSuccess("Project created successfully!");
         setProjects((prev) =>
           (prev || []).map((project) =>
             String(project?.id) === String(tempId) ? { ...createdProject, isPending: false } : project
@@ -76,7 +73,7 @@ function Projects() {
       if (tempId) {
         setProjects((prev) => (prev || []).filter((project) => String(project?.id) !== String(tempId)));
       }
-      setProjectActionError(err?.message || "Project creation failed");
+      toast.showError(err?.message || "Project creation failed");
     };
 
     const openKanban = (project) => {
@@ -185,12 +182,9 @@ function Projects() {
             <p>{projects.length} total</p>
           </div>
 
-          {projectActionError && <p className="status-text error">{projectActionError}</p>}
-
           {loading && <p className="status-text">Loading your projects...</p>}
-          {error && <p className="status-text error">{error}</p>}
 
-          {!loading && !error && projects.length === 0 && (
+          {!loading && projects.length === 0 && (
             <div className="empty-state-card">
               <h3>No owned projects yet</h3>
               <p>Start by creating a project, then add members and set up your board workflow.</p>
@@ -206,7 +200,7 @@ function Projects() {
             </div>
           )}
 
-          {!loading && !error && projects.length > 0 && (
+          {!loading && projects.length > 0 && (
             <div className="project-table-wrapper">
               <table className="project-table">
                 <thead>
@@ -232,13 +226,12 @@ function Projects() {
           </div>
 
           {memberLoading && <p className="status-text">Loading shared projects...</p>}
-          {memberError && <p className="status-text error">{memberError}</p>}
 
-          {!memberLoading && !memberError && memberProjects.length === 0 && (
+          {!memberLoading && memberProjects.length === 0 && (
             <p className="status-text">You are not a member of other projects yet.</p>
           )}
 
-          {!memberLoading && !memberError && memberProjects.length > 0 && (
+          {!memberLoading && memberProjects.length > 0 && (
             <div className="project-table-wrapper">
               <table className="project-table">
                 <thead>

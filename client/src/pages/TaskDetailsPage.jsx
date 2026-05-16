@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useToast } from "../hooks/useToast";
 import { TaskDetailsContent } from "../components/common/TaskDetailsModal";
 import { SkeletonRow, SkeletonBox } from "../components/common/SkeletonComponents";
 import {
@@ -33,6 +34,7 @@ export default function TaskDetailsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { taskId } = useParams();
+  const toast = useToast();
 
   const initialTask = location.state?.task || null;
   const initialProject = location.state?.project || null;
@@ -51,7 +53,6 @@ export default function TaskDetailsPage() {
   const [projectMembers, setProjectMembers] = useState(initialMembers);
   const [taskCategories, setTaskCategories] = useState([]);
   const [taskLoading, setTaskLoading] = useState(false);
-  const [taskError, setTaskError] = useState("");
   const [isAdminOrOwner, setIsAdminOrOwner] = useState(initialIsAdmin);
   const [canMembersAssignTaskToOthers, setCanMembersAssignTaskToOthers] = useState(initialCanAssign);
   const [canMembersReviewTasks, setCanMembersReviewTasks] = useState(initialCanReview);
@@ -127,14 +128,13 @@ export default function TaskDetailsPage() {
 
   const loadTaskById = useCallback(async (id) => {
     setTaskLoading(true);
-    setTaskError("");
 
     try {
       const data = await getTaskById(id);
       const found = data?.task || null;
 
       if (!found) {
-        setTaskError("Task not found.");
+        toast.showNotFound("Task not found.");
       } else {
         setTask(found);
         setProject((prev) => prev || found.project || (found.projectId ? { id: found.projectId } : null));
@@ -147,11 +147,11 @@ export default function TaskDetailsPage() {
         }
       }
     } catch (err) {
-      setTaskError(err?.message || "Unable to load task.");
+      toast.showError(err?.message || "Unable to load task.");
     } finally {
       setTaskLoading(false);
     }
-  }, [hasInitialCanAssign, hasInitialIsAdmin]);
+  }, [hasInitialCanAssign, hasInitialIsAdmin, toast]);
 
   useEffect(() => {
     if (!taskId) return;
@@ -254,7 +254,7 @@ export default function TaskDetailsPage() {
           ) : (
             <>
               <h3>Task not available</h3>
-              <p>{taskError || "Open this page from the board to see task details."}</p>
+              <p>Open this page from the board to see task details.</p>
             </>
           )}
           <div style={{ marginTop: 12 }}>

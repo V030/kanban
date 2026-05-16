@@ -8,6 +8,7 @@ import {
     getProjectInvitations,
     getProjects,
 } from "../services/projectService";
+import { useToast } from "../hooks/useToast";
 
 import {
     SkeletonCard,
@@ -20,11 +21,11 @@ import "../components/styles/SkeletonLoading.css";
 
 function Dashboard() {
     const navigate = useNavigate();
+    const toast = useToast();
 
     const currentUser = useMemo(() => getCurrentUser(), []);
 
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
 
     const [ownedProjects, setOwnedProjects] = useState([]);
     const [memberProjects, setMemberProjects] = useState([]);
@@ -34,7 +35,6 @@ function Dashboard() {
 
     const loadDashboard = useCallback(async () => {
         setLoading(true);
-        setError("");
 
         try {
             const [owned, member, friends, invites] = await Promise.all([
@@ -50,14 +50,14 @@ function Dashboard() {
             setFriendCount((friends.friends || []).length);
             setInviteCount((invites.projectInvitations || []).length);
         } catch (requestError) {
-            setError(
+            toast.showError(
                 requestError?.message ||
                     "Unable to load dashboard data."
             );
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [toast]);
 
     useEffect(() => {
         loadDashboard();
@@ -145,13 +145,6 @@ function Dashboard() {
                 <div className="dashboard-hero-glow" />
 
             </header>
-
-            {/* ERROR */}
-            {error && (
-                <p className="status-text error">
-                    {error}
-                </p>
-            )}
 
             {/* STATS */}
             <section

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { register } from "../../services/authService";
+import { useToast } from "../../hooks/useToast";
 import { useNavigate } from "react-router-dom";
 import "../styles/WorkspacePages.css";
 
@@ -9,22 +10,27 @@ function RegisterForm() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+    const toast = useToast();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      toast.showValidationError("Passwords do not match");
       return;
     }
 
+    setLoading(true);
     try {
       await register(first_name, last_name, email, password);
+      toast.showSuccess("Account created successfully!");
       navigate("/main-page");
     } catch (err) {
-      setError("Registration failed");
+      toast.showError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,11 +97,11 @@ function RegisterForm() {
       </div>
 
       <div className="auth-actions">
-        <button className="btn btn-primary" type="submit">Create Account</button>
-        <button className="btn btn-secondary" type="button" onClick={toLogin}>Back to Login</button>
+        <button className="btn btn-primary" type="submit" disabled={loading}>
+          {loading ? "Creating Account..." : "Create Account"}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={toLogin} disabled={loading}>Back to Login</button>
       </div>
-
-      {error && <p className="auth-error">{error}</p>}
     </form>
   );
 }

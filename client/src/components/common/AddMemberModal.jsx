@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
+import { useToast } from "../../hooks/useToast";
 import { getFriends } from "../../services/friendService";
 import { inviteMemberToProject } from "../../services/projectService";
 import "./CreateProjectModal.css";
 
 export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
+  const toast = useToast();
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [friends, setFriends] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
@@ -42,10 +43,9 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
 
     if (!email || !email.trim()) {
-      setError("Please enter an email");
+      toast.showValidationError("Please enter an email");
       return;
     }
 
@@ -60,13 +60,14 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
         email: email.trim(),
       });
 
+      toast.showSuccess("Invitation sent!");
       setEmail("");
       if (onAdded) {
         await onAdded();
       }
       onClose();
     } catch(err) {
-      setError(err?.message || "Failed to send an invite.");
+      toast.showError(err?.message || "Failed to send an invite.");
     } finally {
       setLoading(false);
     }
@@ -75,15 +76,15 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
   const handleSelectFriend = async (friend, project) => {
     setLoading(true);
     setPendingFriendId(String(friend));
-    setError("");
 
     try {
       await inviteMemberToProject ({
         projectId: project,
         friendId: friend,
       });
+      toast.showSuccess("Invitation sent!");
     } catch (err) {
-      setError(err?.message || "Failed to send an invite.");
+      toast.showError(err?.message || "Failed to send an invite.");
     } finally {
       setLoading(false);
       setPendingFriendId("");
@@ -165,8 +166,6 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
             <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'Sending...' : 'Send Invite'}</button>
           </div>
         </form>
-
-        {error && <p className="error-message">{error}</p>}
       </div>
     </div>
   );

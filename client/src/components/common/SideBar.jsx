@@ -99,9 +99,9 @@ export default function SideBar () {
     return (
         <aside className="sidebar">
             <div className="sidebar-top">
-                <div className="logo-mark" aria-hidden="true">TF</div>
+                <div className="logo-mark" aria-hidden="true">Miru</div>
                 <div>
-                  <h2 className="logo">TaskFlow</h2>
+                  <h2 className="logo">Miruban</h2>
                   <p className="logo-subtitle">Project command center</p>
                 </div>
             </div>

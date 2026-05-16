@@ -3,6 +3,8 @@ import './App.css';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { isAuthenticated } from './services/authService';
+import { ToastProvider } from './contexts/ToastContext';
+import ToastContainer from './components/ToastContainer';
 
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -19,13 +21,14 @@ import Metrics from "./pages/Metrics";
 import { ProtectedRoute } from './components/protected/ProtectedRoutes';
 import { PublicRoute } from './components/public/PublicRoutes';
 
-
 function App() {
   const auth = isAuthenticated();
 
   return (
-    <BrowserRouter>
-      <Routes>
+    <ToastProvider>
+      <BrowserRouter>
+        <ToastContainer />
+        <Routes>
       {/* routes declaration */}
           <Route path="/login" element={
             <PublicRoute>
@@ -51,7 +54,7 @@ function App() {
             </ProtectedRoute>
             
           }>
-          
+
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="projects" element={<Projects />} />
@@ -73,7 +76,8 @@ function App() {
           }>
         </Route>
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
 

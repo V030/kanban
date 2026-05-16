@@ -1,5 +1,7 @@
 // src/services/authService.js
 
+import { transformErrorMessage, extractErrorMessage } from "../utils/errorTransformer";
+
 const API_URL = "http://localhost:5000";
 
 
@@ -39,23 +41,14 @@ export async function fetchWithAuth(url, options = {}) {
   }
   
   if (!response.ok) {
-    let errorMessage = "Request failed";
-
-    try {
-      const error = await response.json();
-      errorMessage = error.message || errorMessage;
-    } catch {
-      const fallbackText = await response.text();
-      if (fallbackText) {
-        errorMessage = fallbackText;
-      }
-    }
-
+    let errorMessage = await extractErrorMessage(response);
+    
     if (response.status === 413) {
       errorMessage = "Image is too large. Please choose a smaller file.";
     }
 
-    throw new Error(errorMessage);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
   }
   
   return response.json();
@@ -69,8 +62,9 @@ export async function login(email, password) {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Login failed");
+      const errorMessage = await extractErrorMessage(response);
+      const userFriendlyMessage = transformErrorMessage(errorMessage);
+      throw new Error(userFriendlyMessage);
     }
 
     const data = await response.json();
@@ -99,8 +93,9 @@ export async function register(
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Registration failed");
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
   }
 
   const data = await response.json();
@@ -118,8 +113,9 @@ export async function requestPasswordResetOtp(email) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to request password reset code");
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
   }
 
   return response.json();
@@ -133,8 +129,9 @@ export async function verifyPasswordResetOtp(email, otp) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to verify OTP");
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
   }
 
   return response.json();
@@ -148,8 +145,9 @@ export async function completePasswordResetWithToken(resetToken, newPassword) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to complete password reset");
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
   }
 
   return response.json();
@@ -163,8 +161,9 @@ export async function resetPasswordWithOtp(email, otp, newPassword) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to reset password");
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
   }
 
   return response.json();

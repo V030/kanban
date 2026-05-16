@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useToast } from "../../hooks/useToast";
 import { getFriendRequests, acceptFriendRequest, declineFriendRequest } from "../../services/friendService";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
 
@@ -9,20 +10,19 @@ function IncomingFriendRequests({
   onFriendRollback,
   onSync,
 }) {
+  const toast = useToast();
   const [myFriendRequests, setMyFriendRequests] = useState(Array.isArray(requests) ? requests : []);
   const [loading, setLoading] = useState(!Array.isArray(requests));
-  const [error, setError] = useState("");
   const [pendingIds, setPendingIds] = useState({});
 
   const loadMyFriendRequests = async () => {
     setLoading(true);
-    setError("");
 
     try {
       const data = await getFriendRequests();
       setMyFriendRequests(data.myFriendRequests || []);
     } catch (err) {
-      setError(err?.message || "Failed loading friend requests.");
+      toast.showError(err?.message || "Failed loading friend requests.");
     } finally {
       setLoading(false);
     }
@@ -41,7 +41,6 @@ function IncomingFriendRequests({
   }, [requests]);
 
   const handleAccept = async (requestId) => {
-    setError("");
     const previousRequests = Array.isArray(myFriendRequests) ? [...myFriendRequests] : [];
     const requestItem = previousRequests.find((req) => String(req?.id) === String(requestId));
     const nextRequests = previousRequests.filter((req) => String(req?.id) !== String(requestId));
@@ -66,12 +65,13 @@ function IncomingFriendRequests({
       setPendingIds((prev) => ({ ...prev, [String(requestId)]: true }));
 
       await acceptFriendRequest(requestId);
+      toast.showSuccess("Friend request accepted!");
       await onSync?.();
     } catch (err) {
       setMyFriendRequests(previousRequests);
       onRequestsChange?.(previousRequests);
       onFriendRollback?.(tempFriendId);
-      setError(err?.message || "Failed to accept friend request.");
+      toast.showError(err?.message || "Failed to accept friend request.");
     } finally {
       setPendingIds((prev) => {
         const next = { ...prev };
@@ -82,7 +82,6 @@ function IncomingFriendRequests({
   };
 
   const handleDecline = async (requestId) => {
-    setError("");
     const previousRequests = Array.isArray(myFriendRequests) ? [...myFriendRequests] : [];
     const nextRequests = previousRequests.filter((req) => String(req?.id) !== String(requestId));
 
@@ -92,11 +91,12 @@ function IncomingFriendRequests({
       setPendingIds((prev) => ({ ...prev, [String(requestId)]: true }));
 
       await declineFriendRequest(requestId);
+      toast.showSuccess("Friend request declined!");
       await onSync?.();
     } catch (err) {
       setMyFriendRequests(previousRequests);
       onRequestsChange?.(previousRequests);
-      setError(err?.message || "Failed to decline friend request.");
+      toast.showError(err?.message || "Failed to decline friend request.");
     } finally {
       setPendingIds((prev) => {
         const next = { ...prev };
@@ -107,7 +107,6 @@ function IncomingFriendRequests({
   };
 
   if (loading) return <p className="status-text">Loading incoming requests...</p>;
-  if (error) return <p className="friends-error">{error}</p>;
   if (myFriendRequests.length === 0) return <p className="friends-empty">No incoming requests.</p>;
 
   return (

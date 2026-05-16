@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from "react";
+import { useToast } from "../../hooks/useToast";
 import { getSentFriendRequests, cancelFriendRequest } from "../../services/friendService";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
 
 function SentFriendRequests({ requests, onRequestsChange, onSync }) {
+  const toast = useToast();
   const [sentFriendRequests, setSentFriendRequests] = useState(Array.isArray(requests) ? requests : []);
   const [loading, setLoading] = useState(!Array.isArray(requests));
-  const [error, setError] = useState("");
   const [pendingIds, setPendingIds] = useState({});
 
   const loadSentFriendRequests = async () => {
     setLoading(true);
-    setError("");
 
     try {
       const data = await getSentFriendRequests();
       setSentFriendRequests(data.sentFriendRequests || []);
     } catch (err) {
-      setError(err?.message || "Failed to load friend requests");
+      toast.showError(err?.message || "Failed to load friend requests");
     } finally {
       setLoading(false);
     }
@@ -35,7 +35,6 @@ function SentFriendRequests({ requests, onRequestsChange, onSync }) {
   }, [requests]);
 
   const handleCancel = async (requestId) => {
-    setError("");
     const previousRequests = Array.isArray(sentFriendRequests) ? [...sentFriendRequests] : [];
     const nextRequests = previousRequests.filter((req) => String(req?.id) !== String(requestId));
 
@@ -45,11 +44,12 @@ function SentFriendRequests({ requests, onRequestsChange, onSync }) {
       setPendingIds((prev) => ({ ...prev, [String(requestId)]: true }));
 
       await cancelFriendRequest(requestId);
+      toast.showSuccess("Friend request cancelled!");
       await onSync?.();
     } catch (err) {
       setSentFriendRequests(previousRequests);
       onRequestsChange?.(previousRequests);
-      setError(err?.message || "Failed to cancel friend request.");
+      toast.showError(err?.message || "Failed to cancel friend request.");
     } finally {
       setPendingIds((prev) => {
         const next = { ...prev };
@@ -60,7 +60,6 @@ function SentFriendRequests({ requests, onRequestsChange, onSync }) {
   };
 
   if (loading) return <p className="status-text">Loading sent requests...</p>;
-  if (error) return <p className="friends-error">{error}</p>;
   if (sentFriendRequests.length === 0) return <p className="friends-empty">No sent requests.</p>;
 
   return (

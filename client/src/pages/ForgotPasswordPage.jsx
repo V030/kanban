@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "../hooks/useToast";
 import { requestPasswordResetOtp, verifyPasswordResetOtp, completePasswordResetWithToken } from "../services/authService";
 import "../components/styles/WorkspacePages.css";
 
 function ForgotPasswordPage() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [step, setStep] = useState("request");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -12,16 +14,12 @@ function ForgotPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
 
   const handleRequestOtp = async (event) => {
     event.preventDefault();
-    setError("");
-    setMessage("");
 
     if (!email.trim()) {
-      setError("Email is required");
+      toast.showValidationError("Email is required");
       return;
     }
 
@@ -29,9 +27,9 @@ function ForgotPasswordPage() {
     try {
       await requestPasswordResetOtp(email.trim());
       setStep("verify");
-      setMessage("If the email exists, a reset code has been sent.");
+      toast.showInfo("If the email exists, a reset code has been sent.");
     } catch (requestError) {
-      setError(requestError.message || "Failed to request password reset code");
+      toast.showError(requestError.message);
     } finally {
       setLoading(false);
     }
@@ -39,16 +37,14 @@ function ForgotPasswordPage() {
 
   const handleVerifyOtp = async (event) => {
     event.preventDefault();
-    setError("");
-    setMessage("");
 
     if (!email.trim()) {
-      setError("Email is required");
+      toast.showValidationError("Email is required");
       return;
     }
 
     if (!otp.trim()) {
-      setError("OTP is required");
+      toast.showValidationError("Please enter the code");
       return;
     }
 
@@ -57,9 +53,9 @@ function ForgotPasswordPage() {
       const res = await verifyPasswordResetOtp(email.trim(), otp.trim());
       setResetToken(res.resetToken);
       setStep("setPassword");
-      setMessage("OTP verified. Please enter your new password.");
+      toast.showSuccess("Code verified! Please enter your new password.");
     } catch (verifyError) {
-      setError(verifyError.message || "Failed to verify OTP");
+      toast.showError(verifyError.message);
     } finally {
       setLoading(false);
     }
@@ -67,31 +63,29 @@ function ForgotPasswordPage() {
 
   const handleSetPassword = async (event) => {
     event.preventDefault();
-    setError("");
-    setMessage("");
 
     if (!newPassword) {
-      setError("New password is required");
+      toast.showValidationError("New password is required");
       return;
     }
 
     if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters");
+      toast.showValidationError("Password must be at least 6 characters");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      toast.showValidationError("Passwords do not match");
       return;
     }
 
     setLoading(true);
     try {
       await completePasswordResetWithToken(resetToken, newPassword);
-      setMessage("Password reset successfully. Redirecting to login...");
+      toast.showSuccess("Password reset successfully! Redirecting to login...");
       setTimeout(() => navigate("/login"), 1400);
     } catch (err) {
-      setError(err.message || "Failed to reset password");
+      toast.showError(err.message);
     } finally {
       setLoading(false);
     }
@@ -117,27 +111,6 @@ function ForgotPasswordPage() {
         <div className="auth-content">
           <h2>Forgot Password</h2>
           <p>{step === "request" ? "Enter your email to receive a reset code." : "Enter the code and choose a new password."}</p>
-
-          {message && (
-            <div role="status" aria-live="polite" className="notice notice--success">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                <path d="M9 12.5l2 2 4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.25" />
-              </svg>
-              <p className="notice__text">{message}</p>
-            </div>
-          )}
-
-          {error && (
-            <div role="alert" className="notice notice--error">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                <path d="M12 8v4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M12 16h.01" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.25" />
-              </svg>
-              <p className="notice__text">{error}</p>
-            </div>
-          )}
 
           {step === "request" && (
             <form className="auth-form" onSubmit={handleRequestOtp}>

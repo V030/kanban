@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMyTasks } from "../services/projectService";
 import { getCurrentUser, hydrateUserFromToken } from "../services/authService";
+import { useToast } from "../hooks/useToast";
 import "../components/styles/WorkspacePages.css";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
 
@@ -56,26 +57,25 @@ function statusPillClass(statusName) {
 
 function MyTasks() {
     const navigate = useNavigate();
+    const toast = useToast();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
     const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
 
     const loadTasks = useCallback(async () => {
         setLoading(true);
-        setError("");
 
         try {
             const data = await getMyTasks();
             const rawTasks = Array.isArray(data?.tasks) ? data.tasks : [];
             setTasks(rawTasks.map(normalizeTask));
         } catch (requestError) {
-            setError(requestError?.message || "Unable to load assigned tasks.");
+            toast.showError(requestError?.message || "Unable to load assigned tasks.");
             setTasks([]);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [toast]);
 
     useEffect(() => {
         loadTasks();
@@ -192,10 +192,9 @@ function MyTasks() {
 
             {/* ── Loading / error ── */}
             {loading && <p className="status-text">Loading tasks…</p>}
-            {error   && <p className="status-text error">{error}</p>}
 
             {/* ── Empty state ── */}
-            {!loading && !error && groupedProjects.length === 0 && (
+            {!loading && groupedProjects.length === 0 && (
                 <div className="empty-state-card">
                     <h3>No assigned tasks yet</h3>
                     <p>Tasks assigned to you will appear here, grouped by project and status.</p>
@@ -208,7 +207,7 @@ function MyTasks() {
             )}
 
             {/* ── Task groups ── */}
-            {!loading && !error && groupedProjects.length > 0 && (
+            {!loading && groupedProjects.length > 0 && (
                 <div className="project-section">
                     {/* Section-level heading — mirrors "My Projects (3 total)" */}
                     <div className="section-heading">

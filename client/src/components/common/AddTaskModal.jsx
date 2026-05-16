@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useToast } from "../../hooks/useToast";
 import "./AddTaskModal.css";
 
 export default function AddTaskModal({
@@ -8,6 +9,7 @@ export default function AddTaskModal({
   initialCategoryId = "",
   categories = [],
 }) {
+  const toast = useToast();
   const priorityOptions = ["unset", "low", "medium", "high", "urgent"];
   const formatLabel = (value) =>
     String(value || "")
@@ -21,7 +23,7 @@ export default function AddTaskModal({
     categoryId: categories.length ? categories[0].id : "",
   });
 
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -39,9 +41,8 @@ export default function AddTaskModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
     if (!taskData.title.trim()) {
-      setError("Task title is required");
+      toast.showValidationError("Task title is required");
       return;
     }
 
@@ -53,8 +54,10 @@ export default function AddTaskModal({
       categoryId: taskData.categoryId || null,
     };
 
+    setLoading(true);
     try {
       if (onCreate) await onCreate(payload);
+      toast.showSuccess("Task created!");
       setTaskData({
         title: "",
         description: "",
@@ -65,7 +68,9 @@ export default function AddTaskModal({
       onClose();
     } catch (err) {
       console.error(err);
-      setError(err?.message || "Failed to create task");
+      toast.showError(err?.message || "Failed to create task");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -156,16 +161,14 @@ export default function AddTaskModal({
           </div>
 
           <div className="modal-footer">
-            <button type="button" className="cancel-btn" onClick={onClose}>
+            <button type="button" className="cancel-btn" onClick={onClose} disabled={loading}>
               Cancel
             </button>
-            <button type="submit" className="submit-btn">
-              Add Task
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? "Creating..." : "Add Task"}
             </button>
           </div>
         </form>
-
-        {error && <p className="error-message">{error}</p>}
       </div>
     </div>
   );
