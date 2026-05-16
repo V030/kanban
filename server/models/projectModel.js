@@ -2010,6 +2010,11 @@ export async function deleteTask({ taskId, requesterId }) {
     await client.query("BEGIN");
 
     await client.query(
+      `DELETE FROM reviews WHERE task_id = $1::int`,
+      [normalizedTaskId]
+    );
+
+    await client.query(
       `DELETE FROM task_comments_replies WHERE task_id = $1::int`,
       [normalizedTaskId]
     );
