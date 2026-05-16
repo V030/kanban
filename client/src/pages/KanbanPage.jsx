@@ -445,12 +445,6 @@ function KanbanPage() {
 	const handleDeleteProject = useCallback(
 		async () => {
 			if (!project?.id || projectRole !== "owner") return;
-			
-			const confirmed = window.confirm(
-				"Are you sure you want to permanently delete this project? This action cannot be undone and all tasks, boards, and member data will be lost."
-			);
-			
-			if (!confirmed) return;
 
 			setDeleteProjectPending(true);
 			setSettingsError("");
@@ -1382,6 +1376,7 @@ function KanbanPage() {
 					settings={taskPermissions}
 					onSettingChange={handleSettingChange}
 					onDeleteProject={handleDeleteProject}
+					projectName={project?.name}
 					projectRole={projectRole}
 					canEditPermissions={canEditProjectSettings}
 					pendingSettings={settingsPending}

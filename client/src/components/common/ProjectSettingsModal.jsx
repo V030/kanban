@@ -43,11 +43,14 @@ export default function ProjectSettingsModal({
   deleteProjectPending = false,
   activeTab,
   setActiveTab,
+  projectName = "",
 }) {
   const [localTab, setLocalTab] = useState("owner");
   const tab = typeof setActiveTab === "function" ? activeTab : localTab;
   const setTab = typeof setActiveTab === "function" ? setActiveTab : setLocalTab;
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTyped, setConfirmTyped] = useState("");
   if (!isOpen) return null;
 
   return (
@@ -119,14 +122,51 @@ export default function ProjectSettingsModal({
                   <div className="ps-danger-zone">
                     <p className="ps-danger-title">Danger zone</p>
                     <p className="ps-danger-desc">Permanently delete this project and all its data. This cannot be undone.</p>
-                    <button
-                      type="button"
-                      className="ps-delete-btn"
-                      onClick={onDeleteProject}
-                      disabled={deleteProjectPending}
-                    >
-                      {deleteProjectPending ? "Deleting..." : "Delete project"}
-                    </button>
+                    {!confirmOpen ? (
+                      <button
+                        type="button"
+                        className="ps-delete-btn"
+                        onClick={() => { setConfirmOpen(true); setConfirmTyped(""); }}
+                        disabled={deleteProjectPending}
+                      >
+                        {deleteProjectPending ? "Deleting..." : "Delete project"}
+                      </button>
+                    ) : (
+                      <div className="ps-delete-confirm">
+                        <p className="ps-delete-confirm-instruction">
+                          Type <span className="ps-delete-name">'{projectName}'</span> to confirm deletion:
+                        </p>
+                        <input
+                          type="text"
+                          className="ps-delete-input"
+                          value={confirmTyped}
+                          onChange={(e) => setConfirmTyped(e.target.value)}
+                          placeholder="Project name"
+                          aria-label="Type project name to confirm deletion"
+                          onKeyDown={(e) => {
+                            const cleaned = (confirmTyped || "").trim();
+                            const expected = (projectName || "").trim();
+                            if (e.key === 'Enter' && cleaned === expected && !deleteProjectPending) {
+                              onDeleteProject?.();
+                            }
+                          }}
+                        />
+                        {confirmTyped.length > 0 && ((confirmTyped || "").trim() !== (projectName || "").trim()) && (
+                          <p className="ps-delete-error">The names do not match.</p>
+                        )}
+                        <div className="ps-delete-confirm-actions">
+                          <button type="button" className="ps-delete-cancel" onClick={() => setConfirmOpen(false)} disabled={deleteProjectPending}>Cancel</button>
+                          <button
+                            type="button"
+                            className="ps-delete-confirm-btn"
+                            onClick={() => onDeleteProject?.()}
+                            disabled={deleteProjectPending || ((confirmTyped || "").trim() !== (projectName || "").trim())}
+                          >
+                            {deleteProjectPending ? "Deleting..." : "Confirm Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

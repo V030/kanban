@@ -289,6 +289,74 @@
   cursor: not-allowed;
 }
 
+/* Delete confirmation inline */
+.ps-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.ps-delete-confirm-instruction {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.ps-delete-name {
+  color: var(--color-danger);
+  font-weight: 700;
+  margin: 0 6px;
+}
+
+.ps-delete-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.8rem;
+}
+
+.ps-delete-input {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  outline: none;
+}
+
+.ps-delete-input:focus { border-color: var(--color-primary); box-shadow: 0 4px 12px rgba(15,127,143,0.06); }
+
+.ps-delete-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.ps-delete-cancel {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ps-delete-confirm-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  background: var(--color-danger);
+  color: #ffffff;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.ps-delete-confirm-btn:disabled { opacity: 0.6; cursor: not-allowed; filter: none; }
+
 /* ── Member note ── */
 .ps-member-note {
   margin: 12px 0 0;
