@@ -1568,10 +1568,12 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                         setLocalSubtasks((prev) => [...prev, optimisticSubtask]);
 
                         try {
-                          const payload = await createSubtasks({
+                        const payload = await createSubtasks({
                             subtaskData: {
                               taskId: task?.id,
                               title: newSubtaskTitle.trim(),
+                              createdBy: currentUser?.id || currentUserId,
+                              status: "unfinished",
                             },
                           });
                           const created = payload?.subtask || payload?.data || payload;
