@@ -88,13 +88,6 @@ export const ToastProvider = ({ children }) => {
 
     setToasts(prevToasts => [...prevToasts, newToast]);
 
-    // Auto-dismiss after duration
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(toastId);
-      }, duration);
-    }
-
     return toastId;
   }, []);
 

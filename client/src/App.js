@@ -13,6 +13,7 @@ import MainPage from "./pages/MainPage";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Friends from "./pages/Friends";
+import Notifications from "./pages/Notifications";
 import KanbanPage from "./pages/KanbanPage";
 import TaskDetailsPage from "./pages/TaskDetailsPage";
 import MyTasks from "./pages/MyTasks";
@@ -62,6 +63,7 @@ function App() {
             <Route path="metrics" element={<Metrics />} />
             <Route path="kanban/task/:taskId" element={<TaskDetailsPage />} />
             <Route path="friends" element={<Friends />} />
+            <Route path="notifications" element={<Notifications />} />
             <Route path="my-tasks" element={<MyTasks />} />
             <Route path="profile" element={<Profile />} />
           </Route>

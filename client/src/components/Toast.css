@@ -183,6 +183,7 @@
   height: 3px;
   background-color: currentColor;
   opacity: 0.5;
+  transition: width 100ms linear;
 }
 
 .toast-success .toast-progress {

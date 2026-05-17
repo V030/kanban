@@ -100,8 +100,7 @@ const Toast = ({ id, type, message, title, icon, duration, onClose }) => {
         <div
           className="toast-progress"
           style={{
-            width: `${progressPercent}%`,
-            animation: isPaused ? 'none' : `toast-progress ${duration}ms linear forwards`
+            width: `${progressPercent}%`
           }}
         />
       )}

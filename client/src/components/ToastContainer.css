@@ -97,8 +97,8 @@
   }
 }
 
-.toast-container .toast {
-  animation-name: toast-enter-animation, toast-stack;
-  animation-duration: 300ms, 150ms;
-  animation-timing-function: ease-out, ease-out;
+.toast-container .toast:not(.toast-exit) {
+  animation-name: toast-enter-animation;
+  animation-duration: 300ms;
+  animation-timing-function: ease-out;
 }

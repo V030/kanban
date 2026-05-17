@@ -43,10 +43,19 @@ function TasksIcon() {
     );
 }
 
+function NotificationsIcon() {
+    return (
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 3a5 5 0 0 0-5 5v2.18c0 .7-.18 1.38-.52 1.98L5.4 14.7A1.5 1.5 0 0 0 6.7 17h10.6a1.5 1.5 0 0 0 1.3-2.3l-1.08-1.54c-.34-.6-.52-1.28-.52-1.98V8a5 5 0 0 0-5-5Zm0 18a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 21Z" />
+        </svg>
+    );
+}
+
 const navItems = [
     { to: "/main-page/dashboard", label: "Dashboard", icon: <DashboardIcon /> },
     { to: "/main-page/projects", label: "Projects", icon: <ProjectsIcon /> },
     { to: "/main-page/friends", label: "Network", icon: <TeamIcon /> },
+    { to: "/main-page/notifications", label: "Notifications", icon: <NotificationsIcon /> },
     { to: "/main-page/my-tasks", label: "My Tasks", icon: <TasksIcon /> },
 ];
 
