@@ -10,7 +10,7 @@ router.get("/profile", authenticateToken, authenticatedLimiter, async (req, res)
     try {
         const userId = req.user.userId;
 
-        const query = "SELECT id, first_name, last_name, email, role, created_at, profile_image_base64 FROM users where id = $1";
+        const query = "SELECT id, first_name, last_name, email, role, created_at, profile_image_base64, profile_picture_url FROM users where id = $1";
         const result = await pool.query(query, [userId]);
 
         if (result.rows.length === 0) {
@@ -30,7 +30,7 @@ router.get("/profile", authenticateToken, authenticatedLimiter, async (req, res)
                 email: user.email,
                 role: user.role,
                 createdAt: user.created_at,
-                profileImageBase64: user.profile_image_base64,
+                profileImageBase64: user.profile_image_base64 || user.profile_picture_url,
             }
         });
     } catch (error) {

@@ -105,6 +105,36 @@ export async function register(
   return data;
 }
 
+export async function googleLogin(credentialResponse) {
+  try {
+    const response = await fetch(`${API_URL}/auth/google`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: credentialResponse.credential }),
+    });
+
+    if (!response.ok) {
+      const errorMessage = await extractErrorMessage(response);
+      const userFriendlyMessage = transformErrorMessage(errorMessage);
+      throw new Error(userFriendlyMessage);
+    }
+
+    const data = await response.json();
+
+    console.log("Google login successful. Storing token...");
+
+    localStorage.setItem("token", data.token);
+    cachedUser = data.user || null;
+
+    console.log("Token stored. User role:", cachedUser?.role);
+
+    return data;
+  } catch (error) {
+    console.error("Google login error:", error);
+    throw error;
+  }
+}
+
 export async function requestPasswordResetOtp(email) {
   const response = await fetch(`${API_URL}/auth/forgot-password/request-otp`, {
     method: "POST",

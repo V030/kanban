@@ -80,6 +80,7 @@ export default function SideBar () {
     const [currentUser, setCurrentUser] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [imageError, setImageError] = useState(false);
     const profileRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
@@ -181,8 +182,13 @@ export default function SideBar () {
                                 >
                                     {(() => {
                                         const src = normalizeProfileImage(currentUser?.profileImageBase64 || currentUser?.profile_image_base64);
-                                        return src ? (
-                                            <img src={src} alt={displayName || "Profile"} className="avatar avatar-image" />
+                                        return src && !imageError ? (
+                                            <img 
+                                                src={src} 
+                                                alt={displayName || "Profile"} 
+                                                className="avatar avatar-image"
+                                                onError={() => setImageError(true)}
+                                            />
                                         ) : (
                                             <div className="avatar">{displayInitials || "U"}</div>
                                         );
@@ -200,8 +206,13 @@ export default function SideBar () {
                                             <div className="dropdown-profile-row">
                                                 {(() => {
                                                     const src = normalizeProfileImage(currentUser?.profileImageBase64 || currentUser?.profile_image_base64);
-                                                    return src ? (
-                                                        <img src={src} alt="Profile" className="avatar avatar-image" />
+                                                    return src && !imageError ? (
+                                                        <img 
+                                                            src={src} 
+                                                            alt="Profile" 
+                                                            className="avatar avatar-image"
+                                                            onError={() => setImageError(true)}
+                                                        />
                                                     ) : (
                                                         <div className="avatar">{displayInitials || "U"}</div>
                                                     );

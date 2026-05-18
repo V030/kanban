@@ -8,6 +8,7 @@ import {
 	completePasswordResetController,
 	testEmailController,
 } from "../controllers/authController.js";
+import { googleAuth } from "../controllers/googleAuthController.js";
 import {
 	createProject,
 	getProjects,
@@ -88,6 +89,7 @@ const router = express.Router();
 
 router.post("/login", authLimiter, login);
 router.post("/register", authLimiter, register);
+router.post("/google", authLimiter, googleAuth);
 router.post("/forgot-password/request-otp", passwordResetRequestLimiter, requestPasswordResetController);
 router.post("/forgot-password/verify-otp", passwordResetConfirmLimiter, verifyPasswordResetController);
 router.post("/forgot-password/complete", passwordResetConfirmLimiter, completePasswordResetController);

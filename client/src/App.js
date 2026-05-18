@@ -1,6 +1,7 @@
 import './App.css';
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 import { isAuthenticated } from './services/authService';
 import { ToastProvider } from './contexts/ToastContext';
@@ -27,61 +28,63 @@ function App() {
   const auth = isAuthenticated();
 
   return (
-    <ToastProvider>
-      <BrowserRouter>
-        <ToastContainer />
-        <NotificationsStream />
-        <Routes>
-      {/* routes declaration */}
-          <Route path="/login" element={
-            <PublicRoute>
-              <LoginPage/>
-            </PublicRoute>
-          } />
+    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
+      <ToastProvider>
+        <BrowserRouter>
+          <ToastContainer />
+          <NotificationsStream />
+          <Routes>
+        {/* routes declaration */}
+            <Route path="/login" element={
+              <PublicRoute>
+                <LoginPage/>
+              </PublicRoute>
+            } />
 
-          <Route path="/register" element={
-            <PublicRoute>
-              <RegisterPage/>
-            </PublicRoute>
-          } />
+            <Route path="/register" element={
+              <PublicRoute>
+                <RegisterPage/>
+              </PublicRoute>
+            } />
 
-          <Route path="/forgot-password" element={
-            <PublicRoute>
-              <ForgotPasswordPage />
-            </PublicRoute>
-          } />
+            <Route path="/forgot-password" element={
+              <PublicRoute>
+                <ForgotPasswordPage />
+              </PublicRoute>
+            } />
 
-          <Route path="/main-page" element={
-            <ProtectedRoute>
-              <MainPage/>
-            </ProtectedRoute>
-            
-          }>
+            <Route path="/main-page" element={
+              <ProtectedRoute>
+                <MainPage/>
+              </ProtectedRoute>
+              
+            }>
 
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="projects" element={<Projects />} />
-            <Route path="kanban" element={<KanbanPage />} />
-            <Route path="metrics" element={<Metrics />} />
-            <Route path="kanban/task/:taskId" element={<TaskDetailsPage />} />
-            <Route path="friends" element={<Friends />} />
-            <Route path="notifications" element={<Notifications />} />
-            <Route path="my-tasks" element={<MyTasks />} />
-            <Route path="profile" element={<Profile />} />
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="projects" element={<Projects />} />
+              <Route path="kanban" element={<KanbanPage />} />
+              <Route path="metrics" element={<Metrics />} />
+              <Route path="kanban/task/:taskId" element={<TaskDetailsPage />} />
+              <Route path="friends" element={<Friends />} />
+              <Route path="notifications" element={<Notifications />} />
+              <Route path="my-tasks" element={<MyTasks />} />
+              <Route path="profile" element={<Profile />} />
+            </Route>
+
+        {/* auth routing logic upon startup */}
+          <Route 
+            path='/'
+            element= {
+              auth 
+                ? <Navigate to="/main-page/dashboard" replace /> 
+                : <Navigate to="/login" replace />
+            }>
           </Route>
-
-      {/* auth routing logic upon startup */}
-        <Route 
-          path='/'
-          element= {
-            auth 
-              ? <Navigate to="/main-page/dashboard" replace /> 
-              : <Navigate to="/login" replace />
-          }>
-        </Route>
-      </Routes>
-      </BrowserRouter>
-    </ToastProvider>
+        </Routes>
+        </BrowserRouter>
+      </ToastProvider>
+    </GoogleOAuthProvider>
   );
 }
 

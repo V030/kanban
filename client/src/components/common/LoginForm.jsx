@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { login } from "../../services/authService";
+import { login, googleLogin } from "../../services/authService";
 import { useToast } from "../../hooks/useToast";
 import { Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from '@react-oauth/google';
 import "../styles/WorkspacePages.css";
 
 function LoginForm() {
@@ -24,6 +25,23 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    try {
+      await googleLogin(credentialResponse);
+      toast.showSuccess("Google login successful!");
+      navigate("/main-page");
+    } catch (err) {
+      toast.showError(err.message || "Google login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    toast.showError("Google login failed. Please try again.");
   };
 
   async function toRegister() {
@@ -62,6 +80,22 @@ function LoginForm() {
           {loading ? "Logging in..." : "Log In"}
         </button>
         <button className="btn btn-secondary" type="button" onClick={ toRegister } disabled={loading}>Create Account</button>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0' }}>
+        <hr style={{ flex: 1, borderColor: '#cccccc28' }} />
+        <span style={{ margin: '0 10px', color: '#cccccce5', fontSize: '14px' }}>or</span>
+        <hr style={{ flex: 1, borderColor: '#cccccc28' }} />
+      </div>
+
+      <div>
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={handleGoogleError}
+          theme="outline"
+          size="large"
+          width="auto"
+        />
       </div>
     </form>
   );

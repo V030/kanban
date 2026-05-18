@@ -40,6 +40,64 @@ export async function createUser(first_name, last_name, role, email, password_ha
   return result.rows[0];
 }
 
+// Find or create user by Google ID (OAuth)
+export async function findOrCreateGoogleUser(googleId, email, firstName, lastName, profilePictureUrl) {
+  try {
+    // First, check if user exists by google_id
+    const googleQuery = "SELECT * FROM users WHERE google_id = $1";
+    const googleResult = await pool.query(googleQuery, [googleId]);
+
+    if (googleResult.rows.length > 0) {
+      return googleResult.rows[0]; // Existing OAuth user
+    }
+
+    // Check if user exists by email (account linking scenario)
+    const emailQuery = "SELECT * FROM users WHERE email = $1";
+    const emailResult = await pool.query(emailQuery, [email]);
+
+    if (emailResult.rows.length > 0) {
+      // Link existing email-based account to Google
+      const updateQuery = `
+        UPDATE users 
+        SET google_id = $1, oauth_provider = $2, profile_picture_url = $3
+        WHERE email = $4
+        RETURNING id, first_name, last_name, email, role, profile_picture_url, google_id, oauth_provider
+      `;
+      const updateResult = await pool.query(updateQuery, [
+        googleId,
+        "google",
+        profilePictureUrl,
+        email,
+      ]);
+      console.log("Google account linked to existing user:", email);
+      return updateResult.rows[0];
+    }
+
+    // Create new user for Google OAuth
+    const createQuery = `
+      INSERT INTO users (first_name, last_name, email, google_id, oauth_provider, profile_picture_url, role, password_hash)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
+      RETURNING id, first_name, last_name, email, role, profile_picture_url, google_id, oauth_provider
+    `;
+
+    const createResult = await pool.query(createQuery, [
+      firstName,
+      lastName,
+      email,
+      googleId,
+      "google",
+      profilePictureUrl,
+      "user", // Default role for new OAuth users
+    ]);
+
+    console.log("New OAuth user created:", email);
+    return createResult.rows[0];
+  } catch (error) {
+    console.error("Error in findOrCreateGoogleUser:", error);
+    throw error;
+  }
+}
+
 function generatePasswordResetOtp() {
   return String(randomInt(0, 1000000)).padStart(6, "0");
 }
