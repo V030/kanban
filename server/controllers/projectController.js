@@ -29,6 +29,7 @@ import { createProject as createProjectModel,
          unassignTaskFromMember as unassignTaskFromMemberModel,
          unassignTaskFromSelf as unassignTaskFromSelfModel,
          createSubtask as createSubtaskModel,
+         deleteSubtask as deleteSubtaskModel,
          createTaskComment as createTaskCommentModel,
          createTaskCommentReply as createTaskCommentReplyModel,
          getTaskComments as getTaskCommentsModel,
@@ -43,8 +44,22 @@ import { createProject as createProjectModel,
          } from "../models/projectModel.js";
 
 import { getProjectMetrics as getProjectMetricsController } from "./metricsController.js";
+import { createNotification, getUserSummary, getProjectSummary, getTaskContext } from "../models/notificationModel.js";
 
 export { getProjectMetricsController as getProjectMetrics };
+
+function truncateNotificationText(value, maxLength = 140) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 3).trim()}...`;
+}
+
+function buildNotificationRecipients({ creatorId, assigneeIds = [], actorId }) {
+  const ids = new Set([creatorId, ...(assigneeIds || [])].filter(Boolean));
+  if (actorId) ids.delete(actorId);
+  return Array.from(ids);
+}
 
 export async function createProject(req, res) {
   const projectName = (req.body?.project_name || req.body?.name || "").trim();
@@ -179,6 +194,28 @@ export async function inviteMemberToProject(req, res) {
         invitee_id: inviteeId,
         project_id: projectId,
       });
+
+      try {
+        const inviter = await getUserSummary(req.user.userId);
+        const project = await getProjectSummary(projectId);
+        const inviteeUserId = inviteRequest?.recipient_id || inviteRequest?.recipientId || inviteeId;
+        if (inviter && project && inviteeUserId) {
+          await createNotification({
+            type: "project_invitation",
+            message: `${inviter.displayName} invited you to join ${project.name}.`,
+            payload: {
+              projectId,
+              requestId: inviteRequest?.id || null,
+              inviterId: inviter.id,
+            },
+            recipientUserId: inviteeUserId,
+            url: "/main-page/projects",
+          });
+        }
+      } catch (notifyError) {
+        console.error("Project invite notification error:", notifyError);
+      }
+
       return res.status(201).json({ message: "Invite sent", inviteRequest });
     } catch (error) {
         if (error?.code === "ALREADY_PENDING" || error?.code === "ALREADY_MEMBER") {
@@ -200,6 +237,28 @@ export async function inviteMemberToProject(req, res) {
         invitee_email: inviteeEmail,
         project_id: projectId,
       });
+
+      try {
+        const inviter = await getUserSummary(req.user.userId);
+        const project = await getProjectSummary(projectId);
+        const inviteeUserId = inviteRequest?.recipient_id || inviteRequest?.recipientId;
+        if (inviter && project && inviteeUserId) {
+          await createNotification({
+            type: "project_invitation",
+            message: `${inviter.displayName} invited you to join ${project.name}.`,
+            payload: {
+              projectId,
+              requestId: inviteRequest?.id || null,
+              inviterId: inviter.id,
+            },
+            recipientUserId: inviteeUserId,
+            url: "/main-page/projects",
+          });
+        }
+      } catch (notifyError) {
+        console.error("Project invite notification error:", notifyError);
+      }
+
       return res.status(201).json({ message: "Invite sent", inviteRequest });
     } catch (error) {
         if (error?.code === "ALREADY_PENDING" || error?.code === "ALREADY_MEMBER") {
@@ -239,6 +298,27 @@ export async function acceptProjectInvitation(req, res) {
 
   try {
     const request = await acceptProjectInvitationModel({ requestId, userId });
+
+    try {
+      const recipient = await getUserSummary(userId);
+      const project = await getProjectSummary(request?.project_id);
+      if (recipient && project && request?.requester_id) {
+        await createNotification({
+          type: "project_invitation_accepted",
+          message: `${recipient.displayName} accepted your invitation to ${project.name}.`,
+          payload: {
+            projectId: project.id,
+            requestId,
+            recipientId: userId,
+          },
+          recipientUserId: request.requester_id,
+          url: "/main-page/projects",
+        });
+      }
+    } catch (notifyError) {
+      console.error("Project invite accepted notification error:", notifyError);
+    }
+
     return res.status(200).json({ message: "Project invitation accepted", request });
   } catch (error) {
     if (error?.code === "REQUEST_NOT_FOUND") {
@@ -522,6 +602,36 @@ export async function updateTaskStatus(req, res) {
       categoryId,
     });
 
+    try {
+      const actor = await getUserSummary(req.user.userId);
+      const taskContext = await getTaskContext(taskId);
+      if (actor && taskContext) {
+        const recipients = buildNotificationRecipients({
+          creatorId: taskContext.creatorId,
+          assigneeIds: taskContext.assigneeIds,
+          actorId: req.user.userId,
+        });
+
+        const statusLabel = taskContext.categoryName || "Updated";
+        await Promise.all(
+          recipients.map((recipientId) => createNotification({
+            type: "task_status_changed",
+            message: `${actor.displayName} moved "${taskContext.taskTitle}" to ${statusLabel} in ${taskContext.projectName}.`,
+            payload: {
+              taskId: taskContext.taskId,
+              projectId: taskContext.projectId,
+              categoryId: taskContext.categoryId,
+              categoryName: taskContext.categoryName,
+            },
+            recipientUserId: recipientId,
+            url: `/main-page/kanban/task/${taskContext.taskId}`,
+          }))
+        );
+      }
+    } catch (notifyError) {
+      console.error("Task status notification error:", notifyError);
+    }
+
     return res.status(200).json({ message: "Task moved successfully", task });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_CATEGORY" || error?.code === "INVALID_USER") {
@@ -581,6 +691,35 @@ export async function approveTaskReview(req, res) {
       reviewerId: req.user.userId,
       comment,
     });
+
+    try {
+      const actor = await getUserSummary(req.user.userId);
+      const taskContext = await getTaskContext(taskId);
+      if (actor && taskContext) {
+        const recipients = buildNotificationRecipients({
+          creatorId: taskContext.creatorId,
+          assigneeIds: taskContext.assigneeIds,
+          actorId: req.user.userId,
+        });
+        const note = truncateNotificationText(comment);
+        await Promise.all(
+          recipients.map((recipientId) => createNotification({
+            type: "review_approved",
+            message: `${actor.displayName} approved the review for "${taskContext.taskTitle}" in ${taskContext.projectName}${note ? `: "${note}"` : ""}.`,
+            payload: {
+              taskId: taskContext.taskId,
+              projectId: taskContext.projectId,
+              comment,
+            },
+            recipientUserId: recipientId,
+            url: `/main-page/kanban/task/${taskContext.taskId}`,
+          }))
+        );
+      }
+    } catch (notifyError) {
+      console.error("Review approved notification error:", notifyError);
+    }
+
     return res.status(200).json({ message: "Task approved and moved to Done", task: updated });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER" || error?.code === "CATEGORY_NOT_FOUND") {
@@ -608,6 +747,35 @@ export async function rejectTaskReview(req, res) {
 
   try {
     const updated = await rejectTaskReviewModel({ taskId, reviewerId: req.user.userId, comment: reviewRaw });
+
+    try {
+      const actor = await getUserSummary(req.user.userId);
+      const taskContext = await getTaskContext(taskId);
+      if (actor && taskContext) {
+        const recipients = buildNotificationRecipients({
+          creatorId: taskContext.creatorId,
+          assigneeIds: taskContext.assigneeIds,
+          actorId: req.user.userId,
+        });
+        const note = truncateNotificationText(reviewRaw);
+        await Promise.all(
+          recipients.map((recipientId) => createNotification({
+            type: "review_rejected",
+            message: `${actor.displayName} rejected the review for "${taskContext.taskTitle}" in ${taskContext.projectName}${note ? `: "${note}"` : ""}.`,
+            payload: {
+              taskId: taskContext.taskId,
+              projectId: taskContext.projectId,
+              comment: reviewRaw,
+            },
+            recipientUserId: recipientId,
+            url: `/main-page/kanban/task/${taskContext.taskId}`,
+          }))
+        );
+      }
+    } catch (notifyError) {
+      console.error("Review rejected notification error:", notifyError);
+    }
+
     return res.status(200).json({ message: "Task rejected and moved to TODO", task: updated });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER" || error?.code === "INVALID_COMMENT" || error?.code === "CATEGORY_NOT_FOUND") {
@@ -940,6 +1108,26 @@ export async function assignTaskToOthers(req, res) {
       memberId,
     });
 
+    try {
+      const actor = await getUserSummary(req.user.userId);
+      const taskContext = await getTaskContext(taskId);
+      if (actor && taskContext) {
+        await createNotification({
+          type: "task_assigned",
+          message: `${actor.displayName} assigned you to "${taskContext.taskTitle}" in ${taskContext.projectName}.`,
+          payload: {
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            assigneeId: memberId,
+          },
+          recipientUserId: memberId,
+          url: `/main-page/kanban/task/${taskContext.taskId}`,
+        });
+      }
+    } catch (notifyError) {
+      console.error("Task assign notification error:", notifyError);
+    }
+
     return res.status(201).json({
       message: "Member assigned to task successfully",
       assignment: assignedMember,
@@ -1036,6 +1224,35 @@ export async function createTaskComment(req, res) {
       comment,
     });
 
+    try {
+      const actor = await getUserSummary(req.user.userId);
+      const taskContext = await getTaskContext(taskId);
+      if (actor && taskContext) {
+        const recipients = buildNotificationRecipients({
+          creatorId: taskContext.creatorId,
+          assigneeIds: taskContext.assigneeIds,
+          actorId: req.user.userId,
+        });
+        const note = truncateNotificationText(comment);
+        await Promise.all(
+          recipients.map((recipientId) => createNotification({
+            type: "task_comment",
+            message: `${actor.displayName} commented on "${taskContext.taskTitle}" in ${taskContext.projectName}${note ? `: "${note}"` : ""}.`,
+            payload: {
+              taskId: taskContext.taskId,
+              projectId: taskContext.projectId,
+              commentId: createdComment?.id || null,
+              comment,
+            },
+            recipientUserId: recipientId,
+            url: `/main-page/kanban/task/${taskContext.taskId}`,
+          }))
+        );
+      }
+    } catch (notifyError) {
+      console.error("Task comment notification error:", notifyError);
+    }
+
     return res.status(201).json({
       message: "Comment added successfully",
       comment: createdComment,
@@ -1089,6 +1306,35 @@ export async function createTaskCommentReply(req, res) {
       userId,
       commentReply,
     });
+
+    try {
+      const actor = await getUserSummary(req.user.userId);
+      const taskContext = await getTaskContext(taskId);
+      if (actor && taskContext) {
+        const recipients = buildNotificationRecipients({
+          creatorId: taskContext.creatorId,
+          assigneeIds: taskContext.assigneeIds,
+          actorId: req.user.userId,
+        });
+        const note = truncateNotificationText(commentReply);
+        await Promise.all(
+          recipients.map((recipientId) => createNotification({
+            type: "task_comment_reply",
+            message: `${actor.displayName} replied on "${taskContext.taskTitle}" in ${taskContext.projectName}${note ? `: "${note}"` : ""}.`,
+            payload: {
+              taskId: taskContext.taskId,
+              projectId: taskContext.projectId,
+              commentId,
+              reply: commentReply,
+            },
+            recipientUserId: recipientId,
+            url: `/main-page/kanban/task/${taskContext.taskId}`,
+          }))
+        );
+      }
+    } catch (notifyError) {
+      console.error("Task comment reply notification error:", notifyError);
+    }
 
     return res.status(201).json({
       message: "Reply added successfully",
@@ -1262,7 +1508,20 @@ export async function deleteSubtask(req, res) {
     return res.status(400).json({ message: "Subtask ID is required" });
   }
 
-  return res.status(501).json({ message: "Subtasks not implemented yet" });
+  try {
+    const deletedSubtask = await deleteSubtaskModel({
+      taskId: Number(taskId),
+      subtaskId: Number(subtaskId),
+    });
+
+    return res.status(200).json(deletedSubtask);
+  } catch (err) {
+    console.error("Error deleting subtask:", err);
+    if (err?.code === "SUBTASK_NOT_FOUND") {
+      return res.status(404).json({ message: "Subtask not found" });
+    }
+    return res.status(500).json({ message: "Failed to delete subtask" });
+  }
 }
 
 export async function unassignTaskFromMember(req, res) {
@@ -1284,6 +1543,26 @@ export async function unassignTaskFromMember(req, res) {
       taskId,
       memberId,
     });
+
+    try {
+      const actor = await getUserSummary(req.user.userId);
+      const taskContext = await getTaskContext(taskId);
+      if (actor && taskContext) {
+        await createNotification({
+          type: "task_unassigned",
+          message: `${actor.displayName} unassigned you from "${taskContext.taskTitle}" in ${taskContext.projectName}.`,
+          payload: {
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            assigneeId: memberId,
+          },
+          recipientUserId: memberId,
+          url: `/main-page/kanban/task/${taskContext.taskId}`,
+        });
+      }
+    } catch (notifyError) {
+      console.error("Task unassign notification error:", notifyError);
+    }
 
     return res.status(200).json({
       message: "Member unassigned from task successfully",

@@ -1,7 +1,8 @@
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
 import { getCurrentUser, logout } from "../../services/authService";
+import { getUnreadNotificationsCount } from "../../services/notificationService";
 import "../styles/SideBar.css";
 
 function DashboardIcon() {
@@ -78,6 +79,7 @@ function getUserInitials(user) {
 export default function SideBar () {
     const [currentUser, setCurrentUser] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
     const profileRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
@@ -89,6 +91,31 @@ export default function SideBar () {
             const user = getCurrentUser();
             setCurrentUser(user);
         }, []);
+
+        const refreshUnreadCount = useCallback(async () => {
+            try {
+                const data = await getUnreadNotificationsCount();
+                const nextCount = Number(data?.count ?? data?.unreadCount ?? 0);
+                setUnreadCount(Number.isFinite(nextCount) ? nextCount : 0);
+            } catch (error) {
+                setUnreadCount(0);
+            }
+        }, []);
+
+        useEffect(() => {
+            refreshUnreadCount();
+            const intervalId = setInterval(refreshUnreadCount, 30000);
+            return () => clearInterval(intervalId);
+        }, [refreshUnreadCount]);
+
+        useEffect(() => {
+            const handleNotificationsUpdated = () => {
+                refreshUnreadCount();
+            };
+
+            window.addEventListener("notifications:updated", handleNotificationsUpdated);
+            return () => window.removeEventListener("notifications:updated", handleNotificationsUpdated);
+        }, [refreshUnreadCount]);
 
         // close dropdown when clicking outside
         useEffect(() => {
@@ -133,7 +160,12 @@ export default function SideBar () {
                                         }}
                                     >
                                         <span className="nav-icon">{item.icon}</span>
-                                        <span>{item.label}</span>
+                                        <span className="nav-label">
+                                            {item.label}
+                                            {item.to === "/main-page/notifications" && unreadCount > 0 && (
+                                                <span className="nav-notification-dot" aria-label="Unread notifications" />
+                                            )}
+                                        </span>
                                     </NavLink>
                                 ))}
                             </nav>

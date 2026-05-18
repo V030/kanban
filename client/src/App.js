@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { isAuthenticated } from './services/authService';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
+import NotificationsStream from "./components/common/NotificationsStream";
 
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -29,6 +30,7 @@ function App() {
     <ToastProvider>
       <BrowserRouter>
         <ToastContainer />
+        <NotificationsStream />
         <Routes>
       {/* routes declaration */}
           <Route path="/login" element={

@@ -62,8 +62,11 @@ function MyTasks() {
     const [loading, setLoading] = useState(false);
     const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
 
-    const loadTasks = useCallback(async () => {
-        setLoading(true);
+    const loadTasks = useCallback(async (options = {}) => {
+        const silent = options.silent === true;
+        if (!silent) {
+            setLoading(true);
+        }
 
         try {
             const data = await getMyTasks();
@@ -73,12 +76,33 @@ function MyTasks() {
             toast.showError(requestError?.message || "Unable to load assigned tasks.");
             setTasks([]);
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
         }
     }, [toast]);
 
     useEffect(() => {
         loadTasks();
+    }, [loadTasks]);
+
+    useEffect(() => {
+        const handleRealtime = (event) => {
+            const detail = event?.detail || {};
+            const type = String(detail.type || "").toLowerCase();
+            const relevant = new Set([
+                "task_assigned",
+                "task_unassigned",
+                "task_status_changed",
+                "review_approved",
+                "review_rejected",
+            ]);
+            if (!relevant.has(type)) return;
+            loadTasks({ silent: true });
+        };
+
+        window.addEventListener("notifications:push", handleRealtime);
+        return () => window.removeEventListener("notifications:push", handleRealtime);
     }, [loadTasks]);
 
     useEffect(() => {

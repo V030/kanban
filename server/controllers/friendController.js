@@ -6,6 +6,7 @@ import { addFriend as addFriendModel,
          declineFriendRequest as declineFriendRequestModel,
          cancelFriendRequest as cancelFriendRequestModel,
         } from "../models/friendModel.js";
+import { createNotification, getUserSummary } from "../models/notificationModel.js";
 
 export async function addFriend(req, res) {
   const requesterId = req.user?.userId;
@@ -26,6 +27,26 @@ export async function addFriend(req, res) {
 
   try {
     const friendRequest = await addFriendModel({ requesterId, email });
+
+    try {
+      const requester = await getUserSummary(requesterId);
+      const recipientId = friendRequest?.recipient?.id || friendRequest?.recipient_id;
+      if (requester && recipientId) {
+        await createNotification({
+          type: "friend_request",
+          message: `${requester.displayName} sent you a friend request.`,
+          payload: {
+            requesterId,
+            requestId: friendRequest?.id || null,
+          },
+          recipientUserId: recipientId,
+          url: "/main-page/friends",
+        });
+      }
+    } catch (notifyError) {
+      console.error("Friend request notification error:", notifyError);
+    }
+
     return res.status(201).json({
       message: "Friend request sent successfully",
       friendRequest: friendRequest || null,
@@ -109,6 +130,25 @@ export async function acceptFriendRequest(req, res) {
 
   try {
     const result = await acceptFriendRequestModel({ requestId, userId });
+
+    try {
+      const recipient = await getUserSummary(userId);
+      if (recipient && result?.requester_id) {
+        await createNotification({
+          type: "friend_request_accepted",
+          message: `${recipient.displayName} accepted your friend request.`,
+          payload: {
+            requestId,
+            recipientId: userId,
+          },
+          recipientUserId: result.requester_id,
+          url: "/main-page/friends",
+        });
+      }
+    } catch (notifyError) {
+      console.error("Friend request accepted notification error:", notifyError);
+    }
+
     return res.status(200).json({ message: "Friend request accepted", request: result });
   } catch (error) {
     if (error?.code === "REQUEST_NOT_FOUND") {

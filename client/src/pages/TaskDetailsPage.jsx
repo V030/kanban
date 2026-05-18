@@ -126,8 +126,11 @@ export default function TaskDetailsPage() {
     })();
   }, [project?.id, hasInitialCanAssign, hasInitialCanMoveDone, hasInitialCanReview]);
 
-  const loadTaskById = useCallback(async (id) => {
-    setTaskLoading(true);
+  const loadTaskById = useCallback(async (id, options = {}) => {
+    const silent = options.silent === true;
+    if (!silent) {
+      setTaskLoading(true);
+    }
 
     try {
       const data = await getTaskById(id);
@@ -149,13 +152,28 @@ export default function TaskDetailsPage() {
     } catch (err) {
       toast.showError(err?.message || "Unable to load task.");
     } finally {
-      setTaskLoading(false);
+      if (!silent) {
+        setTaskLoading(false);
+      }
     }
   }, [hasInitialCanAssign, hasInitialIsAdmin, toast]);
 
   useEffect(() => {
     if (!taskId) return;
     loadTaskById(taskId);
+  }, [taskId, loadTaskById]);
+
+  useEffect(() => {
+    const handleRealtime = (event) => {
+      const detail = event?.detail || {};
+      const payload = detail.payload || {};
+      if (!payload.taskId) return;
+      if (!taskId || String(payload.taskId) !== String(taskId)) return;
+      loadTaskById(taskId, { silent: true });
+    };
+
+    window.addEventListener("notifications:push", handleRealtime);
+    return () => window.removeEventListener("notifications:push", handleRealtime);
   }, [taskId, loadTaskById]);
 
   const handleUpdateTaskName = async (tId, name) => {

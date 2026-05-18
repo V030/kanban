@@ -161,10 +161,11 @@
 
 /* Remove visible container for the focus/header card so it appears flush */
 .tdm-focus-card {
-  border: none;
-  box-shadow: none;
-  background: transparent;
-  padding: 0;
+  border: 1px solid #e3e9f1;
+  box-shadow: 0 8px 18px rgba(16, 24, 40, 0.06);
+  background: #ffffff;
+  padding: 18px 20px;
+  border-radius: 20px;
 }
 
 .tdm-section-header {
@@ -175,6 +176,16 @@
   gap: 12px;
   width: 100%;
   margin-bottom: 8px; /* match the previous h3 spacing */
+}
+
+.tdm-section-header h3,
+.tdm-subtasks-header h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wider);
+  color: var(--color-text-tertiary);
+  font-weight: 800;
 }
 
 
@@ -190,9 +201,9 @@
   flex-direction: column;
   gap: 12px;
   align-content: start;
-  min-height: 100%;
+  min-height: 0;
   align-self: stretch;
-  box-shadow: var(--shadow-md);
+
 }
 
 .task-actions-wrap {
@@ -538,6 +549,70 @@
   margin-top: 6px;
 }
 
+.tdm-meta-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  border-top: 1px solid #e3e9f1;
+  border-bottom: 1px solid #e3e9f1;
+  padding: 12px 0;
+}
+
+.tdm-meta-item {
+  display: grid;
+  gap: 6px;
+  padding-right: 10px;
+  border-right: 1px solid #e3e9f1;
+}
+
+.tdm-meta-item:nth-child(2n) {
+  border-right: none;
+  padding-right: 0;
+}
+
+.tdm-meta-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+  color: var(--color-text-tertiary);
+  font-weight: 700;
+}
+
+.tdm-meta-value {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.tdm-meta-mono {
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+  font-size: 0.82rem;
+}
+
+.tdm-meta-value.is-overdue {
+  color: #b42318;
+}
+
+.tdm-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fee4e2;
+  color: #b42318;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tdm-meta-note {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
 .tdm-task-description-editable {
   margin: 0;
   border: none;
@@ -796,20 +871,30 @@
 
 .tdm-subtask-row {
   display: grid;
-  grid-template-columns: 12px 1fr auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  min-height: 70px;
+  grid-template-columns: 18px 1fr;
+  align-items: start;
+  gap: 10px;
+  padding: 12px 0;
+  min-height: 64px;
   border: none;
+  border-bottom: 1px solid #e7eef6;
   border-radius: 0;
   background: transparent;
+  box-shadow: none;
   transition: background-color var(--transition-fast);
 }
 
+.tdm-subtask-row:last-child {
+  border-bottom: none;
+}
+
 .tdm-subtask-row:hover {
-  background: #f3f6f8;
+  background: #f7fafd;
   transform: none;
+}
+
+.tdm-subtask-row.is-complete {
+  background: #f2f8f5;
 }
 
 .tdm-subtask-left {
@@ -820,13 +905,18 @@
 
 .tdm-subtask-index {
   display: inline-block;
-  vertical-align: middle;
+  min-width: 0;
+  height: auto;
+  border-radius: 0;
+  padding: 0;
   font-weight: 700;
   color: var(--color-text-secondary);
   background: transparent;
-  margin-right: 6px;
-  font-size: 0.78rem;
+  border: none;
+  margin-right: 0;
+  font-size: 0.74rem;
   line-height: 1.15;
+  letter-spacing: 0.01em;
 }
 
 .tdm-subtask-main {
@@ -858,15 +948,19 @@
 
 .tdm-subtask-meta {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   align-items: center;
   color: var(--color-text-secondary);
-  font-size: 0.65rem;
+  font-size: 0.68rem;
 }
 
 .tdm-subtask-created-label {
-  font-weight: 600;
-  color: var(--color-text-secondary);
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.62rem;
 }
 
 .tdm-subtask-created-by {
@@ -877,16 +971,111 @@
 .tdm-subtask-created-at {
   color: var(--color-text-secondary);
   font-size: 0.72rem;
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
 }
 
 .tdm-subtask-actions {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #e5eef7;
-  display: flex;
-  gap: 8px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  display: block;
+}
+
+.tdm-subtask-add-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 18px 1fr;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 0;
+  border: none;
+  border-top: 1px solid #e7eef6;
+  border-bottom: 1px solid #e7eef6;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-weight: 700;
+  font-size: 0.78rem;
+  margin-top: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.tdm-subtask-add-row > span:last-child {
+  justify-self: center;
+  text-align: center;
+}
+
+.tdm-subtask-add-row:hover {
+  background: #f7fafd;
+  color: var(--color-primary);
+}
+
+.tdm-subtask-delete-btn {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 0 2px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tdm-subtask-delete-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tdm-subtask-delete-btn:hover {
+  color: var(--color-danger);
+}
+
+.tdm-subtask-row--composer {
+  background: transparent;
+  border-bottom: 1px solid #e7eef6;
+}
+
+.tdm-subtask-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.15;
+  min-height: 32px;
+  padding: 6px 0;
+  outline: none;
+}
+
+.tdm-subtask-input::placeholder {
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+.tdm-subtask-action-buttons {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.tdm-subtask-action-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.tdm-subtask-action-btn:hover {
+  color: var(--color-text-primary);
 }
 
 .tdm-add-subtask-toggle {
@@ -1410,21 +1599,44 @@
 .tdm-comments-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  min-height: 100%;
-  background: #ffffff;
+  gap: 12px;
+  min-height: 0;
+  max-height: clamp(590px, 70vh, 590px);
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
   border: 1px solid rgba(176, 196, 216, 0.56);
   border-radius: 28px;
+}
+
+.tdm-comments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tdm-comments-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.tdm-comments-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
 }
 
 .tdm-comment-textarea {
   width: 100%;
   border-radius: 12px;
-  border: 1px solid var(--color-border-subtle);
+  border: none;
   padding: 10px 12px;
   resize: vertical;
   font-size: 0.86rem;
-  background: #f9fcff;
+  background: #f7fbff;
+  min-height: 64px;
 }
 
 .tdm-comment-textarea:focus-visible,
@@ -1466,23 +1678,32 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .tdm-comments-list {
   max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.tdm-comments-list-wrap {
+  min-height: 0;
   overflow: auto;
-  padding-right: 2px;
+  padding-right: 4px;
+  scroll-behavior: smooth;
 }
 
 .tdm-comment-item {
   border-radius: 12px;
-  padding: 10px;
+  padding: 0px 12px;
+
   background: #ffffff;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tdm-comment-empty {
@@ -1552,12 +1773,26 @@
 .tdm-comments-composer {
   position: sticky;
   bottom: 0;
-  background: transparent;
+  background: #ffffff;
   border-top: 1px solid #e5eef7;
-  padding-top: 8px;
+  padding-top: 10px;
+  padding-bottom: 6px;
+}
+
+.tdm-comments-composer-card {
+  background: #f7fbff;
+  border: 1px solid #e3edf7;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+}
+
+.tdm-comments-composer-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .tdm-comment-actions {
@@ -1754,7 +1989,27 @@
   box-sizing: border-box;
   width: min(1280px, 100%);
   margin: 0 auto;
-  height: 100%;
+  height: auto;
+}
+
+.page-shell.tdm-page-container {
+  min-height: 0;
+  height: auto;
+}
+
+.content-inner > .page-shell.tdm-page-container {
+  min-height: auto;
+}
+
+.content:has(.tdm-page-container) {
+  height: auto;
+  min-height: 0;
+}
+
+.content-inner:has(> .tdm-page-container) {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
 }
 
 .tdm-task-shell {
@@ -1762,9 +2017,14 @@
   border-radius: 28px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
   box-shadow: var(--shadow-md);
-  padding: 26px;
+  flex: 1;
+  min-height: 0;
+  padding: 18px;
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  min-height: 0;
+  max-height: clamp(590px, 70vh, 590px);
+  overflow: auto;
 }
 
 .tdm-page-hero {
@@ -1772,13 +2032,11 @@
 }
 
 .tdm-subtasks-shell {
-  /* make subtasks appear flush like the header */
-  border: none;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid #e1e8f0;
+  border-radius: 22px;
+  background: #ffffff;
   box-shadow: none;
-  padding-left: 0;
-  padding-right: 0;
+  padding: 16px 18px;
 }
 
 .tdm-subtasks-header {
@@ -1800,7 +2058,8 @@
   position: relative;
   width: 100%;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
+  height: auto;
   max-height: none;
   overflow: visible;
   background: transparent;
@@ -1811,7 +2070,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  flex: 1;
+  flex: 0 0 auto;
 }
 
 .tdm-page-container .tdm-close-btn {

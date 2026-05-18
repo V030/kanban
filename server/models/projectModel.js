@@ -39,6 +39,43 @@ export async function createSubtask({ taskId, title, createdBy, status }) {
   }
 }
 
+export async function deleteSubtask({ taskId, subtaskId }) {
+  const client = await pool.connect();
+
+  try {
+    if (!taskId) {
+      const error = new Error("taskId is required");
+      error.code = "INVALID_TASK";
+      throw error;
+    }
+
+    if (!subtaskId) {
+      const error = new Error("subtaskId is required");
+      error.code = "INVALID_SUBTASK";
+      throw error;
+    }
+
+    const result = await client.query(
+      `
+      DELETE FROM subtasks
+      WHERE id = $1::int AND task_id = $2::int
+      RETURNING id, task_id, title, created_by, status, created_at;
+      `,
+      [subtaskId, taskId]
+    );
+
+    if (result.rows.length === 0) {
+      const error = new Error("Subtask not found");
+      error.code = "SUBTASK_NOT_FOUND";
+      throw error;
+    }
+
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
+}
+
 export async function getTaskById({ taskId, requesterId }) {
   const normalizedTaskId = Number(taskId);
   const normalizedRequesterId = (requesterId || "").trim();

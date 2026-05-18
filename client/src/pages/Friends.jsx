@@ -19,8 +19,11 @@ function Friends() {
 
   const [friendsLoading, setFriendsLoading] = useState(false);
 
-  const loadFriends = async () => {
-    setFriendsLoading(true);
+  const loadFriends = async (options = {}) => {
+    const silent = options.silent === true;
+    if (!silent) {
+      setFriendsLoading(true);
+    }
 
     try {
       const data = await getFriends();
@@ -35,7 +38,9 @@ function Friends() {
     } catch (err) {
       toast.showError(err.message || "Failed to load friends");
     } finally {
-      setFriendsLoading(false);
+      if (!silent) {
+        setFriendsLoading(false);
+      }
     }
   };
 
@@ -63,8 +68,24 @@ function Friends() {
 
   useEffect(() => { loadIncomingFriendRequests(); }, []);
 
+  useEffect(() => {
+    const handleRealtime = (event) => {
+      const detail = event?.detail || {};
+      const type = String(detail.type || "").toLowerCase();
+      const relevant = new Set(["friend_request", "friend_request_accepted"]);
+      if (!relevant.has(type)) return;
+
+      loadFriends({ silent: true });
+      loadSentFriendRequests();
+      loadIncomingFriendRequests();
+    };
+
+    window.addEventListener("notifications:push", handleRealtime);
+    return () => window.removeEventListener("notifications:push", handleRealtime);
+  }, []);
+
   const handleFriendRequestCreated = async () => {
-    await loadFriends();
+    await loadFriends({ silent: true });
     await loadSentFriendRequests();
     await loadIncomingFriendRequests();
   };

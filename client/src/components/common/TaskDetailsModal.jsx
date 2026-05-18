@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "../../services/authService";
-import { getTaskReviews, approveTaskReview, rejectTaskReview } from "../../services/projectService";
+import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask } from "../../services/projectService";
 import { SkeletonCommentInline } from "./SkeletonComponents";
 import "../styles/TaskDetailsModal.css";
 import "../styles/SkeletonLoading.css";
@@ -910,6 +910,31 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     }
   };
 
+  const handleDeleteSubtask = async (subtask) => {
+    if (!task?.id || !subtask?.id) return;
+    const subtaskId = subtask.id;
+    const previousSubtasks = localSubtasks;
+
+    setSubtaskError("");
+    setLocalSubtasks((prev) => prev.filter((item) => String(item?.id) !== String(subtaskId)));
+
+    if (String(subtaskId).startsWith("temp-subtask-")) {
+      setSubtaskPendingIds((prev) => {
+        const next = { ...prev };
+        delete next[subtaskId];
+        return next;
+      });
+      return;
+    }
+
+    try {
+      await deleteSubtask(task.id, subtaskId);
+    } catch (error) {
+      setSubtaskError(error?.message || "Failed to delete subtask");
+      setLocalSubtasks(previousSubtasks);
+    }
+  };
+
   const renderMemberRow = (member, index) => {
     const resolvedMemberId = getMemberId(member);
     const memberId = resolvedMemberId || `${index}-${getMemberLabel(member)}`;
@@ -991,147 +1016,157 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const commentsPanel = (
     <article className="tdm-section-card tdm-comments-panel">
-      <h3>Comments</h3>
+      <div className="tdm-comments-header">
+        <h3>Comments</h3>
+      </div>
 
-      {commentsError && <p className="tdm-comment-error">{commentsError}</p>}
+      <div className="tdm-comments-body">
+        {commentsError && <p className="tdm-comment-error">{commentsError}</p>}
 
-      {commentsLoading ? (
-        <div className="skeleton-list">
-          <SkeletonCommentInline />
-          <SkeletonCommentInline />
-          <SkeletonCommentInline />
-        </div>
-      ) : (
-        <ul className="tdm-comment-list tdm-comments-list" aria-label="Comments">
-                {sortedComments.length === 0 ? (
-            <li className="tdm-comment-empty">No comments yet.</li>
-          ) : (
-            sortedComments.map((commentItem, index) => {
-              const commentUser = commentItem?.user || {};
-              const commentId = commentItem?.id || `${index}-comment`;
-              const timeLabel = formatTimeAgo(commentItem?.createdAt || commentItem?.created_at);
-              const replies = Array.isArray(commentItem?.replies) ? commentItem.replies : [];
-              const sortedReplies = replies
-                .slice()
-                .sort((a, b) => new Date(a?.created_at || a?.createdAt) - new Date(b?.created_at || b?.createdAt));
+        {commentsLoading ? (
+          <div className="skeleton-list">
+            <SkeletonCommentInline />
+            <SkeletonCommentInline />
+            <SkeletonCommentInline />
+          </div>
+        ) : (
+          <div className="tdm-comments-list-wrap">
+            <ul className="tdm-comment-list tdm-comments-list" aria-label="Comments">
+              {sortedComments.length === 0 ? (
+                <li className="tdm-comment-empty">No comments yet.</li>
+              ) : (
+                sortedComments.map((commentItem, index) => {
+                  const commentUser = commentItem?.user || {};
+                  const commentId = commentItem?.id || `${index}-comment`;
+                  const timeLabel = formatTimeAgo(commentItem?.createdAt || commentItem?.created_at);
+                  const replies = Array.isArray(commentItem?.replies) ? commentItem.replies : [];
+                  const sortedReplies = replies
+                    .slice()
+                    .sort((a, b) => new Date(a?.created_at || a?.createdAt) - new Date(b?.created_at || b?.createdAt));
 
-              return (
-                <li key={commentId} className="tdm-comment-item">
-                  <div className="tdm-comment-head">
-                    {(() => {
-                      const src = normalizeProfileImage(commentUser?.profileImageBase64 || commentUser?.profile_image_base64);
-                      return src ? (
-                        <span className="tdm-comment-avatar"><img src={src} alt={getMemberLabel(commentUser)} /></span>
-                      ) : (
-                        <span className="tdm-comment-avatar">{getInitials(commentUser)}</span>
-                      );
-                    })()}
-                    <div className="tdm-comment-meta">
-                      <div className="tdm-comment-name-row">
-                        <span className="tdm-comment-name">{getMemberLabel(commentUser)}</span>
-                        {commentUser?.role ? (
-                          <span className="tdm-comment-role">{capitalizeFirst(commentUser.role)}</span>
-                        ) : null}
+                  return (
+                    <li key={commentId} className="tdm-comment-item">
+                      <div className="tdm-comment-head">
+                        {(() => {
+                          const src = normalizeProfileImage(commentUser?.profileImageBase64 || commentUser?.profile_image_base64);
+                          return src ? (
+                            <span className="tdm-comment-avatar"><img src={src} alt={getMemberLabel(commentUser)} /></span>
+                          ) : (
+                            <span className="tdm-comment-avatar">{getInitials(commentUser)}</span>
+                          );
+                        })()}
+                        <div className="tdm-comment-meta">
+                          <div className="tdm-comment-name-row">
+                            <span className="tdm-comment-name">{getMemberLabel(commentUser)}</span>
+                            {commentUser?.role ? (
+                              <span className="tdm-comment-role">{capitalizeFirst(commentUser.role)}</span>
+                            ) : null}
+                          </div>
+                          {timeLabel && <span className="tdm-comment-time">{timeLabel}</span>}
+                        </div>
                       </div>
-                      {timeLabel && <span className="tdm-comment-time">{timeLabel}</span>}
-                    </div>
-                  </div>
 
-                  <p className="tdm-comment-text">{commentItem?.comment || ""}</p>
-                  {commentItem?.isPending && <span className="tdm-comment-pending">Posting...</span>}
-                  <div className="tdm-comment-actions">
-                    <button
-                      type="button"
-                      className="tdm-reply-toggle"
-                      onClick={() => setActiveReplyId(activeReplyId === String(commentId) ? "" : String(commentId))}
-                    >
-                      Reply
-                    </button>
-                  </div>
-                  {activeReplyId === String(commentId) && (
-                    <div className="tdm-reply-form">
-                      <input
-                        type="text"
-                        className="tdm-reply-input"
-                        value={replyInputs[commentId] || ""}
-                        onChange={(event) =>
-                          setReplyInputs((prev) => ({ ...prev, [commentId]: event.target.value }))
-                        }
-                        placeholder="Write a reply"
-                      />
-                      <button
-                        type="button"
-                        className="tdm-reply-submit"
-                        onClick={() => handleSubmitReply(commentId)}
-                        disabled={replySubmittingId === String(commentId) || !(replyInputs[commentId] || "").trim()}
-                      >
-                        {replySubmittingId === String(commentId) ? "Posting..." : "Post"}
-                      </button>
-                    </div>
-                  )}
+                      <p className="tdm-comment-text">{commentItem?.comment || ""}</p>
+                      {commentItem?.isPending && <span className="tdm-comment-pending">Posting...</span>}
+                      <div className="tdm-comment-actions">
+                        <button
+                          type="button"
+                          className="tdm-reply-toggle"
+                          onClick={() => setActiveReplyId(activeReplyId === String(commentId) ? "" : String(commentId))}
+                        >
+                          Reply
+                        </button>
+                      </div>
+                      {activeReplyId === String(commentId) && (
+                        <div className="tdm-reply-form">
+                          <input
+                            type="text"
+                            className="tdm-reply-input"
+                            value={replyInputs[commentId] || ""}
+                            onChange={(event) =>
+                              setReplyInputs((prev) => ({ ...prev, [commentId]: event.target.value }))
+                            }
+                            placeholder="Write a reply"
+                          />
+                          <button
+                            type="button"
+                            className="tdm-reply-submit"
+                            onClick={() => handleSubmitReply(commentId)}
+                            disabled={replySubmittingId === String(commentId) || !(replyInputs[commentId] || "").trim()}
+                          >
+                            {replySubmittingId === String(commentId) ? "Posting..." : "Post"}
+                          </button>
+                        </div>
+                      )}
 
-                    {sortedReplies.length > 0 && (
-                    <ul className="tdm-replies" aria-label="Replies">
-                      {sortedReplies.map((replyItem, replyIndex) => {
-                        const replyUser = replyItem?.user || {};
-                        const replyTimeLabel = formatTimeAgo(replyItem?.createdAt || replyItem?.created_at);
-                        const replyKey = replyItem?.id || `${commentId}-reply-${replyIndex}`;
+                      {sortedReplies.length > 0 && (
+                        <ul className="tdm-replies" aria-label="Replies">
+                          {sortedReplies.map((replyItem, replyIndex) => {
+                            const replyUser = replyItem?.user || {};
+                            const replyTimeLabel = formatTimeAgo(replyItem?.createdAt || replyItem?.created_at);
+                            const replyKey = replyItem?.id || `${commentId}-reply-${replyIndex}`;
 
-                        return (
-                          <li key={replyKey} className="tdm-reply-item">
-                            {(() => {
-                              const src = normalizeProfileImage(replyUser?.profileImageBase64 || replyUser?.profile_image_base64);
-                              return src ? (
-                                <span className="tdm-reply-avatar"><img src={src} alt={getMemberLabel(replyUser)} /></span>
-                              ) : (
-                                <span className="tdm-reply-avatar">{getInitials(replyUser)}</span>
-                              );
-                            })()}
-                            <div className="tdm-reply-body">
-                              <div className="tdm-reply-name-row">
-                                <span className="tdm-reply-name">{getMemberLabel(replyUser)}</span>
-                                {replyUser?.role ? (
-                                  <span className="tdm-reply-role">{capitalizeFirst(replyUser.role)}</span>
-                                ) : null}
-                              </div>
-                              {replyTimeLabel && <span className="tdm-reply-time">{replyTimeLabel}</span>}
-                              <p className="tdm-reply-text">{replyItem?.commentReply || replyItem?.comment_reply || ""}</p>
-                              {replyItem?.isPending && <span className="tdm-reply-pending">Posting...</span>}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </li>
-              );
-            })
-          )}
-        </ul>
-      )}
+                            return (
+                              <li key={replyKey} className="tdm-reply-item">
+                                {(() => {
+                                  const src = normalizeProfileImage(replyUser?.profileImageBase64 || replyUser?.profile_image_base64);
+                                  return src ? (
+                                    <span className="tdm-reply-avatar"><img src={src} alt={getMemberLabel(replyUser)} /></span>
+                                  ) : (
+                                    <span className="tdm-reply-avatar">{getInitials(replyUser)}</span>
+                                  );
+                                })()}
+                                <div className="tdm-reply-body">
+                                  <div className="tdm-reply-name-row">
+                                    <span className="tdm-reply-name">{getMemberLabel(replyUser)}</span>
+                                    {replyUser?.role ? (
+                                      <span className="tdm-reply-role">{capitalizeFirst(replyUser.role)}</span>
+                                    ) : null}
+                                  </div>
+                                  {replyTimeLabel && <span className="tdm-reply-time">{replyTimeLabel}</span>}
+                                  <p className="tdm-reply-text">{replyItem?.commentReply || replyItem?.comment_reply || ""}</p>
+                                  {replyItem?.isPending && <span className="tdm-reply-pending">Posting...</span>}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <div className="tdm-comments-composer">
-        <textarea
-          className="tdm-comment-textarea"
-          rows={2}
-          value={newComment}
-          onChange={(event) => setNewComment(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              handleSubmitComment();
-            }
-          }}
-          placeholder="Share an update or ask a question"
-        />
-        <button
-          type="button"
-          className="tdm-comment-submit"
-          onClick={handleSubmitComment}
-          disabled={commentSubmitting || !newComment.trim()}
-        >
-          {commentSubmitting ? "Posting..." : "Post Comment"}
-        </button>
+        <div className="tdm-comments-composer-card">
+          <textarea
+            className="tdm-comment-textarea"
+            rows={2}
+            value={newComment}
+            onChange={(event) => setNewComment(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                handleSubmitComment();
+              }
+            }}
+            placeholder="Share an update or ask a question"
+          />
+          <div className="tdm-comments-composer-actions">
+            <button
+              type="button"
+              className="tdm-comment-submit"
+              onClick={handleSubmitComment}
+              disabled={commentSubmitting || !newComment.trim()}
+            >
+              {commentSubmitting ? "Posting..." : "Post Comment"}
+            </button>
+          </div>
+        </div>
       </div>
     </article>
   );
@@ -1422,16 +1457,19 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
               )}
             </div>
             {taskDescError && <p className="tdm-inline-edit-error">{taskDescError}</p>}
-            <div className="tdm-meta-row">
-              <span className="tdm-created-text">Created on: {getCreatedAtLabel(taskData)}</span>
-            </div>
-            <div className="tdm-meta-row tdm-target-row">
-              <span className="tdm-target-label">Target Date:</span>
-              <span className={`tdm-target-value${isPastDue ? " is-overdue" : ""}`}>
-                {formatTargetDate(targetDate)}
-              </span>
-              {isPastDue ? <span className="tdm-overdue-badge">Overdue</span> : null}
-              {targetDateSubmitting ? <span className="tdm-target-pending">Updating...</span> : null}
+            <div className="tdm-meta-grid">
+              <div className="tdm-meta-item">
+                <span className="tdm-meta-label">Created</span>
+                <span className="tdm-meta-value tdm-meta-mono">{getCreatedAtLabel(taskData)}</span>
+              </div>
+              <div className="tdm-meta-item">
+                <span className="tdm-meta-label">Target date</span>
+                <span className={`tdm-meta-value tdm-meta-mono${isPastDue ? " is-overdue" : ""}`}>
+                  {formatTargetDate(targetDate)}
+                </span>
+                {isPastDue ? <span className="tdm-meta-badge">Overdue</span> : null}
+                {targetDateSubmitting ? <span className="tdm-meta-note">Updating...</span> : null}
+              </div>
             </div>
             {targetDateError && <p className="tdm-target-error">{targetDateError}</p>}
             <div className="tdm-tags-area">
@@ -1492,10 +1530,111 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
             <article className="tdm-section-card tdm-subtasks-shell">
               <div className="tdm-subtasks-header">
                 <h3>Subtasks</h3>
-                <button type="button" className="tdm-add-subtask-toggle" onClick={() => setShowAddSubtask((prev) => !prev)} aria-label="Add subtask">
-                  +
-                </button>
               </div>
+              {showAddSubtask ? (
+                <div className="tdm-subtask-actions">
+                  <div className="tdm-subtask-row tdm-subtask-row--composer">
+                    <div className="tdm-subtask-left" />
+                    <div className="tdm-subtask-main">
+                      <div className="tdm-subtask-title-row">
+                        <span className="tdm-subtask-index">+</span>
+                        <input
+                          type="text"
+                          value={newSubtaskTitle}
+                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                          placeholder="New subtask title"
+                          className="tdm-subtask-input"
+                        />
+                        <div className="tdm-subtask-action-buttons">
+                          <button
+                            type="button"
+                            className="tdm-subtask-action-btn"
+                            onClick={async () => {
+                              if (!newSubtaskTitle.trim()) return;
+
+                              const tempId = `temp-subtask-${Date.now()}`;
+                              const createdAt = new Date().toISOString();
+                              const optimisticSubtask = {
+                                id: tempId,
+                                title: newSubtaskTitle.trim(),
+                                status: "unfinished",
+                                createdAt,
+                                createdBy: currentUser
+                                  ? {
+                                      id: currentUser?.id || currentUserId,
+                                      firstName: currentUser.firstName || currentUser.first_name,
+                                      lastName: currentUser.lastName || currentUser.last_name,
+                                      email: currentUser.email,
+                                    }
+                                  : { id: currentUserId },
+                                isPending: true,
+                              };
+
+                              setSubtaskError("");
+                              setSubtaskPendingIds((prev) => ({ ...prev, [tempId]: true }));
+                              setLocalSubtasks((prev) => [...prev, optimisticSubtask]);
+
+                              try {
+                                const payload = await createSubtasks({
+                                  subtaskData: {
+                                    taskId: task?.id,
+                                    title: newSubtaskTitle.trim(),
+                                    createdBy: currentUser?.id || currentUserId,
+                                    status: "unfinished",
+                                  },
+                                });
+                                const created = payload?.subtask || payload?.data || payload;
+                                if (created && created.id) {
+                                  setLocalSubtasks((prev) =>
+                                    prev.map((item) => (item.id === tempId ? { ...item, ...created, isPending: false } : item))
+                                  );
+                                } else {
+                                  setLocalSubtasks((prev) =>
+                                    prev.map((item) => (item.id === tempId ? { ...item, isPending: false } : item))
+                                  );
+                                }
+                                setShowAddSubtask(false);
+                                setNewSubtaskTitle("");
+                              } catch (error) {
+                                setSubtaskError(error.message || "Failed to add subtask");
+                                setLocalSubtasks((prev) => prev.filter((item) => item.id !== tempId));
+                              } finally {
+                                setSubtaskPendingIds((prev) => {
+                                  const next = { ...prev };
+                                  delete next[tempId];
+                                  return next;
+                                });
+                              }
+                            }}
+                            aria-label="Save subtask"
+                            title="Save"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            type="button"
+                            className="tdm-subtask-action-btn"
+                            onClick={() => setShowAddSubtask(false)}
+                            aria-label="Cancel"
+                            title="Cancel"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="tdm-subtask-add-row"
+                  onClick={() => setShowAddSubtask(true)}
+                >
+                  <span className="tdm-subtask-index"></span>
+                  <span>+ New Subtask</span>
+                </button>
+              )}
               {subtaskError && <p className="tdm-subtask-error">{subtaskError}</p>}
               {localSubtasks.length === 0 ? (
                 <p>No subtasks added.</p>
@@ -1508,13 +1647,30 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     const isPending = subtaskPendingIds[String(st?.id)] || st?.isPending;
 
                     return (
-                      <li key={st.id || `${idx}-${st.title || st}` } className="tdm-subtask-row">
+                      <li
+                        key={st.id || `${idx}-${st.title || st}` }
+                        className={`tdm-subtask-row${isCompleted ? " is-complete" : ""}`}
+                      >
                         <div className="tdm-subtask-left" />
 
                         <div className="tdm-subtask-main">
                           <div className="tdm-subtask-title-row">
                             <span className="tdm-subtask-index">{idx + 1}.</span>
                             <div className="tdm-subtask-title">{st.title || String(st)}</div>
+                            <button
+                              type="button"
+                              className="tdm-subtask-delete-btn"
+                              onClick={() => handleDeleteSubtask(st)}
+                              aria-label="Delete subtask"
+                              title="Delete"
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path
+                                  d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"
+                                  fill="currentColor"
+                                />
+                              </svg>
+                            </button>
                           </div>
                           {isPending && <div className="tdm-subtask-pending">Saving...</div>}
                           <div className="tdm-subtask-meta">
@@ -1529,86 +1685,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 </ul>
               )}
 
-              <div className="tdm-subtask-actions">
-                {showAddSubtask ? (
-                  <div className="tdm-add-subtask-form">
-                    <input
-                      type="text"
-                      value={newSubtaskTitle}
-                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                      placeholder="New subtask title"
-                      className="tdm-input"
-                    />
-                    <button
-                      type="button"
-                      className="tdm-add-subtask-btn"
-                      onClick={async () => {
-                        if (!newSubtaskTitle.trim()) return;
-
-                        const tempId = `temp-subtask-${Date.now()}`;
-                        const createdAt = new Date().toISOString();
-                        const optimisticSubtask = {
-                          id: tempId,
-                          title: newSubtaskTitle.trim(),
-                          status: "unfinished",
-                          createdAt,
-                          createdBy: currentUser
-                            ? {
-                                id: currentUser?.id || currentUserId,
-                                firstName: currentUser.firstName || currentUser.first_name,
-                                lastName: currentUser.lastName || currentUser.last_name,
-                                email: currentUser.email,
-                              }
-                            : { id: currentUserId },
-                          isPending: true,
-                        };
-
-                        setSubtaskError("");
-                        setSubtaskPendingIds((prev) => ({ ...prev, [tempId]: true }));
-                        setLocalSubtasks((prev) => [...prev, optimisticSubtask]);
-
-                        try {
-                        const payload = await createSubtasks({
-                            subtaskData: {
-                              taskId: task?.id,
-                              title: newSubtaskTitle.trim(),
-                              createdBy: currentUser?.id || currentUserId,
-                              status: "unfinished",
-                            },
-                          });
-                          const created = payload?.subtask || payload?.data || payload;
-                          if (created && created.id) {
-                            setLocalSubtasks((prev) =>
-                              prev.map((item) => (item.id === tempId ? { ...item, ...created, isPending: false } : item))
-                            );
-                          } else {
-                            setLocalSubtasks((prev) =>
-                              prev.map((item) => (item.id === tempId ? { ...item, isPending: false } : item))
-                            );
-                          }
-                          setShowAddSubtask(false);
-                          setNewSubtaskTitle("");
-                        } catch (error) {
-                          setSubtaskError(error.message || "Failed to add subtask");
-                          setLocalSubtasks((prev) => prev.filter((item) => item.id !== tempId));
-                        } finally {
-                          setSubtaskPendingIds((prev) => {
-                            const next = { ...prev };
-                            delete next[tempId];
-                            return next;
-                          });
-                        }
-                      }}
-                    >
-                      Add Subtask
-                    </button>
-
-                    <button type="button" className="tdm-cancel-subtask-btn" onClick={() => setShowAddSubtask(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                ) : null}
-              </div>
             </article>
           </div>
 

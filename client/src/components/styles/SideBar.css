@@ -76,6 +76,20 @@
   font-size: var(--text-sm);
 }
 
+.nav-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-notification-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.18);
+}
+
 .nav-btn:hover {
   border-color: rgba(197, 212, 229, 0.7);
   background: #f6fafd;

@@ -6,7 +6,7 @@ function LoginPage() {
             <section className="auth-panel">
                 <aside className="auth-brand">
                     <div>
-                        <h1>Plan better workdays with TaskFlow.</h1>
+                        <h1>Plan better workdays with Miruban.</h1>
                         <p>
                             Keep projects clear, boards tidy, and team momentum visible from one focused workspace.
                         </p>

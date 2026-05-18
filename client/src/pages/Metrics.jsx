@@ -268,8 +268,11 @@ export default function Metrics() {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadMetrics = useCallback(async () => {
-    setLoading(true);
+  const loadMetrics = useCallback(async (options = {}) => {
+    const silent = options.silent === true;
+    if (!silent) {
+      setLoading(true);
+    }
 
     try {
       let pid = projectId;
@@ -290,7 +293,7 @@ export default function Metrics() {
     } catch (err) {
       if (isMountedRef.current) toast.showError(err?.message || "Unable to load metrics");
     } finally {
-      if (isMountedRef.current) setLoading(false);
+      if (isMountedRef.current && !silent) setLoading(false);
     }
   }, [projectId, windowDays, toast]);
 
@@ -301,6 +304,30 @@ export default function Metrics() {
       isMountedRef.current = false;
     };
   }, [loadMetrics]);
+
+  useEffect(() => {
+    const handleRealtime = (event) => {
+      const detail = event?.detail || {};
+      const payload = detail.payload || {};
+      const type = String(detail.type || "").toLowerCase();
+
+      if (!projectId) return;
+      if (payload.projectId && String(payload.projectId) !== String(projectId)) return;
+
+      const relevant = new Set([
+        "task_assigned",
+        "task_unassigned",
+        "task_status_changed",
+        "review_approved",
+        "review_rejected",
+      ]);
+      if (!relevant.has(type)) return;
+      loadMetrics({ silent: true });
+    };
+
+    window.addEventListener("notifications:push", handleRealtime);
+    return () => window.removeEventListener("notifications:push", handleRealtime);
+  }, [projectId, loadMetrics]);
 
   const kpis = useMemo(() => {
     const completion = Number(metrics?.completion_rate || 0);

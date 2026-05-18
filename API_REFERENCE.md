@@ -1,6 +1,6 @@
 # API Reference
 
-Last updated: 2026-05-13
+Last updated: 2026-05-18
 
 This document describes the actual API surface used by the frontend services. It includes examples so humans and AI agents can infer request shapes without reverse-engineering components.
 
@@ -697,6 +697,92 @@ Purpose: decline a friend request.
 
 ### PATCH /auth/friends/requests/:requestId/cancel
 Purpose: cancel a sent friend request.
+
+## Notifications
+
+### GET /auth/notifications?limit=50&offset=0
+Purpose: fetch notifications for the signed-in user ordered newest-first.
+
+Query params:
+- limit (optional, default 50, max 200)
+- offset (optional, default 0)
+
+Success example:
+```json
+{
+  "notifications": [
+    {
+      "id": "0c66d4f1-1d3d-4ef1-b3d0-7e9d7314a6af",
+      "type": "task_comment",
+      "message": "Aeri Uchinaga commented on \"Backend API\" in Pretend this is a project name: \"Please fix the API response.\".",
+      "payload": {
+        "taskId": 42,
+        "projectId": "e7c1...",
+        "commentId": 10,
+        "comment": "Please fix the API response."
+      },
+      "recipient_user_id": "b7f3...",
+      "url": "/main-page/kanban/task/42",
+      "status": "unread",
+      "created_at": "2026-05-18T08:30:00.000Z",
+      "updated_at": "2026-05-18T08:30:00.000Z"
+    }
+  ]
+}
+```
+
+### GET /auth/notifications/unread-count
+Purpose: fetch the unread notification count for the signed-in user.
+
+Success example:
+```json
+{ "count": 3 }
+```
+
+### PATCH /auth/notifications/:notificationId/read
+Purpose: mark one notification as read for the signed-in user.
+
+Success example:
+```json
+{
+  "notification": {
+    "id": "0c66d4f1-1d3d-4ef1-b3d0-7e9d7314a6af",
+    "status": "read",
+    "updated_at": "2026-05-18T08:45:00.000Z"
+  }
+}
+```
+
+Common errors:
+- 404 when the notification does not belong to the current user or does not exist.
+
+### PATCH /auth/notifications/mark-all-read
+Purpose: mark all unread notifications as read for the signed-in user.
+
+Success example:
+```json
+{ "updatedCount": 5 }
+```
+
+### Notification event types currently emitted
+
+- project_invitation
+- project_invitation_accepted
+- task_assigned
+- task_unassigned
+- task_status_changed
+- review_approved
+- review_rejected
+- task_comment
+- task_comment_reply
+- friend_request
+- friend_request_accepted
+
+Message format principle:
+- Notifications are contextual and descriptive: who did what where.
+- Task and review notifications include task title and project name.
+- Comment/reply/review-note content is included and truncated when long.
+- task-related notifications include url = /main-page/kanban/task/:taskId so the UI can open task details directly.
 
 ## Metrics
 

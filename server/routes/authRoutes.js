@@ -64,6 +64,14 @@ import {
 	cancelFriendRequest,
 } from "../controllers/friendController.js";
 
+import {
+	getNotifications,
+	getUnreadNotificationsCount,
+	markNotificationAsRead,
+	markAllNotificationsAsRead,
+	streamNotifications,
+} from "../controllers/notificationController.js";
+
 import { authenticateToken } from "../middleware/authMiddleware.js";
 import {
 	authLimiter,
@@ -96,6 +104,11 @@ router.get("/friends/incoming", authenticateToken, authenticatedLimiter, getInco
 router.patch("/friends/requests/:requestId/accept", authenticateToken, inviteLimiter, acceptFriendRequest);
 router.patch("/friends/requests/:requestId/decline", authenticateToken, inviteLimiter, declineFriendRequest);
 router.patch("/friends/requests/:requestId/cancel", authenticateToken, inviteLimiter, cancelFriendRequest);
+router.get("/notifications/stream", streamNotifications);
+router.get("/notifications", authenticateToken, authenticatedLimiter, getNotifications);
+router.get("/notifications/unread-count", authenticateToken, authenticatedLimiter, getUnreadNotificationsCount);
+router.patch("/notifications/:notificationId/read", authenticateToken, authenticatedLimiter, markNotificationAsRead);
+router.patch("/notifications/mark-all-read", authenticateToken, authenticatedLimiter, markAllNotificationsAsRead);
 router.post("/projects/send-invite/", authenticateToken, inviteLimiter, inviteMemberToProject);
 router.get("/projects/get-invites/", authenticateToken, authenticatedLimiter, getProjectInvitations);
 router.patch("/projects/invitations/:requestId/accept", authenticateToken, inviteLimiter, acceptProjectInvitation);

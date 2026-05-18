@@ -196,9 +196,12 @@ function KanbanPage() {
 		return { columnCount: countColumns, taskCount: countTasks };
 	}, [columnsForBoard]);
 
-	const loadTaskCategories = useCallback(async () => {
+	const loadTaskCategories = useCallback(async (options = {}) => {
 		if (!project?.id) return;
-		setLoading(true);
+		const silent = options.silent === true;
+		if (!silent) {
+			setLoading(true);
+		}
 
 		try {
 			const data = await getTaskCategories(project.id);
@@ -206,7 +209,9 @@ function KanbanPage() {
 		} catch (err) {
 			toast.showError(err?.message || "Error fetching task categories for this project.");
 		} finally {
-			setLoading(false);
+			if (!silent) {
+				setLoading(false);
+			}
 		}
 	}, [project?.id, toast]);
 
@@ -288,6 +293,31 @@ function KanbanPage() {
 	useEffect(() => {
 		taskCategoriesRef.current = taskCategories;
 	}, [taskCategories]);
+
+	useEffect(() => {
+		const handleRealtime = (event) => {
+			const detail = event?.detail || {};
+			const payload = detail.payload || {};
+			const type = String(detail.type || "").toLowerCase();
+			if (!project?.id) return;
+			if (payload.projectId && String(payload.projectId) !== String(project.id)) return;
+
+			const relevant = new Set([
+				"task_assigned",
+				"task_unassigned",
+				"task_status_changed",
+				"review_approved",
+				"review_rejected",
+				"task_comment",
+				"task_comment_reply",
+			]);
+			if (!relevant.has(type)) return;
+			loadTaskCategories({ silent: true });
+		};
+
+		window.addEventListener("notifications:push", handleRealtime);
+		return () => window.removeEventListener("notifications:push", handleRealtime);
+	}, [project?.id, loadTaskCategories]);
 
 	const setTaskPending = useCallback((taskId, action) => {
 		if (!taskId) return;
@@ -380,7 +410,7 @@ function KanbanPage() {
 
 			try {
 				await deleteTask(taskId);
-				await loadTaskCategories();
+				await loadTaskCategories({ silent: true });
 			} catch (err) {
 				toast.showError(err?.message || "Unable to create task.");
 				toast.showError(err?.message || "Unable to delete task.");
@@ -590,7 +620,7 @@ function KanbanPage() {
 
 			try {
 				await takeTask(taskId);
-				await loadTaskCategories();
+				await loadTaskCategories({ silent: true });
 			} catch (err) {
 				toast.showError(err?.message || "Unable to create task.");
 				setLocalTaskAssignees((prev) => {
@@ -631,7 +661,7 @@ function KanbanPage() {
 					await rejectTaskReview(taskId, reason);
 				}
 
-				await loadTaskCategories();
+				await loadTaskCategories({ silent: true });
 				setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null });
 				setDragReviewReason("");
 			} catch (err) {
@@ -708,7 +738,7 @@ function KanbanPage() {
 			} else {
 				await updateTaskStatus(taskId, column.id);
 			}
-			await loadTaskCategories();
+			await loadTaskCategories({ silent: true });
 		} catch (dropError) {
 			toast.showError(dropError?.message || "Unable to move task to this category.");
 			setTaskCategories((prev) => {
@@ -738,7 +768,7 @@ function KanbanPage() {
 
 			try {
 				await unassignTask(taskId);
-				await loadTaskCategories();
+				await loadTaskCategories({ silent: true });
 			} catch (err) {
 				toast.showError(err?.message || "Unable to create task.");
 				toast.showError(err?.message || "Unable to unassign task.");
@@ -1323,7 +1353,7 @@ function KanbanPage() {
 									return insertTaskIntoCategory(removed.next, targetCategoryId, createdTask);
 								});
 							}
-							await loadTaskCategories();
+							await loadTaskCategories({ silent: true });
 						} catch (err) {
 						toast.showError(err?.message || "Unable to create task.");
 							setTaskCategories((prev) => removeTaskById(prev, tempId).next);
