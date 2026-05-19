@@ -121,7 +121,7 @@ function Projects() {
           </td>
           <td className="project-table-date">{dateLabel}</td>
           <td className="project-table-action-cell">
-            {type === "owner" && (
+            {/* {type === "owner" && (
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
@@ -138,7 +138,7 @@ function Projects() {
                 </svg>
                 Add Member
               </button>
-            )}
+            )} */}
           </td>
         </tr>
       );
@@ -228,7 +228,10 @@ function Projects() {
           {memberLoading && <p className="status-text">Loading shared projects...</p>}
 
           {!memberLoading && memberProjects.length === 0 && (
-            <p className="status-text">You are not a member of other projects yet.</p>
+            <div className="empty-state-card">
+              <h3>No shared projects yet</h3>
+              <p>You are not a member of other projects yet. Once someone invites you, the project will appear here.</p>
+            </div>
           )}
 
           {!memberLoading && memberProjects.length > 0 && (

@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 // Create the Toast Context
 export const ToastContext = createContext();
 
+const NETWORK_ERROR_MESSAGE = 'Network error. Please check your connection and try again.';
+
 // Toast type definitions
 export const TOAST_TYPES = {
   SUCCESS: 'success',
@@ -103,6 +105,10 @@ export const ToastProvider = ({ children }) => {
 
   // Show an error toast
   const showError = useCallback((message, options) => {
+    if (message === NETWORK_ERROR_MESSAGE) {
+      return null;
+    }
+
     return addToast(message, TOAST_TYPES.ERROR, options);
   }, [addToast]);
 

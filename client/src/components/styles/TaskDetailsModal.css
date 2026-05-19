@@ -210,7 +210,7 @@
   position: relative;
   display: inline-block;
   margin-left: auto; /* push to far right of header */
-  z-index: 2200;
+  z-index: 6000;
 }
 
 .tdm-section-header .tdm-task-title-label {
@@ -236,16 +236,38 @@
 
 
 .task-dropdown {
-  position: absolute;
-  right: 0;
+  position: fixed;
   width: 240px;
   max-width: 240px;
   background: #ffffff;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
+  border-radius: 15px;
   padding: 10px;
   box-shadow: 0 8px 24px rgba(15,23,42,0.08);
-  z-index: 2300;
+  z-index: 10000;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  transform-origin: top right;
+  animation: taskDropdownFadeIn 140ms ease-out;
+  will-change: opacity, transform;
+}
+
+@keyframes taskDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-dropdown {
+    animation: none;
+  }
 }
 
 
@@ -983,10 +1005,10 @@
 
 .tdm-subtask-add-row {
   width: 100%;
-  display: grid;
+  display: flex;
   grid-template-columns: 18px 1fr;
-  align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 0px;
   padding: 12px 0;
   border: none;
   border-top: 1px solid #e7eef6;
@@ -997,7 +1019,7 @@
   font-size: 0.78rem;
   margin-top: 10px;
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
@@ -1160,20 +1182,20 @@
 }
 
 .tdm-assign-btn {
-  border: 1px solid #b7d4d9;
+  border: 1px solid var(--color-primary);
   border-radius: var(--radius-sm);
-  background: var(--color-primary-subtle);
-  color: var(--color-primary-hover);
+  background: var(--color-primary);
+  color: #ffffff;
   padding: 6px 10px;
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  transition: filter var(--transition-fast);
 }
 
 .tdm-assign-btn:hover {
-  background: #cee6ea;
-  transform: translateY(-1px);
+  filter: brightness(0.9);
 }
 
 .tdm-assign-btn.is-assigned {
@@ -1327,17 +1349,19 @@
 }
 
 .tdm-view-assignees-btn {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
   padding: 7px 12px;
   border-radius: 10px;
   cursor: pointer;
+  font-size: small;
   font-weight: 700;
-  color: var(--color-primary-hover);
+  color: #ffffff;
+  transition: filter var(--transition-fast);
 }
 
 .tdm-view-assignees-btn:hover {
-  background: #dff2f5;
+  filter: brightness(0.9);
 }
 
 .tdm-manage-tags-modal {
@@ -1564,7 +1588,7 @@
 .tdm-tags-controls {
   margin-top: 12px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
 }
 
@@ -1647,20 +1671,22 @@
 
 .tdm-comment-submit {
   align-self: flex-end;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
-  background: var(--color-primary-subtle);
-  color: #ffffff;
-  padding: 7px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-primary);
+  padding: 0;
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color var(--transition-fast), transform var(--transition-fast);
 }
 
 .tdm-comment-submit:hover:not(:disabled) {
-  background: var(--color-primary);
-  border-color: var(--color-primary-hover);
+  color: var(--color-primary-hover);
   transform: translateY(-1px);
 }
 
@@ -1698,7 +1724,7 @@
 
 .tdm-comment-item {
   border-radius: 12px;
-  padding: 0px 12px;
+  padding: 12px 12px;
 
   background: #ffffff;
   display: flex;
@@ -1707,8 +1733,22 @@
 }
 
 .tdm-comment-empty {
-  color: var(--color-text-tertiary);
+  margin: 0;
+  padding: 28px 16px;
+  color: var(--color-text-secondary);
   font-size: 0.86rem;
+  text-align: center;
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.012);
+}
+
+.tdm-subtasks-empty {
+  margin: 0;
+  padding: 24px 16px;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 .tdm-comment-head {
@@ -1773,17 +1813,17 @@
 .tdm-comments-composer {
   position: sticky;
   bottom: 0;
-  background: #ffffff;
-  border-top: 1px solid #e5eef7;
+  background: transparent;
+  border-top: 1px solid rgba(176, 196, 216, 0.45);
   padding-top: 10px;
   padding-bottom: 6px;
 }
 
 .tdm-comments-composer-card {
-  background: #f7fbff;
-  border: 1px solid #e3edf7;
+ 
+  border: 1px solid rgba(176, 196, 216, 0.56);
   border-radius: 16px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04);
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -1836,17 +1876,30 @@
 }
 
 .tdm-reply-submit {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
-  padding: 0 12px;
-  color: var(--color-primary-hover);
-  padding: 6px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--color-primary);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   height: 36px;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.tdm-reply-submit:hover:not(:disabled) {
+  color: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.tdm-send-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
 }
 
 .tdm-reply-submit:disabled {

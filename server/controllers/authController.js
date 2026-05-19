@@ -351,6 +351,30 @@ export async function updateProfileController(req, res) {
   }
 }
 
+export async function checkEmailController(req, res) {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
+  try {
+    const existingUser = await findByEmail(email.trim());
+    if (existingUser) {
+      return res.status(409).json({ available: false, message: "Email is already taken" });
+    }
+
+    return res.status(200).json({ available: true, message: "Email is available" });
+  } catch (err) {
+    console.error("❌ Check email error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
 export async function testEmailController(req, res) {
   const { to, subject, text } = req.body;
 

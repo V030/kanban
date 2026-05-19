@@ -226,10 +226,6 @@ function Notifications() {
             </header>
 
             <section className="project-section notifications-panel">
-                <div className="section-heading">
-                    <h2>Notifications</h2>
-                    <p>{filteredNotifications.length} shown</p>
-                </div>
 
                 <div className="notifications-tabs" role="tablist" aria-label="Notification filters">
                     {filters.map((filter) => {

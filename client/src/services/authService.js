@@ -4,6 +4,30 @@ import { transformErrorMessage, extractErrorMessage } from "../utils/errorTransf
 
 const API_URL = "http://localhost:5000";
 
+const NETWORK_ERROR_EVENT = "kanban:network-error";
+
+function redirectToConnectionErrorPage() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(NETWORK_ERROR_EVENT));
+}
+
+function handleNetworkFailure(error) {
+  const isNetworkFailure =
+    error instanceof TypeError ||
+    error?.name === "TypeError" ||
+    (typeof window !== "undefined" && !window.navigator.onLine);
+
+  if (isNetworkFailure) {
+    redirectToConnectionErrorPage();
+    throw new Error("Network error. Please check your connection and try again.");
+  }
+
+  throw error;
+}
+
 
 export async function fetchWithAuth(url, options = {}) {
   const token = getToken();
@@ -27,10 +51,16 @@ export async function fetchWithAuth(url, options = {}) {
     Authorization: `Bearer ${token}`,
   };
   
-  const response = await fetch(url, {
-    ...restOptions,
-    headers,
-  });
+  let response;
+
+  try {
+    response = await fetch(url, {
+      ...restOptions,
+      headers,
+    });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
   
   // handle token expiration/authentication failure
   if (response.status === 401) {
@@ -55,19 +85,25 @@ export async function fetchWithAuth(url, options = {}) {
 }
 
 export async function login(email, password) {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/login`, {
       headers: { "Content-Type": "application/json" },
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
 
-    if (!response.ok) {
-      const errorMessage = await extractErrorMessage(response);
-      const userFriendlyMessage = transformErrorMessage(errorMessage);
-      throw new Error(userFriendlyMessage);
-    }
+  if (!response.ok) {
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
+  }
 
-    const data = await response.json();
+  const data = await response.json();
 
     console.log("Login successful. Storing token...");
 
@@ -80,17 +116,42 @@ export async function login(email, password) {
     return data;
 }
 
+export async function checkEmail(email) {
+  const response = await fetch(`${API_URL}/auth/check-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    if (response.status === 409) {
+      throw new Error(data.message || "Email is already taken");
+    }
+    throw new Error(data.message || "Failed to check email");
+  }
+
+  return data;
+}
+
 export async function register(
     first_name, 
     last_name, 
     email, 
     password
   ) {
-  const response = await fetch(`${API_URL}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ first_name, last_name, email, password }),
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ first_name, last_name, email, password }),
+    });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
 
   if (!response.ok) {
     const errorMessage = await extractErrorMessage(response);
@@ -130,17 +191,27 @@ export async function googleLogin(credentialResponse) {
 
     return data;
   } catch (error) {
+    if (error instanceof TypeError || error?.name === "TypeError") {
+      handleNetworkFailure(error);
+    }
+
     console.error("Google login error:", error);
     throw error;
   }
 }
 
 export async function requestPasswordResetOtp(email) {
-  const response = await fetch(`${API_URL}/auth/forgot-password/request-otp`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/forgot-password/request-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
 
   if (!response.ok) {
     const errorMessage = await extractErrorMessage(response);
@@ -152,11 +223,17 @@ export async function requestPasswordResetOtp(email) {
 }
 
 export async function verifyPasswordResetOtp(email, otp) {
-  const response = await fetch(`${API_URL}/auth/forgot-password/verify-otp`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, otp }),
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/forgot-password/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, otp }),
+    });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
 
   if (!response.ok) {
     const errorMessage = await extractErrorMessage(response);
@@ -168,11 +245,17 @@ export async function verifyPasswordResetOtp(email, otp) {
 }
 
 export async function completePasswordResetWithToken(resetToken, newPassword) {
-  const response = await fetch(`${API_URL}/auth/forgot-password/complete`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ resetToken, newPassword }),
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/forgot-password/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resetToken, newPassword }),
+    });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
 
   if (!response.ok) {
     const errorMessage = await extractErrorMessage(response);
@@ -184,11 +267,17 @@ export async function completePasswordResetWithToken(resetToken, newPassword) {
 }
 
 export async function resetPasswordWithOtp(email, otp, newPassword) {
-  const response = await fetch(`${API_URL}/auth/forgot-password/reset-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, otp, newPassword }),
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/forgot-password/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, otp, newPassword }),
+    });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
 
   if (!response.ok) {
     const errorMessage = await extractErrorMessage(response);

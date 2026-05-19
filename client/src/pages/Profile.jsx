@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { useToast } from "../hooks/useToast";
 import { getCurrentUser, changePassword, updateProfile } from "../services/authService";
 import "../components/styles/WorkspacePages.css";
@@ -66,12 +66,18 @@ function Profile() {
         confirmPassword: "",
     });
     const [loading, setLoading] = useState(false);
+    const [imageError, setImageError] = useState(false);
 
     const fullName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "User";
     const initials = `${(user?.firstName || "").charAt(0)}${(user?.lastName || "").charAt(0)}`.toUpperCase() || "U";
     const accountImageSource = normalizeProfileImage(
         editFormData.profileImageBase64 || user?.profileImageBase64 || user?.profile_image_base64 || ""
     );
+
+    // Reset image error when the source changes (new upload, remove, or user change)
+    useEffect(() => {
+        setImageError(false);
+    }, [editFormData.profileImageBase64, user?.profileImageBase64, user?.profile_image_base64]);
 
     const handleProfileUpdate = useCallback(
         async (e) => {
@@ -208,8 +214,13 @@ function Profile() {
                 <div className="profile-hero-content">
                     <div className="profile-hero-main">
                         <div className="profile-hero-avatar-wrap">
-                            {accountImageSource ? (
-                                <img src={accountImageSource} alt={fullName} className="profile-avatar-lg" />
+                            {accountImageSource && !imageError ? (
+                                <img
+                                    src={accountImageSource}
+                                    alt={fullName}
+                                    className="profile-avatar-lg"
+                                    onError={() => setImageError(true)}
+                                />
                             ) : (
                                 <div className="profile-avatar-lg">{initials}</div>
                             )}
@@ -255,8 +266,13 @@ function Profile() {
                     <div className="profile-photo-section">
                         <div className="section-title">PROFILE PHOTO</div>
                         <div className="photo-preview">
-                            {accountImageSource ? (
-                                <img src={accountImageSource} alt={fullName} className="preview-img" />
+                            {accountImageSource && !imageError ? (
+                                <img
+                                    src={accountImageSource}
+                                    alt={fullName}
+                                    className="preview-img"
+                                    onError={() => setImageError(true)}
+                                />
                             ) : (
                                 <div className="preview-placeholder">{initials}</div>
                             )}

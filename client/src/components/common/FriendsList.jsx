@@ -9,7 +9,12 @@ function getFriendDisplayInitials(friend) {
 
 function FriendsList({ friends = [] }) {
   if (friends.length === 0) {
-    return <p className="friends-empty">No friends yet.</p>;
+    return (
+      <div className="empty-state-card friends-empty-state">
+        <h3>No friends yet</h3>
+        <p>Your friends list will appear here once you connect with people.</p>
+      </div>
+    );
   }
 
   return (

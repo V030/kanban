@@ -2,6 +2,7 @@ import express from "express";
 import {
 	login,
 	register,
+	checkEmailController,
 	requestPasswordResetController,
 	resetPasswordController,
 	verifyPasswordResetController,
@@ -89,6 +90,7 @@ const router = express.Router();
 
 router.post("/login", authLimiter, login);
 router.post("/register", authLimiter, register);
+router.post("/check-email", authLimiter, checkEmailController);
 router.post("/google", authLimiter, googleAuth);
 router.post("/forgot-password/request-otp", passwordResetRequestLimiter, requestPasswordResetController);
 router.post("/forgot-password/verify-otp", passwordResetConfirmLimiter, verifyPasswordResetController);

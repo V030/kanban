@@ -1,6 +1,7 @@
 import './App.css';
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 import { isAuthenticated } from './services/authService';
@@ -21,8 +22,30 @@ import TaskDetailsPage from "./pages/TaskDetailsPage";
 import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
 import Metrics from "./pages/Metrics";
+import ErrorPage from "./pages/ErrorPage";
+import ConnectionErrorPage from "./pages/ConnectionErrorPage";
 import { ProtectedRoute } from './components/protected/ProtectedRoutes';
 import { PublicRoute } from './components/public/PublicRoutes';
+
+const NETWORK_ERROR_EVENT = "kanban:network-error";
+
+function NetworkErrorRedirector() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleNetworkError = () => {
+      navigate("/connection-error", { replace: true });
+    };
+
+    window.addEventListener(NETWORK_ERROR_EVENT, handleNetworkError);
+
+    return () => {
+      window.removeEventListener(NETWORK_ERROR_EVENT, handleNetworkError);
+    };
+  }, [navigate]);
+
+  return null;
+}
 
 function App() {
   const auth = isAuthenticated();
@@ -33,6 +56,7 @@ function App() {
         <BrowserRouter>
           <ToastContainer />
           <NotificationsStream />
+          <NetworkErrorRedirector />
           <Routes>
         {/* routes declaration */}
             <Route path="/login" element={
@@ -81,6 +105,10 @@ function App() {
                 : <Navigate to="/login" replace />
             }>
           </Route>
+
+          {/* Catch-all route for 404/invalid paths */}
+          <Route path="/connection-error" element={<ConnectionErrorPage />} />
+          <Route path="*" element={<ErrorPage />} />
         </Routes>
         </BrowserRouter>
       </ToastProvider>

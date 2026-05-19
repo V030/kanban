@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { login, googleLogin } from "../../services/authService";
-import { useToast } from "../../hooks/useToast";
 import { Link, useNavigate } from "react-router-dom";
 import { GoogleLogin } from '@react-oauth/google';
 import "../styles/WorkspacePages.css";
@@ -9,19 +8,42 @@ function LoginForm() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const toast = useToast();
+    const [emailError, setEmailError] = useState("");
+    const [passwordError, setPasswordError] = useState("");
+    const [formError, setFormError] = useState("");
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    // reset errors
+    setEmailError("");
+    setPasswordError("");
+    setFormError("");
 
+    // basic client-side validation
+    if (!email.trim()) {
+      setEmailError("Please enter your email");
+      return;
+    }
+    if (!password) {
+      setPasswordError("Please enter your password");
+      return;
+    }
+
+    setLoading(true);
     try {
       await login(email, password);
-      toast.showSuccess("Login successful!");
       navigate("/main-page");
     } catch (err) {
-      toast.showError(err.message);
+      const msg = (err && err.message) ? String(err.message) : "Login failed";
+      // map common server messages to fields
+      if (/email/i.test(msg)) {
+        setEmailError(msg);
+      } else if (/password/i.test(msg)) {
+        setPasswordError(msg);
+      } else {
+        setFormError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -31,17 +53,17 @@ function LoginForm() {
     setLoading(true);
     try {
       await googleLogin(credentialResponse);
-      toast.showSuccess("Google login successful!");
       navigate("/main-page");
     } catch (err) {
-      toast.showError(err.message || "Google login failed");
+      const msg = (err && err.message) ? String(err.message) : "Google login failed";
+      setFormError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleError = () => {
-    toast.showError("Google login failed. Please try again.");
+    setFormError("Google login failed. Please try again.");
   };
 
   async function toRegister() {
@@ -57,8 +79,10 @@ function LoginForm() {
           type="email"
           placeholder="name@company.com"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          className={emailError ? 'is-invalid' : ''}
+          onChange={(e) => { setEmail(e.target.value); setEmailError(''); setFormError(''); }}
         />
+        {emailError && <div className="field-error-text">{emailError}</div>}
       </div>
 
       <div className="auth-field">
@@ -68,12 +92,16 @@ function LoginForm() {
           type="password"
           placeholder="Enter password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          className={passwordError ? 'is-invalid' : ''}
+          onChange={(e) => { setPassword(e.target.value); setPasswordError(''); setFormError(''); }}
         />
         <Link className="auth-inline-link" to="/forgot-password">
           Forgot Password?
         </Link>
+        {passwordError && <div className="field-error-text">{passwordError}</div>}
       </div>
+
+      {formError && <div className="auth-error">{formError}</div>}
 
       <div className="auth-actions">
         <button className="btn btn-primary" type="submit" disabled={loading}>
@@ -82,7 +110,7 @@ function LoginForm() {
         <button className="btn btn-secondary" type="button" onClick={ toRegister } disabled={loading}>Create Account</button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0' }}>
         <hr style={{ flex: 1, borderColor: '#cccccc28' }} />
         <span style={{ margin: '0 10px', color: '#cccccce5', fontSize: '14px' }}>or</span>
         <hr style={{ flex: 1, borderColor: '#cccccc28' }} />

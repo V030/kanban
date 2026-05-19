@@ -107,7 +107,14 @@ function IncomingFriendRequests({
   };
 
   if (loading) return <p className="status-text">Loading incoming requests...</p>;
-  if (myFriendRequests.length === 0) return <p className="friends-empty">No incoming requests.</p>;
+  if (myFriendRequests.length === 0) {
+    return (
+      <div className="empty-state-card friends-empty-state">
+        <h3>No incoming requests</h3>
+        <p>New friend requests will show up here when someone reaches out.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="friends-list">

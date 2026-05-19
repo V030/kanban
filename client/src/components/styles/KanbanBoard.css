@@ -132,15 +132,18 @@
 
 /* Empty State */
 .tf-empty-message {
-  margin: 0;
-  padding: 20px 12px;
+  margin: 0 10px 10px;
+  padding: 28px 16px;
   text-align: center;
-  color: var(--tf-text-light);
+  color: var(--color-text-secondary);
   font-size: 0.875rem;
   flex-grow: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.012);
 }
 
 /* Task Card */
@@ -249,6 +252,27 @@
 .tf-priority-unset {
   background: #e5e7eb;
   color: #6b7280;
+}
+
+/* Status Line */
+.tf-status-line {
+  min-height: 18px;
+}
+
+/* Status Badge Line */
+.tf-status-badge-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--color-text-secondary);
+}
+
+/* Status Prefix */
+.tf-status-prefix {
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 /* Task Title */

@@ -60,7 +60,14 @@ function SentFriendRequests({ requests, onRequestsChange, onSync }) {
   };
 
   if (loading) return <p className="status-text">Loading sent requests...</p>;
-  if (sentFriendRequests.length === 0) return <p className="friends-empty">No sent requests.</p>;
+  if (sentFriendRequests.length === 0) {
+    return (
+      <div className="empty-state-card friends-empty-state">
+        <h3>No sent requests</h3>
+        <p>Requests you send will appear here until they are accepted or canceled.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="friends-list">

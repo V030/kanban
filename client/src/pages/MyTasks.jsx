@@ -219,15 +219,17 @@ function MyTasks() {
 
             {/* ── Empty state ── */}
             {!loading && groupedProjects.length === 0 && (
-                <div className="empty-state-card">
-                    <h3>No assigned tasks yet</h3>
-                    <p>Tasks assigned to you will appear here, grouped by project and status.</p>
-                    <div className="empty-state-actions">
-                        <button type="button" className="btn btn-secondary" onClick={() => navigate("/main-page/projects")}>
-                            Browse Projects
-                        </button>
+                <section className="project-section">
+                    <div className="empty-state-card">
+                        <h3>No assigned tasks yet</h3>
+                        <p>Tasks assigned to you will appear here, grouped by project and status.</p>
+                        <div className="empty-state-actions">
+                            <button type="button" className="btn btn-secondary" onClick={() => navigate("/main-page/projects")}>
+                                Browse Projects
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </section>
             )}
 
             {/* ── Task groups ── */}

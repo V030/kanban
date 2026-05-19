@@ -81,6 +81,16 @@ function formatDateShort(value) {
 	return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+/** Map a column/status name to a status pill variant class */
+function getStatusPillClass(columnName) {
+	const key = String(columnName || "").toLowerCase().replace(/\s+/g, "_");
+	if (key === "done" || key === "completed") return "done";
+	if (key === "in_progress" || key === "in progress") return "in_progress";
+	if (key === "todo" || key === "to_do") return "todo";
+	if (key === "to_review" || key === "review") return "pending";
+	return "todo";
+}
+
 const demoColumns = [
 	{
 		id: "todo",
@@ -1219,6 +1229,19 @@ function KanbanPage() {
 											<span className="tf-priority-line">
 												<span className="tf-priority-prefix">Priority •</span>{" "}
 												<span className={`tf-priority-pill tf-priority-${pillClass}`}>{label}</span>
+												</span>
+											);
+										})()}
+									</div>
+
+									<div className="tf-status-line">
+										{(() => {
+											const statusClass = getStatusPillClass(columnName);
+											const statusLabel = statusClass === "pending" ? "To Review" : statusClass.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+											return (
+												<span className="tf-status-badge-line">
+													<span className="tf-status-prefix">Status •</span>{" "}
+													<span className={`pill ${statusClass}`}>{statusLabel}</span>
 												</span>
 											);
 										})()}

@@ -211,8 +211,24 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const taskTitleRef = useRef(null);
   const taskDescRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
   const dropdownRef = useRef(null);
   const menuButtonRef = useRef(null);
+
+  const updateMenuPosition = useCallback(() => {
+    const button = menuButtonRef.current;
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const dropdownWidth = 240;
+    const gap = 8;
+    const viewportPadding = 8;
+    const maxLeft = Math.max(viewportPadding, window.innerWidth - dropdownWidth - viewportPadding);
+    const left = Math.min(Math.max(rect.right - dropdownWidth, viewportPadding), maxLeft);
+    const top = Math.min(rect.bottom + gap, Math.max(viewportPadding, window.innerHeight - viewportPadding - 16));
+
+    setMenuPosition({ top, left });
+  }, []);
 
   useEffect(() => {
     function handleOutsideClick(e) {
@@ -234,6 +250,21 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       document.removeEventListener("keydown", handleEsc);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const syncMenuPosition = () => updateMenuPosition();
+    syncMenuPosition();
+
+    document.addEventListener("scroll", syncMenuPosition, true);
+    window.addEventListener("resize", syncMenuPosition);
+
+    return () => {
+      document.removeEventListener("scroll", syncMenuPosition, true);
+      window.removeEventListener("resize", syncMenuPosition);
+    };
+  }, [menuOpen, updateMenuPosition]);
 
   useEffect(() => {
     const ids = (Array.isArray(task?.assignees) ? task.assignees : [])
@@ -1014,6 +1045,21 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     .slice()
     .sort((a, b) => new Date(a?.created_at || a?.createdAt) - new Date(b?.created_at || b?.createdAt));
 
+  const sendIcon = (
+    <svg 
+      className="tdm-send-icon" 
+      viewBox="0 0 24 24" 
+      aria-hidden="true" 
+      focusable="false"
+      style={{ transform: "rotate(-45deg)" }}
+    >
+      <path 
+        d="M2 21l21-9L2 3v7l15 2-15 2v7z" 
+        fill="currentColor" 
+      />
+    </svg>
+  );
+
   const commentsPanel = (
     <article className="tdm-section-card tdm-comments-panel">
       <div className="tdm-comments-header">
@@ -1094,7 +1140,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                             onClick={() => handleSubmitReply(commentId)}
                             disabled={replySubmittingId === String(commentId) || !(replyInputs[commentId] || "").trim()}
                           >
-                            {replySubmittingId === String(commentId) ? "Posting..." : "Post"}
+                            {replySubmittingId === String(commentId) ? "Posting..." : sendIcon}
                           </button>
                         </div>
                       )}
@@ -1163,7 +1209,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
               onClick={handleSubmitComment}
               disabled={commentSubmitting || !newComment.trim()}
             >
-              {commentSubmitting ? "Posting..." : "Post Comment"}
+              {commentSubmitting ? "Posting..." : sendIcon}
             </button>
           </div>
         </div>
@@ -1193,7 +1239,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
             <article className="tdm-section-card tdm-focus-card">
               <div className="tdm-section-header">
                 <h3 className="tdm-task-title-label">Task</h3>
-                <div className="task-actions-wrap" ref={menuButtonRef}>
+                <div className="task-actions-wrap">
                 
                 <button
                   className="task-more-btn"
@@ -1207,7 +1253,13 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 </button>
 
                 {menuOpen && (
-                  <div className="task-dropdown" ref={dropdownRef} role="dialog" aria-label="Task actions">
+                  <div
+                    className="task-dropdown"
+                    ref={dropdownRef}
+                    role="dialog"
+                    aria-label="Task actions"
+                    style={menuPosition ? { top: `${menuPosition.top}px`, left: `${menuPosition.left}px` } : undefined}
+                  >
                     <div className="dropdown-section">
                       <p className="dropdown-label">Target Date</p>
                       <div className="tdm-target-row">
@@ -1537,7 +1589,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     <div className="tdm-subtask-left" />
                     <div className="tdm-subtask-main">
                       <div className="tdm-subtask-title-row">
-                        <span className="tdm-subtask-index">+</span>
+                        
                         <input
                           type="text"
                           value={newSubtaskTitle}
@@ -1637,7 +1689,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
               )}
               {subtaskError && <p className="tdm-subtask-error">{subtaskError}</p>}
               {localSubtasks.length === 0 ? (
-                <p>No subtasks added.</p>
+                <p className="tdm-subtasks-empty">No subtasks added.</p>
               ) : (
                 <ul className="tdm-subtasks-list">
                   {localSubtasks.map((st, idx) => {
@@ -1664,12 +1716,19 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                               aria-label="Delete subtask"
                               title="Delete"
                             >
-                              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                <path
-                                  d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"
-                                  fill="currentColor"
-                                />
-                              </svg>
+<svg 
+  viewBox="0 0 24 24" 
+  aria-hidden="true" 
+  focusable="false"
+>
+  <path 
+    d="M6 7h12v14H6V7zm3-3h6v2H9V4zM4 7h16v2H4V7z" 
+    fill="currentColor" 
+  />
+</svg>
+
+
+
                             </button>
                           </div>
                           {isPending && <div className="tdm-subtask-pending">Saving...</div>}
@@ -1792,14 +1851,14 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
           }}
         >
           <div className="tdm-manage-content">
-            <button
+            {/* <button
               type="button"
               className="tdm-close-btn tdm-manage-close"
               onClick={() => setShowTagsModal(false)}
               aria-label="Close manage tags"
             >
               ×
-            </button>
+            </button> */}
             <h3>Manage Tags</h3>
             <p className="tdm-manage-desc">
               Tags help categorize and filter tasks across the project. Add new tags or choose
@@ -1872,7 +1931,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
             <div className="tdm-tags-controls">
               <button type="button" onClick={() => setShowTagsModal(false)} className="tdm-close-btn tdm-manage-close-bottom">
-                Close
+                Done
               </button>
             </div>
           </div>

@@ -54,19 +54,22 @@
   background-color: #2563eb; /* solid blue */
 }
 
+
 .toast-warning,
 .toast-validation,
 .toast-rate-limit {
   border-left-color: var(--toast-amber);
-  background-color: #d97706; /* solid amber */
+  /* Use a solid amber background for warnings so text remains readable */
+  background-color: #f59e0b; /* solid amber */
+  color: #fff;
 }
 
-
-.toast-warning,
-.toast-validation,
-.toast-rate-limit {
-  border-left-color: var(--toast-amber);
-  background-color: #fff6e5; /* soft amber tint */
+/* Ensure warning toast text/icon/close button contrast is good */
+.toast-warning .toast-title,
+.toast-warning .toast-message,
+.toast-warning .toast-close-btn,
+.toast-warning .toast-icon {
+  color: #ffffff;
 }
 
 
@@ -114,11 +117,11 @@
   color: var(--toast-blue);
 }
 
-/* Warning icons color */
+/* Warning icons color - use white on amber background */
 .toast-warning .toast-icon,
 .toast-validation .toast-icon,
 .toast-rate-limit .toast-icon {
-  color: var(--toast-amber);
+  color: #ffffff;
 }
 
 /* Message container */
@@ -175,6 +178,20 @@
   outline-offset: 2px;
 }
 
+/* Ensure warning toasts keep close button visible (override defaults) */
+.toast-warning .toast-close-btn,
+.toast-validation .toast-close-btn,
+.toast-rate-limit .toast-close-btn {
+  color: #ffffff;
+}
+
+.toast-warning .toast-close-btn:hover,
+.toast-validation .toast-close-btn:hover,
+.toast-rate-limit .toast-close-btn:hover {
+  background-color: rgba(255,255,255,0.08);
+  opacity: 1;
+}
+
 /* Progress bar */
 .toast-progress {
   position: absolute;
@@ -206,7 +223,9 @@
 .toast-warning .toast-progress,
 .toast-validation .toast-progress,
 .toast-rate-limit .toast-progress {
-  background-color: var(--toast-amber);
+  /* Use a high-contrast progress indicator on amber background */
+  background-color: rgba(255,255,255,0.92);
+  opacity: 1;
 }
 
 /* Animations */
