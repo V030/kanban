@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createProjectModelMock } = vi.hoisted(() => ({
+const { createProjectModelMock, createTaskModelMock } = vi.hoisted(() => ({
   createProjectModelMock: vi.fn(),
+  createTaskModelMock: vi.fn(),
 }));
 
 vi.mock("../models/projectModel.js", () => ({
   createProject: createProjectModelMock,
+  createTask: createTaskModelMock,
 }));
 
-import { createProject } from "../controllers/projectController.js";
+import { createProject, createNewTask } from "../controllers/projectController.js";
 
 function createMockRes() {
   const res = {
@@ -52,7 +54,7 @@ describe("projectController.createProject", () => {
 
   it("returns 400 when project name is too long", async () => {
     const req = {
-      body: { name: "a".repeat(256) },
+      body: { name: "a".repeat(256), description: "Valid project description" },
       user: { userId: "user-1" },
     };
     const res = createMockRes();
@@ -61,6 +63,20 @@ describe("projectController.createProject", () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ message: "Project name is too long" });
+    expect(createProjectModelMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when project description is empty", async () => {
+    const req = {
+      body: { name: "Alpha", description: "   " },
+      user: { userId: "user-1" },
+    };
+    const res = createMockRes();
+
+    await createProject(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: "Project description is required" });
     expect(createProjectModelMock).not.toHaveBeenCalled();
   });
 
@@ -124,7 +140,7 @@ describe("projectController.createProject", () => {
     createProjectModelMock.mockRejectedValue(new Error("DB down"));
 
     const req = {
-      body: { name: "Alpha" },
+      body: { name: "Alpha", description: "Good description" },
       user: { userId: "user-1" },
     };
     const res = createMockRes();
@@ -146,7 +162,7 @@ describe("projectController.createProject", () => {
     });
 
     const req = {
-      body: { name: "Alpha" },
+      body: { name: "Alpha", description: "Good description" },
       user: { userId: "user-1" },
     };
     const res = createMockRes();
@@ -158,5 +174,20 @@ describe("projectController.createProject", () => {
     expect(consoleSpy).toHaveBeenCalled();
 
     consoleSpy.mockRestore();
+  });
+
+  it("returns 400 when task description is empty", async () => {
+    const req = {
+      params: { projectId: "project-1", categoryId: "2" },
+      body: { title: "Task A", description: "   " },
+      user: { userId: "user-1" },
+    };
+    const res = createMockRes();
+
+    await createNewTask(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: "Task description is required" });
+    expect(createTaskModelMock).not.toHaveBeenCalled();
   });
 });

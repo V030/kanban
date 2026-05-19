@@ -993,22 +993,10 @@ function KanbanPage() {
 							aria-label="Project name"
 							onInput={(event) => setProjectNameDraft(event.currentTarget.textContent || "")}
 							onKeyDown={handleProjectNameKeyDown}
+							onClick={() => canEditProjectName && !isEditingProjectName && beginEditProjectName()}
 						>
 							{isEditingProjectName ? null : project.name}
 						</h1>
-						{canEditProjectName && !isEditingProjectName && (
-							<button
-								type="button"
-								className="kanban-inline-edit-btn"
-								onClick={beginEditProjectName}
-								title="Edit project name"
-								aria-label="Edit project name"
-							>
-								<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-									<path d="M14.06 3.4a2 2 0 0 1 2.83 0l3.7 3.7a2 2 0 0 1 0 2.83l-9.9 9.9-5.55 1.38 1.38-5.55 9.9-9.9zM4 20h16v2H4z" />
-								</svg>
-							</button>
-						)}
 						{canEditProjectName && isEditingProjectName && (
 							<div className="kanban-inline-edit-actions">
 								<button
@@ -1051,22 +1039,10 @@ function KanbanPage() {
 							aria-label="Project description"
 							onInput={(event) => setProjectDescDraft(event.currentTarget.textContent || "")}
 							onKeyDown={handleProjectDescKeyDown}
+							onClick={() => canEditProjectName && !isEditingProjectDesc && beginEditProjectDesc()}
 						>
 							{isEditingProjectDesc ? null : (project.description || "")}
 						</p>
-						{canEditProjectName && !isEditingProjectDesc && (
-							<button
-								type="button"
-								className="kanban-inline-edit-btn"
-								onClick={beginEditProjectDesc}
-								title="Edit project description"
-								aria-label="Edit project description"
-							>
-								<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-									<path d="M14.06 3.4a2 2 0 0 1 2.83 0l3.7 3.7a2 2 0 0 1 0 2.83l-9.9 9.9-5.55 1.38 1.38-5.55 9.9-9.9zM4 20h16v2H4z" />
-								</svg>
-							</button>
-						)}
 						{canEditProjectName && isEditingProjectDesc && (
 							<div className="kanban-inline-edit-actions">
 								<button
@@ -1232,18 +1208,22 @@ function KanbanPage() {
 												</span>
 											);
 										})()}
+										<span className="tf-drag-handle" aria-hidden="true" title="Drag to move">
+											<svg viewBox="0 0 13 9" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+												<circle cx="2.5" cy="2" r="1.1" />
+												<circle cx="6.5" cy="2" r="1.1" />
+												<circle cx="10.5" cy="2" r="1.1" />
+												<circle cx="2.5" cy="7" r="1.1" />
+												<circle cx="6.5" cy="7" r="1.1" />
+												<circle cx="10.5" cy="7" r="1.1" />
+											</svg>
+										</span>
 									</div>
 
 									<div className="tf-status-line">
 										{(() => {
 											const statusClass = getStatusPillClass(columnName);
 											const statusLabel = statusClass === "pending" ? "To Review" : statusClass.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-											return (
-												<span className="tf-status-badge-line">
-													<span className="tf-status-prefix">Status •</span>{" "}
-													<span className={`pill ${statusClass}`}>{statusLabel}</span>
-												</span>
-											);
 										})()}
 									</div>
 
@@ -1487,4 +1467,3 @@ function KanbanPage() {
 }
 
 export default KanbanPage;
-

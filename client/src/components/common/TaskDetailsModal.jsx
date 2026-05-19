@@ -1409,22 +1409,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 aria-label="Task name"
                 onInput={(event) => setTaskTitleDraft(event.currentTarget.textContent || "")}
                 onKeyDown={handleTaskTitleKeyDown}
+                onClick={() => canEditTaskTitle && !isEditingTaskTitle && beginEditTaskTitle()}
               >
                 {isEditingTaskTitle ? null : (taskTitle || taskData.title || "Untitled task")}
               </h4>
-              {canEditTaskTitle && !isEditingTaskTitle && (
-                <button
-                  type="button"
-                  className="tdm-inline-edit-btn"
-                  onClick={beginEditTaskTitle}
-                  title="Edit task name"
-                  aria-label="Edit task name"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M14.06 3.4a2 2 0 0 1 2.83 0l3.7 3.7a2 2 0 0 1 0 2.83l-9.9 9.9-5.55 1.38 1.38-5.55 9.9-9.9zM4 20h16v2H4z" />
-                  </svg>
-                </button>
-              )}
               {canEditTaskTitle && isEditingTaskTitle && (
                 <div className="tdm-inline-edit-actions">
                   <button
@@ -1464,22 +1452,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 aria-label="Task description"
                 onInput={(event) => setTaskDescDraft(event.currentTarget.textContent || "")}
                 onKeyDown={handleTaskDescKeyDown}
+                onClick={() => canEditTaskTitle && !isEditingTaskDesc && beginEditTaskDesc()}
               >
                 {isEditingTaskDesc ? null : (taskDesc || taskData.description || "No description provided.")}
               </p>
-              {canEditTaskTitle && !isEditingTaskDesc && (
-                <button
-                  type="button"
-                  className="tdm-inline-edit-btn"
-                  onClick={beginEditTaskDesc}
-                  title="Edit task description"
-                  aria-label="Edit task description"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M14.06 3.4a2 2 0 0 1 2.83 0l3.7 3.7a2 2 0 0 1 0 2.83l-9.9 9.9-5.55 1.38 1.38-5.55 9.9-9.9zM4 20h16v2H4z" />
-                  </svg>
-                </button>
-              )}
               {canEditTaskTitle && isEditingTaskDesc && (
                 <div className="tdm-inline-edit-actions">
                   <button

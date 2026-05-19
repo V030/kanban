@@ -46,9 +46,15 @@ export default function AddTaskModal({
       return;
     }
 
+    const trimmedDescription = taskData.description.trim();
+    if (!trimmedDescription) {
+      toast.showValidationError("Task description is required");
+      return;
+    }
+
     const payload = {
       title: taskData.title.trim(),
-      description: taskData.description.trim(),
+      description: trimmedDescription,
       priority: taskData.priority || "unset",
       targetDate: taskData.targetDate || null,
       categoryId: taskData.categoryId || null,
@@ -104,13 +110,16 @@ export default function AddTaskModal({
             </div>
 
             <div className="form-group">
-              <label htmlFor="taskDescription">Description</label>
+              <label htmlFor="taskDescription">
+                Description <span className="required">*</span>
+              </label>
               <textarea
                 id="taskDescription"
                 name="description"
-                placeholder="Optional details"
+                placeholder="Enter task details"
                 value={taskData.description}
                 onChange={handleChange}
+                required
               ></textarea>
             </div>
 

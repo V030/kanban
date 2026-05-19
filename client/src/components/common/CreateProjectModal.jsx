@@ -30,6 +30,11 @@ export default function CreateProjectModal({
       return;
     }
 
+    if (!trimmedDescription) {
+      toast.showValidationError("Project description is required");
+      return;
+    }
+
     const tempId = `temp-project-${Date.now()}`;
     const optimisticProject = {
       id: tempId,
@@ -109,13 +114,16 @@ export default function CreateProjectModal({
             </div>
 
             <div className="form-group">
-              <label htmlFor="projectDescription">Description</label>
+              <label htmlFor="projectDescription">
+                Description <span className="required">*</span>
+              </label>
               <textarea
                 id="projectDescription"
                 name="description"
-                placeholder="Add a brief description (optional)"
+                placeholder="Add a brief description"
                 value={projectData.description}
                 onChange={handleChange}
+                required
               ></textarea>
             </div>
           </div>

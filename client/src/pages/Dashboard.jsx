@@ -398,81 +398,104 @@ function Dashboard() {
 
                     </div>
 
-                    <div className="focus-list">
-
-                        <div className="focus-row">
-
-                            <h4>
-                                Review project invites
-                            </h4>
-
-                            <p>
-                                {inviteCount > 0
-                                    ? `${inviteCount} invites need your response.`
-                                    : "No pending invites right now."}
-                            </p>
-
-                        </div>
-
-                        <div className="focus-row">
-
-                            <h4>
-                                Organize workflow updates
-                            </h4>
-
-                            <p>
-                                Keep task progression predictable
-                                with structured board management.
-                            </p>
-
-                        </div>
-
-                        <div className="focus-row">
-
-                            <h4>
-                                Coordinate with teammates
-                            </h4>
-
-                            <p>
-                                {friendCount > 0
-                                    ? `${friendCount} collaborators available in your network.`
-                                    : "Expand your network to collaborate faster."}
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                    <div className="quick-actions">
+                    <div className="focus-grid">
 
                         <button
                             type="button"
-                            className="btn btn-primary"
-                            onClick={() =>
-                                navigate("/main-page/kanban")
-                            }
+                            className="focus-tile focus-tile--primary"
+                            onClick={() => navigate("/main-page/kanban")}
                         >
-                            Open Current Board
+                            <span className="focus-tile__icon focus-tile__icon--teal" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="3" width="7" height="9" rx="1.5" />
+                                    <rect x="14" y="3" width="7" height="5" rx="1.5" />
+                                    <rect x="14" y="12" width="7" height="9" rx="1.5" />
+                                    <rect x="3" y="16" width="7" height="5" rx="1.5" />
+                                </svg>
+                            </span>
+                            <span className="focus-tile__label">Open Board</span>
+                            <span className="focus-tile__sub">Current project</span>
                         </button>
 
                         <button
                             type="button"
-                            className="btn btn-secondary"
-                            onClick={() =>
-                                navigate("/main-page/friends")
-                            }
+                            className="focus-tile"
+                            onClick={() => navigate("/main-page/my-tasks")}
                         >
-                            Manage Members
+                            <span className="focus-tile__icon focus-tile__icon--amber" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M9 11l3 3L22 4" />
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                                </svg>
+                            </span>
+                            <span className="focus-tile__label">My Tasks</span>
+                            <span className="focus-tile__sub">Review all</span>
                         </button>
 
                         <button
                             type="button"
-                            className="btn btn-secondary"
-                            onClick={() =>
-                                navigate("/main-page/my-tasks")
-                            }
+                            className="focus-tile"
+                            onClick={() => navigate("/main-page/projects")}
                         >
-                            Review My Tasks
+                            <span className="focus-tile__icon focus-tile__icon--purple" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                                </svg>
+                            </span>
+                            <span className="focus-tile__label">Projects</span>
+                            <span className="focus-tile__sub">All workspaces</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className="focus-tile"
+                            onClick={() => navigate("/main-page/friends")}
+                        >
+                            <span className="focus-tile__icon focus-tile__icon--blue" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                    <circle cx="9" cy="7" r="4" />
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                </svg>
+                            </span>
+                            <span className="focus-tile__label">Members</span>
+                            <span className="focus-tile__sub">
+                                {friendCount > 0 ? `${friendCount} in network` : "Manage team"}
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className="focus-tile"
+                            onClick={() => navigate("/main-page/notifications")}
+                        >
+                            <span className="focus-tile__icon focus-tile__icon--coral" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                                </svg>
+                            </span>
+                            <span className="focus-tile__label">Invites</span>
+                            <span className="focus-tile__sub">
+                                {inviteCount > 0 ? `${inviteCount} pending` : "No pending"}
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className="focus-tile"
+                            onClick={loadDashboard}
+                        >
+                            <span className="focus-tile__icon focus-tile__icon--green" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <polyline points="1 20 1 14 7 14" />
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                                </svg>
+                            </span>
+                            <span className="focus-tile__label">Refresh</span>
+                            <span className="focus-tile__sub">Sync data</span>
                         </button>
 
                     </div>

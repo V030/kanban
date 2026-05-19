@@ -732,6 +732,13 @@ export async function rejectTaskReview({ taskId, reviewerId, comment }) {
 
 
 export async function createTask(taskData) {
+  const description = (taskData?.taskDescription || taskData?.description || "").trim();
+  if (!description) {
+    const error = new Error("description is required");
+    error.code = "INVALID_DESCRIPTION";
+    throw error;
+  }
+
   const client = await pool.connect();
 
   try {
@@ -741,10 +748,10 @@ export async function createTask(taskData) {
     const categoryIdRaw = taskData?.categoryId ?? taskData?.category_id;
     const categoryId = Number(categoryIdRaw);
     const title = (taskData?.taskName || taskData?.title || "").trim();
-    const description = (taskData?.taskDescription || taskData?.description || "").trim();
     const createdBy = (taskData?.createdBy || taskData?.created_by || "").trim();
     const normalizedPriority = String(taskData?.priority || "").trim().toLowerCase();
     const targetDateRaw = taskData?.targetDate ?? taskData?.target_date ?? null;
+
 
     const access = await getProjectPermissionContext({ projectId, requesterId: createdBy });
     if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_create_task) {
@@ -858,6 +865,13 @@ export async function createTask(taskData) {
 }
 
 export async function createProject(projectData) {
+  const description = String(projectData?.description || "").trim();
+  if (!description) {
+    const error = new Error("description is required");
+    error.code = "INVALID_DESCRIPTION";
+    throw error;
+  }
+
   const client = await pool.connect();
 
   try {
@@ -871,7 +885,7 @@ export async function createProject(projectData) {
       `,
       [
         projectData.name,
-        projectData.description || null,
+        description,
         projectData.created_by,
         projectData.created_by,
       ]

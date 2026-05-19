@@ -19,7 +19,7 @@
 
   border: 1px solid rgba(176, 196, 216, 0.56);
 
-  min-height: 165px;
+  min-height: 0;
 
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
   
@@ -33,9 +33,15 @@
   z-index: 2;
 
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.dashboard-hero-content > div:first-child {
+  flex: 1 1 420px;
+  min-width: 0;
 }
 
 .dashboard-hero-glow {
@@ -104,6 +110,7 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .dashboard-hero-icon-button {
@@ -442,72 +449,26 @@
   color: #2dd4bf;
 }
 
-/* ───────────────── FOCUS ───────────────── */
+/* ───────────────── FOCUS GRID (DashboardTheme overrides) ───────────────── */
 
-.focus-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.focus-grid {
+  gap: 10px;
 }
 
-.focus-row {
-  padding: 18px;
-
-  border-radius: 20px;
-
-  border: 1px solid rgba(176, 196, 216, 0.56);
-
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
-  backdrop-filter: blur(2px);
-
-  outline: none;
-  box-shadow: none;
-
-  transition:
-    transform .2s ease,
-    border-color .2s ease,
-    box-shadow .2s ease,
-    background .2s ease;
+.focus-tile {
+  border-radius: 16px;
+  padding: 16px 14px 14px;
 }
 
-.focus-row:hover {
-  transform: translateY(-2px);
-
-  border-color: rgba(20,184,166,.50);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 249, 253, 0.98) 100%);
-
-  box-shadow: var(--shadow-md);
+.focus-tile__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
 }
 
-.focus-row:focus,
-.focus-row:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-.focus-row h4 {
-  margin: 0;
-
-  font-size: .95rem;
-  font-weight: 700;
-}
-
-.focus-row p {
-  margin-top: 8px;
-
-  color: var(--color-text-secondary);
-
-  font-size: .88rem;
-  line-height: 1.6;
-}
-
-/* ───────────────── QUICK ACTIONS ───────────────── */
-
-.quick-actions {
-  display: grid;
-  gap: 16px;
-
-  margin-top: 8px;
+.focus-tile__icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* ───────────────── METRICS STRIP ───────────────── */
@@ -558,8 +519,16 @@
 }
 
 @media (max-width: 720px) {
+  .dashboard-hero {
+    overflow: visible;
+  }
+
   .dashboard-hero-content {
     flex-direction: column;
+  }
+
+  .dashboard-hero-actions {
+    margin-left: 0;
   }
 
   .dashboard-stats {

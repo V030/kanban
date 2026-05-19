@@ -466,6 +466,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  cursor: pointer;
 }
 
 .tdm-task-title.is-editing {
@@ -507,22 +508,26 @@
 }
 
 .tdm-inline-edit-action-btn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
-  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.tdm-inline-edit-action-btn:hover {
+  opacity: 0.7;
 }
 
 .tdm-inline-edit-action-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   fill: currentColor;
 }
 
@@ -530,8 +535,16 @@
   color: var(--color-primary);
 }
 
+.tdm-inline-edit-save svg {
+  transform: scale(1.15);
+}
+
 .tdm-inline-edit-cancel {
   color: var(--color-text-secondary);
+}
+
+.tdm-inline-edit-cancel svg {
+  transform: scale(0.9);
 }
 
 .tdm-inline-edit-save,
@@ -639,6 +652,7 @@
   margin: 0;
   border: none;
   padding: 0;
+  cursor: pointer;
 }
 
 .tdm-task-description-editable.is-editing {

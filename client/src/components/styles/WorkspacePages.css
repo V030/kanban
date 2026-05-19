@@ -242,51 +242,86 @@
   max-width: 340px;
 }
 
-/* ── Focus list ── */
-.focus-list {
-  display: flex;
-  flex-direction: column;
+/* ── Focus grid ── */
+.focus-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
-.focus-row {
+.focus-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 13px 13px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
-  background: rgba(0,0,0,.018);
-  padding: 12px 14px;
-  transition: background 150ms ease, border-color 150ms ease;
+  border-radius: 12px;
+  background: var(--color-bg-surface);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 
-.focus-row:hover {
-  background: rgba(0,0,0,.035);
-  border-color: #c5d8e4;
+.focus-tile:hover {
+  background: rgba(0,0,0,.025);
+  border-color: rgba(20,184,166,.35);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0,0,0,.07);
 }
 
-.focus-row h4 {
-  margin: 0;
-  font-size: 0.875rem;
+.focus-tile:active {
+  transform: scale(0.97);
+}
+
+.focus-tile--primary {
+  border-color: rgba(20,184,166,.3);
+  background: rgba(20,184,166,.04);
+}
+
+.focus-tile--primary:hover {
+  background: rgba(20,184,166,.08);
+  border-color: rgba(20,184,166,.5);
+}
+
+.focus-tile__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.focus-tile__icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.focus-tile__icon--teal  { background: rgba(20,184,166,.13);  color: #0d9488; }
+.focus-tile__icon--amber { background: rgba(245,158,11,.13);  color: #b45309; }
+.focus-tile__icon--purple{ background: rgba(139,92,246,.13);  color: #7c3aed; }
+.focus-tile__icon--blue  { background: rgba(59,130,246,.13);  color: #1d4ed8; }
+.focus-tile__icon--coral { background: rgba(239,68,68,.11);   color: #dc2626; }
+.focus-tile__icon--green { background: rgba(34,197,94,.13);   color: #16a34a; }
+
+.focus-tile__label {
+  display: block;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--color-text-primary);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
-.focus-row p {
-  margin: 3px 0 0;
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
-  line-height: 1.45;
-}
-
-/* ── Quick actions ── */
-.quick-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.quick-actions .btn {
-  width: 100%;
-  justify-content: center;
+.focus-tile__sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.3;
+  font-weight: 500;
 }
 
 /* ── Pills ── */
@@ -1534,6 +1569,8 @@
 }
 
 @media (max-width: 760px) {
+  .focus-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
   .project-grid,
   .task-list-grid { grid-template-columns: 1fr; }
 

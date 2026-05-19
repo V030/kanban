@@ -44,6 +44,7 @@ const ERROR_MESSAGE_MAP = {
   'project name is required': 'Please enter a project name.',
   'project name is too long': 'Project name is too long. Please use a shorter name.',
   'project description is required': 'Please enter a project description.',
+  'task description is required': 'Please enter a task description.',
 
   // Task errors
   'task created successfully': 'Task created successfully!',

@@ -4,10 +4,16 @@ import { transformErrorMessage } from "../utils/errorTransformer";
 const API_URL = "http://localhost:5000";
 
 export async function createProject(projectData) {
-    return fetchWithAuth(`${API_URL}/auth/create-project`, {
-        method: "POST",
-        body: JSON.stringify(projectData),
-    });
+  const trimmedDescription = String(projectData?.description || "").trim();
+  if (!trimmedDescription) throw new Error("Please enter a project description.");
+
+  return fetchWithAuth(`${API_URL}/auth/create-project`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...projectData,
+      description: trimmedDescription,
+    }),
+  });
 }
 
 export async function getProjects() {
@@ -101,10 +107,16 @@ export async function createNewTaskCategory(project) {
 export async function createNewTask(taskContent) {
   const projectId = taskContent?.projectId;
   const categoryId = taskContent?.categoryId;
+  const trimmedDescription = String(taskContent?.description || taskContent?.taskDescription || "").trim();
+  if (!trimmedDescription) throw new Error("Please enter a task description.");
 
   return fetchWithAuth(`${API_URL}/auth/projects/${projectId}/${categoryId}/create-new-task`, {
     method: 'POST',
-    body: JSON.stringify(taskContent || {}),
+    body: JSON.stringify({
+      ...taskContent,
+      description: trimmedDescription,
+      taskDescription: trimmedDescription,
+    }),
   });
 }
 

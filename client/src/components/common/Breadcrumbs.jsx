@@ -1,0 +1,357 @@
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { getCurrentUser, getProfile } from "../../services/authService";
+import { getMemberProjects, getProjects, getTaskById } from "../../services/projectService";
+import "../styles/Breadcrumbs.css";
+
+function getUserFullName(user) {
+  if (!user) return "";
+  const first = user.firstName || user.first_name || "";
+  const last = user.lastName || user.last_name || "";
+  const fullName = `${first} ${last}`.trim();
+  return fullName || user.username || user.email || "";
+}
+
+function getProjectName(project) {
+  return project?.name || project?.title || "";
+}
+
+function getProjectId(project) {
+  return project?.id || project?.projectId || null;
+}
+
+function getTaskTitle(task) {
+  return task?.title || task?.name || "";
+}
+
+function isProjectMatch(project, id) {
+  return String(project?.id || project?.projectId || "") === String(id || "");
+}
+
+function findProjectInState(state, projectId) {
+  const stateProject = state?.project;
+  if (projectId && isProjectMatch(stateProject, projectId)) {
+    return stateProject;
+  }
+
+  const taskProject = state?.task?.project;
+  if (projectId && isProjectMatch(taskProject, projectId)) {
+    return taskProject;
+  }
+
+  if (!projectId) {
+    return stateProject || taskProject || null;
+  }
+
+  return null;
+}
+
+function shouldHideBreadcrumb(pathname) {
+  return pathname === "/main-page";
+}
+
+function shouldShowBackButton(pathname) {
+  return ![
+    "/main-page/dashboard",
+    "/main-page/projects",
+    "/main-page/friends",
+    "/main-page/notifications",
+    "/main-page/my-tasks",
+    "/main-page/profile",
+  ].includes(pathname);
+}
+
+export default function Breadcrumbs() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pathname = useMemo(() => {
+    if (!location.pathname) return "/";
+    if (location.pathname.length > 1 && location.pathname.endsWith("/")) {
+      return location.pathname.slice(0, -1);
+    }
+    return location.pathname;
+  }, [location.pathname]);
+
+  const [resolvedProjectName, setResolvedProjectName] = useState("");
+  const [resolvedProjectId, setResolvedProjectId] = useState("");
+  const [resolvedProject, setResolvedProject] = useState(null);
+  const [resolvedTaskTitle, setResolvedTaskTitle] = useState("");
+  const [resolvedProfileName, setResolvedProfileName] = useState("");
+  const [portalTarget, setPortalTarget] = useState(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function resolveDynamicLabels() {
+      const state = location.state || {};
+      const stateProject = findProjectInState(state);
+      const nextProjectName = getProjectName(stateProject);
+      const nextProjectId = getProjectId(stateProject);
+      const nextTaskTitle = getTaskTitle(state?.task);
+      const nextProfileName = getUserFullName(getCurrentUser());
+
+      if (isActive) {
+        setResolvedProjectName(nextProjectName);
+        setResolvedProjectId(nextProjectId ? String(nextProjectId) : "");
+        setResolvedProject(stateProject || null);
+        setResolvedTaskTitle(nextTaskTitle);
+        setResolvedProfileName(nextProfileName);
+      }
+
+      const projectIdMatch = pathname.match(/^\/main-page\/projects\/([^/]+)$/);
+      const projectId = projectIdMatch ? projectIdMatch[1] : null;
+      const isKanbanRoute = pathname === "/main-page/kanban";
+      const taskMatch = pathname.match(/^\/main-page\/kanban\/task\/([^/]+)$/);
+      const taskId = taskMatch ? taskMatch[1] : null;
+      const isProfileRoute = pathname === "/main-page/profile";
+
+      if (taskId) {
+        try {
+          const data = await getTaskById(taskId);
+          const task = data?.task || null;
+          const taskTitle = getTaskTitle(task);
+          const taskProject = task?.project || null;
+          const projectName = getProjectName(taskProject) || getProjectName(stateProject);
+          const projectId = getProjectId(taskProject) || getProjectId(stateProject) || task?.projectId || task?.project_id || null;
+
+          if (isActive) {
+            if (taskTitle) setResolvedTaskTitle(taskTitle);
+            if (projectName) setResolvedProjectName(projectName);
+            if (projectId) setResolvedProjectId(String(projectId));
+            if (taskProject) setResolvedProject(taskProject);
+          }
+        } catch (error) {
+          // Keep best-effort labels from location state/current cache.
+        }
+      }
+
+      if (projectId || isKanbanRoute) {
+        try {
+          const [ownedResult, memberResult] = await Promise.allSettled([
+            getProjects(),
+            getMemberProjects(),
+          ]);
+
+          const owned = ownedResult.status === "fulfilled" ? ownedResult.value?.projects || [] : [];
+          const member = memberResult.status === "fulfilled" ? memberResult.value?.projects || [] : [];
+          const allProjects = [...owned, ...member];
+
+          let selectedProject = null;
+
+          if (projectId) {
+            selectedProject = allProjects.find((project) => isProjectMatch(project, projectId)) || null;
+          } else {
+            selectedProject =
+              findProjectInState(state) ||
+              owned[0] ||
+              member[0] ||
+              null;
+          }
+
+          const projectName = getProjectName(selectedProject);
+          const projectId = getProjectId(selectedProject);
+          if (isActive && projectName) {
+            setResolvedProjectName(projectName);
+          }
+          if (isActive && projectId) {
+            setResolvedProjectId(String(projectId));
+          }
+          if (isActive && selectedProject) {
+            setResolvedProject(selectedProject);
+          }
+        } catch (error) {
+          // Keep best-effort labels from location state/current cache.
+        }
+      }
+
+      if (isProfileRoute && !nextProfileName) {
+        try {
+          const profile = await getProfile();
+          const profileUser = profile?.user || profile || null;
+          const fullName = getUserFullName(profileUser);
+          if (isActive && fullName) {
+            setResolvedProfileName(fullName);
+          }
+        } catch (error) {
+          // Keep fallback text for profile name.
+        }
+      }
+    }
+
+    resolveDynamicLabels();
+
+    return () => {
+      isActive = false;
+    };
+  }, [location.state, pathname]);
+
+  useEffect(() => {
+    let isActive = true;
+    let host = null;
+
+    const findAndAttach = () => {
+      if (!isActive) return;
+      const hero = document.querySelector(
+        ".content-inner .page-shell .workspace-hero, .content-inner .page-shell .dashboard-hero"
+      );
+
+      if (!hero) return false;
+
+      host = document.createElement("div");
+      host.className = "breadcrumb-portal-host";
+      hero.prepend(host);
+      setPortalTarget(host);
+      return true;
+    };
+
+    // try immediately, then a couple of times in case the target mounts slightly later
+    if (!findAndAttach()) {
+      let attempts = 0;
+      const maxAttempts = 4;
+      const retry = () => {
+        if (!isActive) return;
+        attempts += 1;
+        if (findAndAttach()) return;
+        if (attempts < maxAttempts) {
+          setTimeout(retry, 80);
+        }
+      };
+      setTimeout(retry, 80);
+    }
+
+    return () => {
+      isActive = false;
+      setPortalTarget(null);
+      if (host && host.parentNode) host.parentNode.removeChild(host);
+    };
+  }, [pathname]);
+
+  const segments = useMemo(() => {
+    if (!pathname.startsWith("/main-page") || shouldHideBreadcrumb(pathname)) {
+      return [];
+    }
+
+    if (pathname === "/main-page/dashboard") {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Dashboard" },
+      ];
+    }
+
+    if (pathname === "/main-page/notifications") {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Notifications" },
+      ];
+    }
+
+    if (pathname === "/main-page/my-tasks") {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "My Tasks" },
+      ];
+    }
+
+    if (pathname === "/main-page/friends") {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Friends" },
+      ];
+    }
+
+    if (pathname === "/main-page/projects") {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Projects" },
+      ];
+    }
+
+    const projectIdMatch = pathname.match(/^\/main-page\/projects\/([^/]+)$/);
+    if (projectIdMatch) {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Projects", to: "/main-page/projects" },
+        { label: resolvedProjectName || "Project" },
+      ];
+    }
+
+    if (pathname === "/main-page/kanban") {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Projects", to: "/main-page/projects" },
+        { label: resolvedProjectName || "Project" },
+      ];
+    }
+
+    const taskMatch = pathname.match(/^\/main-page\/kanban\/task\/([^/]+)$/);
+    if (taskMatch) {
+      const projectPath = resolvedProject
+        ? { pathname: "/main-page/kanban", state: { project: resolvedProject } }
+        : resolvedProjectId
+        ? `/main-page/projects/${resolvedProjectId}`
+        : "/main-page/kanban";
+
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Projects", to: "/main-page/projects" },
+        { label: resolvedProjectName || "Project", to: projectPath },
+        { label: resolvedTaskTitle || "Task" },
+      ];
+    }
+
+    if (pathname === "/main-page/profile") {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Profile", to: "/main-page/profile" },
+        { label: resolvedProfileName || "User" },
+      ];
+    }
+
+    return [];
+  }, [pathname, resolvedProfileName, resolvedProjectId, resolvedProjectName, resolvedTaskTitle]);
+
+  if (segments.length === 0 || !portalTarget) {
+    return null;
+  }
+
+  const breadcrumbMarkup = (
+    <nav className="global-breadcrumb" aria-label="Breadcrumb">
+      <ol className="breadcrumb-list">
+        {segments.map((segment, index) => {
+          const isLast = index === segments.length - 1;
+          const key = `${segment.label}-${index}`;
+
+          return (
+            <li key={key} className="breadcrumb-item">
+              {!isLast && segment.to ? (
+                <Link to={segment.to} className="breadcrumb-link">
+                  {segment.label}
+                </Link>
+              ) : (
+                <span className="breadcrumb-current" aria-current={isLast ? "page" : undefined}>
+                  {segment.label}
+                </span>
+              )}
+
+              {!isLast && <span className="breadcrumb-separator">/</span>}
+            </li>
+          );
+        })}
+      </ol>
+
+      {shouldShowBackButton(pathname) && (
+        <button
+          type="button"
+          className="breadcrumb-back-btn"
+          onClick={() => navigate(-1)}
+          aria-label="Go back"
+        >
+          {"<"}
+        </button>
+      )}
+    </nav>
+  );
+
+  return createPortal(breadcrumbMarkup, portalTarget);
+}

@@ -73,6 +73,10 @@ export async function createProject(req, res) {
     return res.status(400).json({ message: "Project name is required" });
   }
 
+  if (!projectDescription) {
+    return res.status(400).json({ message: "Project description is required" });
+  }
+
   if (projectName.length > 255) {
     return res.status(400).json({ message: "Project name is too long" });
   }
@@ -500,20 +504,16 @@ export async function createNewTask(req, res) {
     return res.status(400).json({ message: "categoryId parameter is required" });
   }
 
-  // console.log("Project ID: ", projectId);  
-  // console.log("Category ID: ",categoryId); 
-
-  						// ...payload,
-							// projectId: project?.id,
-							// categoryId: payload.categoryId || selectedCategoryId,
-							// taskName: payload.title,
-							// taskDescription: payload.description,
+  const taskDescription = (req.body.taskDescription || req.body.description || "").trim();
+  if (!taskDescription) {
+    return res.status(400).json({ message: "Task description is required" });
+  }
 
   const taskData = {
     projectId: req.body.projectId || projectId,
     categoryId: req.body.categoryId || categoryId,
     taskName: req.body.taskName || req.body.title,
-    taskDescription: req.body.taskDescription || req.body.description,
+    taskDescription,
     priority: req.body.priority,
     targetDate: req.body.targetDate ?? req.body.target_date ?? null,
     createdBy: req.user.userId,
