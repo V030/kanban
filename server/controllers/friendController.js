@@ -4,7 +4,9 @@ import { addFriend as addFriendModel,
          getIncomingFriendRequests as getMyFriendRequests,
          acceptFriendRequest as acceptFriendRequestModel,
          declineFriendRequest as declineFriendRequestModel,
-         cancelFriendRequest as cancelFriendRequestModel,
+          cancelFriendRequest as cancelFriendRequestModel,
+        removeFriend as removeFriendModel,
+        removeFriendByUserIds as removeFriendByUserIdsModel,
         } from "../models/friendModel.js";
 import { createNotification, getUserSummary } from "../models/notificationModel.js";
 
@@ -209,5 +211,38 @@ export async function cancelFriendRequest(req, res) {
 
     console.error("Cancel friend request error:", error);
     return res.status(500).json({ message: "Unable to cancel friend request." });
+  }
+}
+
+export async function removeFriend(req, res) {
+  const userId = req.user?.userId;
+  const { friendshipId } = req.params;
+
+  if (!userId) return res.status(401).json({ message: "Authentication required" });
+  if (!friendshipId) return res.status(400).json({ message: "Friendship ID is required" });
+
+  try {
+    let removed;
+
+    // If friendshipId looks like a numeric id, use the existing remove by id.
+    const asNumber = Number(friendshipId);
+    if (Number.isInteger(asNumber) && asNumber > 0) {
+      removed = await removeFriendModel({ friendshipId: asNumber, userId });
+    } else {
+      // Otherwise treat it as the other user's UUID and attempt to remove by user ids.
+      removed = await removeFriendByUserIdsModel({ userId, otherUserId: friendshipId });
+    }
+    return res.status(200).json({ message: "Friend removed", friendship: removed });
+  } catch (error) {
+    if (error?.code === "INVALID_FRIENDSHIP") {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error?.code === "FRIENDSHIP_NOT_FOUND") {
+      return res.status(404).json({ message: "Friendship not found." });
+    }
+
+    console.error("Remove friend error:", error);
+    return res.status(500).json({ message: "Unable to remove friend." });
   }
 }

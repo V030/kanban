@@ -69,11 +69,9 @@ function Dashboard() {
     ];
 
     const openProjectBoard = (project) => {
-        if (!project) return;
+        if (!project || !project.id) return;
 
-        navigate("/main-page/kanban", {
-            state: { project },
-        });
+        navigate(`/main-page/projects/${project.id}/kanban`);
     };
 
     const greetingName =

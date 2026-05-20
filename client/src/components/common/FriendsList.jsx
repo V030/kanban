@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
 
 function getFriendDisplayInitials(friend) {
@@ -7,7 +7,21 @@ function getFriendDisplayInitials(friend) {
   return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || (friend?.initials || "U");
 }
 
-function FriendsList({ friends = [] }) {
+function FriendsList({ friends = [], onUnfriend, pendingFriendRemovalId = "" }) {
+  const [openMenuId, setOpenMenuId] = useState("");
+  const menuWrapRef = useRef(null);
+
+  useEffect(() => {
+    const handleDocumentClick = (event) => {
+      if (!openMenuId) return;
+      if (event.target?.closest?.(".friend-more-menu-wrap")) return;
+      setOpenMenuId("");
+    };
+
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, [openMenuId]);
+
   if (friends.length === 0) {
     return (
       <div className="empty-state-card friends-empty-state">
@@ -46,7 +60,38 @@ function FriendsList({ friends = [] }) {
             </div>
           </div>
 
-          <button type="button" className="friend-more-btn" aria-label="More actions" disabled={friend.isPending}>...</button>
+          <div className="friend-more-menu-wrap" ref={openMenuId === String(friend.id) ? menuWrapRef : null}>
+            <button
+              type="button"
+              className="friend-more-btn"
+              aria-label="More actions"
+              aria-expanded={openMenuId === String(friend.id)}
+              aria-haspopup="menu"
+              onClick={() => {
+                setOpenMenuId((current) => (current === String(friend.id) ? "" : String(friend.id)));
+              }}
+              disabled={friend.isPending || pendingFriendRemovalId === String(friend.id)}
+            >
+              ...
+            </button>
+
+            {openMenuId === String(friend.id) && (
+              <div className="friend-more-menu" role="menu" aria-label={`Actions for ${friend.name || friend.email || "friend"}`}>
+                <button
+                  type="button"
+                  className="friend-more-menu-item friend-more-menu-item--danger"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpenMenuId("");
+                    onUnfriend?.(friend);
+                  }}
+                  disabled={pendingFriendRemovalId === String(friend.id)}
+                >
+                  {pendingFriendRemovalId === String(friend.id) ? "Removing..." : "Unfriend"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       ))}
     </div>

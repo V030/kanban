@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useToast } from "../hooks/useToast";
 import FriendsList from "../components/common/FriendsList";
 import IncomingFriendRequests from "../components/common/IncomingFriendRequests";
 import SentFriendRequests from "../components/common/SentFriendRequests";
 import AddFriendsModal from "../components/common/AddFriendsModal";
 import { SkeletonAvatarWithText } from "../components/common/SkeletonComponents";
-import { getFriends, getSentFriendRequests, getFriendRequests } from "../services/friendService";
+import { getFriends, getSentFriendRequests, getFriendRequests, removeFriend } from "../services/friendService";
+import ConfirmModal from "../components/common/ConfirmModal";
 import "../components/styles/FriendsPage.css";
 import "../components/styles/SkeletonLoading.css";
 
@@ -18,8 +19,11 @@ function Friends() {
   const [myFriendRequests, setMyFriendRequests] = useState([]);
 
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [pendingFriendRemovalId, setPendingFriendRemovalId] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [candidateFriend, setCandidateFriend] = useState(null);
 
-  const loadFriends = async (options = {}) => {
+  const loadFriends = useCallback(async (options = {}) => {
     const silent = options.silent === true;
     if (!silent) {
       setFriendsLoading(true);
@@ -29,6 +33,11 @@ function Friends() {
       const data = await getFriends();
       const mappedFriends = (data.friends || []).map((friend) => ({
         id: friend.id,
+        friendshipId: (() => {
+          const raw = friend.friendshipId || friend.friendship_id || null;
+          const n = Number(raw);
+          return Number.isInteger(n) && n > 0 ? n : null;
+        })(),
         initials: `${(friend.firstName || "").charAt(0)}${(friend.lastName || "").charAt(0)}`.toUpperCase(),
         name: `${friend.firstName || ""} ${friend.lastName || ""}`.trim(),
         email: friend.email,
@@ -42,31 +51,31 @@ function Friends() {
         setFriendsLoading(false);
       }
     }
-  };
+  }, [toast]);
 
-  useEffect(() => { loadFriends(); }, []);
+  useEffect(() => { loadFriends(); }, [loadFriends]);
 
-  const loadSentFriendRequests = async () => {
+  const loadSentFriendRequests = useCallback(async () => {
     try {
       const data = await getSentFriendRequests();
       setSentFriendRequests(data.sentFriendRequests || []);
     } catch (err) {
       toast.showError(err.message || "Failed to load sent requests");
     }
-  };
+  }, [toast]);
 
-  useEffect(() => { loadSentFriendRequests(); }, []);
+  useEffect(() => { loadSentFriendRequests(); }, [loadSentFriendRequests]);
 
-  const loadIncomingFriendRequests = async () => {
+  const loadIncomingFriendRequests = useCallback(async () => {
     try {
       const data = await getFriendRequests();
       setMyFriendRequests(data.myFriendRequests || []);
     } catch (err) {
       toast.showError(err.message || "Failed to load friend requests");
     }
-  };
+  }, [toast]);
 
-  useEffect(() => { loadIncomingFriendRequests(); }, []);
+  useEffect(() => { loadIncomingFriendRequests(); }, [loadIncomingFriendRequests]);
 
   useEffect(() => {
     const handleRealtime = (event) => {
@@ -82,7 +91,7 @@ function Friends() {
 
     window.addEventListener("notifications:push", handleRealtime);
     return () => window.removeEventListener("notifications:push", handleRealtime);
-  }, []);
+  }, [loadFriends, loadSentFriendRequests, loadIncomingFriendRequests]);
 
   const handleFriendRequestCreated = async () => {
     await loadFriends({ silent: true });
@@ -106,6 +115,43 @@ function Friends() {
   const handleFriendRollback = (tempId) => {
     if (!tempId) return;
     setFriends((prev) => (prev || []).filter((item) => String(item?.id) !== String(tempId)));
+  };
+
+  // Open confirmation modal for unfriend
+  const handleUnfriend = (friend) => {
+    if (!friend) return;
+    setCandidateFriend(friend);
+    setConfirmOpen(true);
+  };
+
+  const performUnfriend = async () => {
+    const friend = candidateFriend;
+    setConfirmOpen(false);
+    setCandidateFriend(null);
+    const fid = friend?.friendshipId != null ? Number(friend.friendshipId) : null;
+
+    let target = null;
+    if (fid && Number.isInteger(fid) && fid > 0) {
+      target = fid;
+    } else if (friend?.id && String(friend.id).includes("-")) {
+      // Fallback: treat friend.id as UUID and call delete with that param
+      target = friend.id;
+    } else {
+      toast.showError("Unable to remove this friend right now (invalid friendship id).");
+      return;
+    }
+
+    setPendingFriendRemovalId(String(friend.id || target));
+
+    try {
+      await removeFriend(target);
+      toast.showSuccess("Friend removed successfully.");
+      await loadFriends({ silent: true });
+    } catch (err) {
+      toast.showError(err.message || "Failed to remove friend");
+    } finally {
+      setPendingFriendRemovalId("");
+    }
   };
 
   const handleOptimisticSentCreate = (request) => {
@@ -181,7 +227,11 @@ function Friends() {
                 <SkeletonAvatarWithText />
               </div>
             ) : (
-              <FriendsList friends={friends} />
+              <FriendsList
+                friends={friends}
+                onUnfriend={handleUnfriend}
+                pendingFriendRemovalId={pendingFriendRemovalId}
+              />
             )
           ) : (
             <div className="requests-grid">
@@ -226,6 +276,16 @@ function Friends() {
         onOptimisticCreate={handleOptimisticSentCreate}
         onCreateResolved={handleSentCreateResolved}
         onCreateFailed={handleSentCreateFailed}
+      />
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Remove Friend"
+        message={`Remove ${candidateFriend?.name || "this friend"} from your friends list?`}
+        confirmLabel="Unfriend"
+        cancelLabel="Cancel"
+        onConfirm={performUnfriend}
+        onCancel={() => { setConfirmOpen(false); setCandidateFriend(null); }}
       />
     </section>
   );

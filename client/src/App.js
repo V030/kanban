@@ -87,9 +87,12 @@ function App() {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="projects" element={<Projects />} />
-              <Route path="kanban" element={<KanbanPage />} />
-              <Route path="metrics" element={<Metrics />} />
-              <Route path="kanban/task/:taskId" element={<TaskDetailsPage />} />
+              <Route path="projects/:projectId" element={<KanbanPage />} />
+              <Route path="projects/:projectId/kanban" element={<KanbanPage />} />
+              <Route path="projects/:projectId/kanban/tasks/:taskId" element={<TaskDetailsPage />} />
+              <Route path="projects/:projectId/tasks" element={<KanbanPage />} />
+              <Route path="projects/:projectId/settings" element={<KanbanPage />} />
+              <Route path="projects/:projectId/metrics" element={<Metrics />} />
               <Route path="friends" element={<Friends />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="my-tasks" element={<MyTasks />} />

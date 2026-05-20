@@ -64,6 +64,7 @@ import {
 	acceptFriendRequest,
 	declineFriendRequest,
 	cancelFriendRequest,
+	removeFriend,
 } from "../controllers/friendController.js";
 
 import {
@@ -103,6 +104,7 @@ router.get("/projects/other-projects", authenticateToken, authenticatedLimiter, 
 router.get("/projects/:projectId/members", authenticateToken, authenticatedLimiter, getProjectMembers);
 router.post("/friends", authenticateToken, inviteLimiter, addFriend);
 router.get("/friends", authenticateToken, authenticatedLimiter, getFriends);
+router.delete("/friends/:friendshipId", authenticateToken, authenticatedLimiter, removeFriend);
 router.get("/friends/sent", authenticateToken, authenticatedLimiter, getSentFriendRequests);
 router.get("/friends/incoming", authenticateToken, authenticatedLimiter, getIncomingFriendRequests);
 router.patch("/friends/requests/:requestId/accept", authenticateToken, inviteLimiter, acceptFriendRequest);

@@ -1,5 +1,4 @@
 import { fetchWithAuth } from "./authService";
-import { transformErrorMessage } from "../utils/errorTransformer";
 
 const API_URL = "http://localhost:5000";
 
@@ -14,6 +13,16 @@ export async function getFriends() {
     return fetchWithAuth(`${API_URL}/auth/friends`, {
         method: "GET",
     });
+}
+
+export async function removeFriend(friendshipId) {
+  if (!friendshipId) {
+    throw new Error("Friendship ID is required.");
+  }
+
+  return fetchWithAuth(`${API_URL}/auth/friends/${friendshipId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function getSentFriendRequests() {

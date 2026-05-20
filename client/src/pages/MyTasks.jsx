@@ -182,13 +182,13 @@ function MyTasks() {
     );
 
     const openTask = (task) => {
-        if (!task?.id) return;
-        navigate(`/main-page/kanban/task/${task.id}`, { state: { task, project: task.project } });
+        if (!task?.id || !task?.project?.id) return;
+        navigate(`/main-page/projects/${task.project.id}/kanban/tasks/${task.id}`);
     };
 
     const openProject = (project) => {
         if (!project?.id) return;
-        navigate("/main-page/kanban", { state: { project } });
+        navigate(`/main-page/projects/${project.id}/kanban`);
     };
 
     return (

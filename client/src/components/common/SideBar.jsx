@@ -151,10 +151,9 @@ export default function SideBar () {
                                         key={item.to}
                                         to={item.to}
                                         className={({ isActive }) => {
-                                            // Keep Projects highlighted when user opens a project (which navigates to /main-page/kanban with project in state)
+                                            // Keep Projects highlighted when user opens a project (which navigates to /main-page/projects/:projectId/kanban)
                                             if (item.to === "/main-page/projects") {
-                                                const isProjectActive = location.pathname.startsWith("/main-page/projects") ||
-                                                    (location.pathname === "/main-page/kanban" && location.state && location.state.project);
+                                                const isProjectActive = location.pathname.startsWith("/main-page/projects");
                                                 return isProjectActive ? "nav-btn active" : "nav-btn";
                                             }
                                             return isActive ? "nav-btn active" : "nav-btn";

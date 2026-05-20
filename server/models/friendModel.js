@@ -349,3 +349,73 @@ export async function cancelFriendRequest({ requestId, userId }) {
 
 	return result.rows[0];
 }
+
+export async function removeFriend({ friendshipId, userId }) {
+	const normalizedFriendshipId = Number(friendshipId);
+	const normalizedUserId = (userId || "").trim();
+
+	if (!Number.isInteger(normalizedFriendshipId) || normalizedFriendshipId <= 0) {
+		const error = new Error("friendshipId is required");
+		error.code = "INVALID_FRIENDSHIP";
+		throw error;
+	}
+
+	if (!normalizedUserId) {
+		const error = new Error("userId is required");
+		error.code = "INVALID_USER";
+		throw error;
+	}
+
+	const result = await pool.query(
+		`
+		DELETE FROM friends
+		WHERE id = $1::int
+		  AND (user1_id = $2::uuid OR user2_id = $2::uuid)
+		RETURNING id, user1_id, user2_id, created_at
+		`,
+		[normalizedFriendshipId, normalizedUserId]
+	);
+
+	if (result.rows.length === 0) {
+		const error = new Error("Friendship not found");
+		error.code = "FRIENDSHIP_NOT_FOUND";
+		throw error;
+	}
+
+	return result.rows[0];
+}
+
+export async function removeFriendByUserIds({ userId, otherUserId }) {
+	const normalizedUserId = (userId || "").trim();
+	const normalizedOtherUserId = (otherUserId || "").trim();
+
+	if (!normalizedUserId) {
+		const error = new Error("userId is required");
+		error.code = "INVALID_USER";
+		throw error;
+	}
+
+	if (!normalizedOtherUserId) {
+		const error = new Error("otherUserId is required");
+		error.code = "INVALID_OTHER_USER";
+		throw error;
+	}
+
+	const result = await pool.query(
+		`
+		DELETE FROM friends
+		WHERE user1_id = LEAST($1::uuid, $2::uuid)
+			AND user2_id = GREATEST($1::uuid, $2::uuid)
+		RETURNING id, user1_id, user2_id, created_at
+		`,
+		[normalizedUserId, normalizedOtherUserId]
+	);
+
+	if (result.rows.length === 0) {
+		const error = new Error("Friendship not found");
+		error.code = "FRIENDSHIP_NOT_FOUND";
+		throw error;
+	}
+
+	return result.rows[0];
+}

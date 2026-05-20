@@ -91,6 +91,7 @@ export default function Breadcrumbs() {
       const nextTaskTitle = getTaskTitle(state?.task);
       const nextProfileName = getUserFullName(getCurrentUser());
 
+      // First, set whatever we can get from location.state
       if (isActive) {
         setResolvedProjectName(nextProjectName);
         setResolvedProjectId(nextProjectId ? String(nextProjectId) : "");
@@ -99,12 +100,17 @@ export default function Breadcrumbs() {
         setResolvedProfileName(nextProfileName);
       }
 
-      const projectIdMatch = pathname.match(/^\/main-page\/projects\/([^/]+)$/);
-      const projectId = projectIdMatch ? projectIdMatch[1] : null;
-      const isKanbanRoute = pathname === "/main-page/kanban";
-      const taskMatch = pathname.match(/^\/main-page\/kanban\/task\/([^/]+)$/);
-      const taskId = taskMatch ? taskMatch[1] : null;
+      const projectKanbanMatch = pathname.match(/^\/main-page\/projects\/([^/]+)(?:\/kanban)?$/);
+      const metricsMatch = pathname.match(/^\/main-page\/projects\/([^/]+)\/metrics$/);
+      const extractedProjectId = projectKanbanMatch ? projectKanbanMatch[1] : (metricsMatch ? metricsMatch[1] : null);
+      const taskMatch = pathname.match(/^\/main-page\/projects\/([^/]+)\/kanban\/tasks\/([^/]+)$/);
+      const taskId = taskMatch ? taskMatch[2] : null;
       const isProfileRoute = pathname === "/main-page/profile";
+
+      // If we already have a project name from state, skip the API fetch
+      if (nextProjectName && !taskId) {
+        return;
+      }
 
       if (taskId) {
         try {
@@ -126,8 +132,9 @@ export default function Breadcrumbs() {
         }
       }
 
-      if (projectId || isKanbanRoute) {
+      if (extractedProjectId) {
         try {
+          // Fetch all projects and search for the matching one
           const [ownedResult, memberResult] = await Promise.allSettled([
             getProjects(),
             getMemberProjects(),
@@ -137,27 +144,16 @@ export default function Breadcrumbs() {
           const member = memberResult.status === "fulfilled" ? memberResult.value?.projects || [] : [];
           const allProjects = [...owned, ...member];
 
-          let selectedProject = null;
+          const selectedProject = allProjects.find((project) => isProjectMatch(project, extractedProjectId)) || null;
 
-          if (projectId) {
-            selectedProject = allProjects.find((project) => isProjectMatch(project, projectId)) || null;
-          } else {
-            selectedProject =
-              findProjectInState(state) ||
-              owned[0] ||
-              member[0] ||
-              null;
-          }
-
-          const projectName = getProjectName(selectedProject);
-          const projectId = getProjectId(selectedProject);
-          if (isActive && projectName) {
-            setResolvedProjectName(projectName);
-          }
-          if (isActive && projectId) {
-            setResolvedProjectId(String(projectId));
-          }
-          if (isActive && selectedProject) {
+          if (selectedProject && isActive) {
+            const projectName = getProjectName(selectedProject);
+            const projectId = getProjectId(selectedProject);
+            // Always update state, even if projectName is empty
+            setResolvedProjectName(projectName || "Project");
+            if (projectId) {
+              setResolvedProjectId(String(projectId));
+            }
             setResolvedProject(selectedProject);
           }
         } catch (error) {
@@ -267,8 +263,9 @@ export default function Breadcrumbs() {
       ];
     }
 
-    const projectIdMatch = pathname.match(/^\/main-page\/projects\/([^/]+)$/);
-    if (projectIdMatch) {
+    // Match /main-page/projects/:projectId or /main-page/projects/:projectId/kanban
+    const projectKanbanMatch = pathname.match(/^\/main-page\/projects\/([^/]+)(?:\/kanban)?$/);
+    if (projectKanbanMatch) {
       return [
         { label: "Main Page", to: "/main-page/dashboard" },
         { label: "Projects", to: "/main-page/projects" },
@@ -276,27 +273,28 @@ export default function Breadcrumbs() {
       ];
     }
 
-    if (pathname === "/main-page/kanban") {
-      return [
-        { label: "Main Page", to: "/main-page/dashboard" },
-        { label: "Projects", to: "/main-page/projects" },
-        { label: resolvedProjectName || "Project" },
-      ];
-    }
-
-    const taskMatch = pathname.match(/^\/main-page\/kanban\/task\/([^/]+)$/);
+    // Match /main-page/projects/:projectId/kanban/tasks/:taskId
+    const taskMatch = pathname.match(/^\/main-page\/projects\/([^/]+)\/kanban\/tasks\/([^/]+)$/);
     if (taskMatch) {
-      const projectPath = resolvedProject
-        ? { pathname: "/main-page/kanban", state: { project: resolvedProject } }
-        : resolvedProjectId
-        ? `/main-page/projects/${resolvedProjectId}`
-        : "/main-page/kanban";
+      const projectId = taskMatch[1];
+      const projectPath = `/main-page/projects/${projectId}/kanban`;
 
       return [
         { label: "Main Page", to: "/main-page/dashboard" },
         { label: "Projects", to: "/main-page/projects" },
         { label: resolvedProjectName || "Project", to: projectPath },
         { label: resolvedTaskTitle || "Task" },
+      ];
+    }
+
+    // Match /main-page/projects/:projectId/metrics
+    const metricsMatch = pathname.match(/^\/main-page\/projects\/([^/]+)\/metrics$/);
+    if (metricsMatch) {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Projects", to: "/main-page/projects" },
+        { label: resolvedProjectName || "Project", to: `/main-page/projects/${metricsMatch[1]}/kanban` },
+        { label: "Metrics" },
       ];
     }
 

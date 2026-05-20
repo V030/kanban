@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import KanbanBoard from "../components/common/KanbanBoard";
 import AddTaskModal from "../components/common/AddTaskModal";
@@ -12,7 +12,7 @@ import "../components/styles/ColumnsReorderModal.css";
 import "../components/styles/SkeletonLoading.css";
 import "../components/styles/WorkspacePages.css";
 import { getCurrentUser } from "../services/authService";
-import { getProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, approveTaskReview, rejectTaskReview, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
+import { getProjects, getMemberProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, approveTaskReview, rejectTaskReview, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
 
 const DEFAULT_TASK_PERMISSIONS = {
@@ -129,8 +129,13 @@ const demoColumns = [
 function KanbanPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
+	const { projectId: routeProjectId } = useParams();
 	const toast = useToast();
-	const [project, setProject] = useState(location.state?.project || null);
+	
+	// Prefer route params over location.state
+	const initialProject = location.state?.project || null;
+	const [project, setProject] = useState(initialProject && !routeProjectId ? initialProject : null);
+	const [projectId, setProjectId] = useState(routeProjectId || (initialProject?.id || null));
 	const [taskCategories, setTaskCategories] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [reorderOpen, setReorderOpen] = useState(false);
@@ -207,14 +212,14 @@ function KanbanPage() {
 	}, [columnsForBoard]);
 
 	const loadTaskCategories = useCallback(async (options = {}) => {
-		if (!project?.id) return;
+		if (!projectId) return;
 		const silent = options.silent === true;
 		if (!silent) {
 			setLoading(true);
 		}
 
 		try {
-			const data = await getTaskCategories(project.id);
+			const data = await getTaskCategories(projectId);
 			setTaskCategories(data.categories || []);
 		} catch (err) {
 			toast.showError(err?.message || "Error fetching task categories for this project.");
@@ -223,15 +228,15 @@ function KanbanPage() {
 				setLoading(false);
 			}
 		}
-	}, [project?.id, toast]);
+	}, [projectId, toast]);
 
 	const loadProjectMembers = useCallback(async () => {
-		if (!project?.id) return;
+		if (!projectId) return;
 
 		setMembersLoading(true);
 
 		try {
-			const data = await getProjectMembers(project.id);
+			const data = await getProjectMembers(projectId);
 			setProjectMembers(data.members || []);
 		} catch (membersRequestError) {
 			toast.showError(membersRequestError?.message || "Unable to load project members.");
@@ -239,52 +244,92 @@ function KanbanPage() {
 		} finally {
 			setMembersLoading(false);
 		}
-	}, [project?.id, toast]);
+	}, [projectId, toast]);
 
 	const loadProjectSettings = useCallback(async () => {
-		if (!project?.id) return;
+		if (!projectId) return;
 
 		try {
-			const settings = await getProjectSettings(project.id);
+			const settings = await getProjectSettings(projectId);
 			setTaskPermissions({ ...DEFAULT_TASK_PERMISSIONS, ...settings });
 		} catch (settingsError) {
 			toast.showError(settingsError?.message || "Unable to load project settings.");
 			setTaskPermissions(DEFAULT_TASK_PERMISSIONS);
 		}
-	}, [project?.id]);
+	}, [projectId]);
 
 	useEffect(() => {
-		if (location.state?.project) {
-			setProject(location.state.project);
+		if (!projectId) {
+			// If no projectId in route or state, try to load first available project
+			(async () => {
+				try {
+					const data = await getProjects();
+					const myProjects = data.projects || [];
+					if (myProjects.length > 0) {
+						const firstProject = myProjects[0];
+						setProjectId(firstProject.id);
+						setProject(firstProject);
+					}
+				} catch (err) {
+					console.error("Unable to load projects for Kanban fallback:", err);
+				}
+			})();
 			return;
 		}
 
-		// Fallback: fetch user's projects and pick the first available
+		// If projectId is in route params, use it to load/construct project context
+		if (routeProjectId) {
+			// First, try to use project from location.state if it matches the route projectId
+			if (location.state?.project && String(location.state.project.id) === String(routeProjectId)) {
+				setProject(location.state.project);
+				return;
+			}
+
+			// Otherwise, construct a minimal project object with just the ID
+			// The full context will be loaded via project members and categories calls
+			setProject({ id: routeProjectId });
+		}
+	}, [projectId, routeProjectId, location.state]);
+
+	// Fetch full project details when projectId comes from route params
+	useEffect(() => {
+		if (!routeProjectId || project?.name) return; // Skip if we already have project name
+		
 		(async () => {
 			try {
-				const data = await getProjects();
-				const myProjects = data.projects || [];
-				if (myProjects.length > 0) setProject(myProjects[0]);
+				const [ownedResult, memberResult] = await Promise.allSettled([
+					getProjects(),
+					getMemberProjects()
+				]);
+				
+				const owned = ownedResult.status === "fulfilled" ? ownedResult.value?.projects || [] : [];
+				const member = memberResult.status === "fulfilled" ? memberResult.value?.projects || [] : [];
+				const allProjects = [...owned, ...member];
+				
+				const matchedProject = allProjects.find(p => String(p.id) === String(routeProjectId));
+				if (matchedProject && matchedProject.name) {
+					setProject(matchedProject);
+				}
 			} catch (err) {
-				// Fallback load failed - show cached data or empty state
-				console.error("Unable to load projects for Kanban fallback:", err);
+				console.error("Unable to fetch project details:", err);
+				// Keep the minimal project object with just the ID
 			}
 		})();
-	}, [location.state]);
+	}, [routeProjectId, project?.name]);
 
 	// load categories whenever the selected project changes
 	useEffect(() => {
-		if (!project) return;
+		if (!projectId) return;
 		loadTaskCategories();
-	}, [project, loadTaskCategories]);
+	}, [projectId, loadTaskCategories]);
 
 	useEffect(() => {
-		if (!project) return;
+		if (!projectId) return;
 		loadProjectMembers();
-	}, [project, loadProjectMembers]);
+	}, [projectId, loadProjectMembers]);
 
 	useEffect(() => {
-		if (!project?.id) {
+		if (!projectId) {
 			setTaskPermissions(DEFAULT_TASK_PERMISSIONS);
 			setLocalTaskAssignees({});
 			setProjectMembers([]);
@@ -298,7 +343,7 @@ function KanbanPage() {
 
 		setLocalTaskAssignees({});
 		
-	}, [project, loadProjectSettings]);
+	}, [projectId, loadProjectSettings]);
 
 	useEffect(() => {
 		taskCategoriesRef.current = taskCategories;
@@ -1100,7 +1145,7 @@ function KanbanPage() {
 					</button>
 					<button
 						className="kanban-icon-btn"
-						onClick={() => navigate("/main-page/metrics", { state: { project } })}
+						onClick={() => navigate(`/main-page/projects/${projectId}/metrics`)}
 						title="Metrics"
 						aria-label="Metrics"
 					>
@@ -1148,7 +1193,7 @@ function KanbanPage() {
 					canDragTask={canDragTask}
 					onTaskClick={(task) => {
 						if (pendingTaskActions[String(task?.id)] || task?.isPending) return;
-						navigate(`/main-page/kanban/task/${task.id}`, { state: { task, project, projectMembers, isAdminOrOwner, canMembersAssignTaskToOthers, canMembersReviewTasks, canMembersMoveTaskToDone } });
+						navigate(`/main-page/projects/${projectId}/kanban/tasks/${task.id}`);
 					}}
 					showAddTaskButton={canCreateTask}
 					onTaskDrop={handleTaskDrop}

@@ -33,7 +33,7 @@ import "../components/styles/SkeletonLoading.css";
 export default function TaskDetailsPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { taskId } = useParams();
+  const { taskId, projectId } = useParams();
   const toast = useToast();
 
   const initialTask = location.state?.task || null;
@@ -77,29 +77,32 @@ export default function TaskDetailsPage() {
   }, [currentUser?.id, hasInitialIsAdmin]);
 
   useEffect(() => {
-    if (!project?.id) return;
-    loadMembers(project.id);
-  }, [project?.id, loadMembers]);
+    const projectIdToUse = projectId || project?.id;
+    if (!projectIdToUse) return;
+    loadMembers(projectIdToUse);
+  }, [projectId, project?.id, loadMembers]);
 
   useEffect(() => {
-    if (!project?.id) return;
+    const projectIdToUse = projectId || project?.id;
+    if (!projectIdToUse) return;
 
     (async () => {
       try {
-        const data = await getTaskCategories(project.id);
+        const data = await getTaskCategories(projectIdToUse);
         setTaskCategories(Array.isArray(data?.categories) ? data.categories : []);
       } catch (err) {
         setTaskCategories([]);
       }
     })();
-  }, [project?.id]);
+  }, [projectId, project?.id]);
 
   useEffect(() => {
-    if (!project?.id) return;
+    const projectIdToUse = projectId || project?.id;
+    if (!projectIdToUse) return;
 
     (async () => {
       try {
-        const settings = await getProjectSettings(project.id);
+        const settings = await getProjectSettings(projectIdToUse);
         const nextCanAssign = !!settings?.allow_assign_task_to_member;
         const nextCanReview = !!settings?.allow_member_review;
         const nextCanMoveDone = !!settings?.allow_member_move_task_to_done;
@@ -124,7 +127,7 @@ export default function TaskDetailsPage() {
         }
       }
     })();
-  }, [project?.id, hasInitialCanAssign, hasInitialCanMoveDone, hasInitialCanReview]);
+  }, [projectId, project?.id, hasInitialCanAssign, hasInitialCanMoveDone, hasInitialCanReview]);
 
   const loadTaskById = useCallback(async (id, options = {}) => {
     const silent = options.silent === true;
@@ -139,6 +142,13 @@ export default function TaskDetailsPage() {
       if (!found) {
         toast.showNotFound("Task not found.");
       } else {
+        // Validate that the task's project matches the route's projectId if provided
+        const taskProjectId = found.project?.id || found.projectId;
+        if (projectId && String(taskProjectId) !== String(projectId)) {
+          toast.showError("This task does not belong to the selected project.");
+          return;
+        }
+
         setTask(found);
         setProject((prev) => prev || found.project || (found.projectId ? { id: found.projectId } : null));
         if (!hasInitialIsAdmin) {
@@ -156,7 +166,7 @@ export default function TaskDetailsPage() {
         setTaskLoading(false);
       }
     }
-  }, [hasInitialCanAssign, hasInitialIsAdmin, toast]);
+  }, [hasInitialCanAssign, hasInitialIsAdmin, projectId, toast]);
 
   useEffect(() => {
     if (!taskId) return;
@@ -244,8 +254,9 @@ export default function TaskDetailsPage() {
     if (!tId) return;
     await deleteTask(tId);
 
-    if (project?.id) {
-      navigate("/main-page/kanban", { state: { project }, replace: true });
+    if (projectId || project?.id) {
+      const pId = projectId || project.id;
+      navigate(`/main-page/projects/${pId}/kanban`, { replace: true });
       return;
     }
 

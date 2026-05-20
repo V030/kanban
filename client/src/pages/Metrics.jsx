@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import "../components/styles/Metrics.css";
 import "../components/styles/SkeletonLoading.css";
@@ -259,11 +259,12 @@ function KpiCard({ title, value, trend, trendTone = "neutral", meta }) {
 
 export default function Metrics() {
   const location = useLocation();
+  const { projectId: routeProjectId } = useParams();
   const toast = useToast();
   const isMountedRef = useRef(true);
 
-  const [projectId, setProjectId] = useState(location.state?.project?.id || null);
-  const [projectName, setProjectName] = useState(location.state?.project?.name || "");
+  const [projectId, setProjectId] = useState(routeProjectId || null);
+  const [projectName, setProjectName] = useState("");
   const [windowDays, setWindowDays] = useState(30);
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);

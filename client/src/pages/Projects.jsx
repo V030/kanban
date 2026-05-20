@@ -77,7 +77,8 @@ function Projects() {
     };
 
     const openKanban = (project) => {
-      navigate("/main-page/kanban", { state: { project } });
+      if (!project || !project.id) return;
+      navigate(`/main-page/projects/${project.id}/kanban`);
     };
 
     const formatDate = (dateStr) => {
