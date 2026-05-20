@@ -62,6 +62,28 @@ Key rules:
 - getProjectPermissionContext resolves project membership plus settings.
 - getTaskPermissionContext resolves task access through the task’s project.
 
+## Realtime Flow
+
+The application uses the existing SSE notification stream as its realtime transport.
+
+Flow:
+
+1. The controller completes the write through the model.
+2. The controller asks the broadcaster to emit a typed event to the project members or acting user.
+3. `server/utils/notificationStream.js` pushes the SSE payload to connected clients.
+4. `client/src/components/common/NotificationsStream.jsx` forwards the payload into window events and toast handling.
+5. Feature pages subscribe to those window events and refresh the affected slice of state.
+
+Key event types:
+
+- `permissionUpdate` for project settings changes.
+- `taskUpdate` for task rename, description, priority, target date, and status changes.
+- `approvalDecision` for To Review -> Done / To Review -> TODO review outcomes.
+- `commentUpdate` for task comments and replies.
+- `toast` for forbidden or validation feedback that should surface immediately in the UI.
+
+The payloads are intentionally small and flat so clients can react without reimplementing server logic. A typical payload includes `eventType`, `projectId`, `taskId`, `userRole`, `reason`, and `timestamp`, plus any extra fields needed by the page that received it.
+
 ## Layer Responsibilities
 
 ### Routes

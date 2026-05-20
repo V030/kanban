@@ -52,7 +52,7 @@ Operational note:
 
 ## Permission Risks
 
-- Review approval and assignee-to-Done permissions are controlled by allow_member_review and allow_member_move_task_to_done.
+- Review approval is controlled by allow_member_review.
 - Those flags must stay aligned across the migration, permission helper, project settings UI, and server-side task handlers.
 - Any new permission flag must be added in three places: migration, permission helper, and updateProjectSettings allowed keys.
 

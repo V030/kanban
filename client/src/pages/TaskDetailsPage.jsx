@@ -42,11 +42,9 @@ export default function TaskDetailsPage() {
   const hasInitialIsAdmin = Object.prototype.hasOwnProperty.call(location.state || {}, "isAdminOrOwner");
   const hasInitialCanAssign = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersAssignTaskToOthers");
   const hasInitialCanReview = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersReviewTasks");
-  const hasInitialCanMoveDone = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersMoveTaskToDone");
   const initialIsAdmin = location.state?.isAdminOrOwner || false;
   const initialCanAssign = location.state?.canMembersAssignTaskToOthers || false;
   const initialCanReview = location.state?.canMembersReviewTasks || false;
-  const initialCanMoveDone = location.state?.canMembersMoveTaskToDone || false;
 
   const [task, setTask] = useState(initialTask);
   const [project, setProject] = useState(initialProject);
@@ -56,7 +54,6 @@ export default function TaskDetailsPage() {
   const [isAdminOrOwner, setIsAdminOrOwner] = useState(initialIsAdmin);
   const [canMembersAssignTaskToOthers, setCanMembersAssignTaskToOthers] = useState(initialCanAssign);
   const [canMembersReviewTasks, setCanMembersReviewTasks] = useState(initialCanReview);
-  const [canMembersMoveTaskToDone, setCanMembersMoveTaskToDone] = useState(initialCanMoveDone);
 
   const currentUser = getCurrentUser();
 
@@ -75,6 +72,30 @@ export default function TaskDetailsPage() {
       console.error("Unable to load project members", err);
     }
   }, [currentUser?.id, hasInitialIsAdmin]);
+
+  const loadProjectSettings = useCallback(async (projectIdToUse) => {
+    const resolvedProjectId = projectIdToUse || projectId || project?.id;
+    if (!resolvedProjectId) return;
+
+    try {
+      const settings = await getProjectSettings(resolvedProjectId);
+      const nextCanAssign = !!settings?.allow_assign_task_to_member;
+      const nextCanReview = !!settings?.allow_member_review;
+      if (!hasInitialCanAssign) {
+        setCanMembersAssignTaskToOthers(nextCanAssign);
+      }
+      if (!hasInitialCanReview) {
+        setCanMembersReviewTasks(nextCanReview);
+      }
+    } catch (err) {
+      if (!hasInitialCanAssign) {
+        setCanMembersAssignTaskToOthers(false);
+      }
+      if (!hasInitialCanReview) {
+        setCanMembersReviewTasks(false);
+      }
+    }
+  }, [hasInitialCanAssign, hasInitialCanReview, project?.id, projectId]);
 
   useEffect(() => {
     const projectIdToUse = projectId || project?.id;
@@ -99,35 +120,8 @@ export default function TaskDetailsPage() {
   useEffect(() => {
     const projectIdToUse = projectId || project?.id;
     if (!projectIdToUse) return;
-
-    (async () => {
-      try {
-        const settings = await getProjectSettings(projectIdToUse);
-        const nextCanAssign = !!settings?.allow_assign_task_to_member;
-        const nextCanReview = !!settings?.allow_member_review;
-        const nextCanMoveDone = !!settings?.allow_member_move_task_to_done;
-        if (!hasInitialCanAssign) {
-          setCanMembersAssignTaskToOthers(nextCanAssign);
-        }
-        if (!hasInitialCanReview) {
-          setCanMembersReviewTasks(nextCanReview);
-        }
-        if (!hasInitialCanMoveDone) {
-          setCanMembersMoveTaskToDone(nextCanMoveDone);
-        }
-      } catch (err) {
-        if (!hasInitialCanAssign) {
-          setCanMembersAssignTaskToOthers(false);
-        }
-        if (!hasInitialCanReview) {
-          setCanMembersReviewTasks(false);
-        }
-        if (!hasInitialCanMoveDone) {
-          setCanMembersMoveTaskToDone(false);
-        }
-      }
-    })();
-  }, [projectId, project?.id, hasInitialCanAssign, hasInitialCanMoveDone, hasInitialCanReview]);
+    loadProjectSettings(projectIdToUse);
+  }, [projectId, project?.id, loadProjectSettings]);
 
   const loadTaskById = useCallback(async (id, options = {}) => {
     const silent = options.silent === true;
@@ -176,7 +170,16 @@ export default function TaskDetailsPage() {
   useEffect(() => {
     const handleRealtime = (event) => {
       const detail = event?.detail || {};
-      const payload = detail.payload || {};
+      const payload = detail.payload || detail;
+      const eventType = String(detail.eventType || detail.type || payload.eventType || payload.type || "").toLowerCase();
+
+      if (eventType === "permissionupdate") {
+        const incomingProjectId = payload.projectId || detail.projectId;
+        if (incomingProjectId && projectId && String(incomingProjectId) !== String(projectId)) return;
+        loadProjectSettings(incomingProjectId || projectId || project?.id);
+        return;
+      }
+
       if (!payload.taskId) return;
       if (!taskId || String(payload.taskId) !== String(taskId)) return;
       loadTaskById(taskId, { silent: true });
@@ -184,7 +187,7 @@ export default function TaskDetailsPage() {
 
     window.addEventListener("notifications:push", handleRealtime);
     return () => window.removeEventListener("notifications:push", handleRealtime);
-  }, [taskId, loadTaskById]);
+  }, [loadProjectSettings, loadTaskById, project?.id, projectId, taskId]);
 
   const handleUpdateTaskName = async (tId, name) => {
     const data = await updateTaskName(tId, name);
@@ -318,7 +321,6 @@ export default function TaskDetailsPage() {
         isAdminOrOwner={isAdminOrOwner}
         canMembersAssignTaskToOthers={canMembersAssignTaskToOthers}
         canMembersReviewTasks={canMembersReviewTasks}
-        canMembersMoveTaskToDone={canMembersMoveTaskToDone}
         assignMemberToTask={handleAssignMemberToTask}
         unassignMemberFromTask={handleUnassignMemberFromTask}
         createSubtasks={async ({ subtaskData }) => createSubtask(subtaskData)}

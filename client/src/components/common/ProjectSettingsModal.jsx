@@ -295,15 +295,6 @@ export default function ProjectSettingsModal({
                     pending={!!pendingSettings.allow_member_review}
                   />
                   <ToggleRow
-                    id="allow-member-move-task-to-done"
-                    label="Move assigned tasks to done"
-                    description="Allow an assignee to mark their own task as done."
-                    checked={settings.allow_member_move_task_to_done}
-                    onChange={(v) => onSettingChange("allow_member_move_task_to_done", v)}
-                    disabled={!canEditPermissions}
-                    pending={!!pendingSettings.allow_member_move_task_to_done}
-                  />
-                  <ToggleRow
                     id="allow-assign-task-to-member"
                     label="Assign tasks to others"
                     description="Allow project members to assign tasks to other members."

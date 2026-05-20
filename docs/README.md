@@ -23,6 +23,11 @@ This folder contains the repository’s canonical documentation set.
 - [Toast Integration Guide](../TOAST_INTEGRATION_GUIDE.md)
 - [Implementation Summary](../IMPLEMENTATION_SUMMARY.md)
 
+## Realtime events
+
+- [Architecture](./architecture/ARCHITECTURE.md#realtime-flow)
+- [API Reference](./api/API_REFERENCE.md#realtime-events-sse)
+
 ## Notes
 
 - This `docs/README.md` is the canonical landing page for human navigation.

@@ -599,6 +599,10 @@ export async function approveTaskReview({ taskId, reviewerId, comment: commentIn
     throw error;
   }
 
+  if (!access.isOwner && !access.isAdmin && !access.isManager) {
+    // Review permission alone governs member approval/rejection.
+  }
+
   // find done category id for this project
   const catRes = await pool.query(
     `SELECT id FROM tasks_categories WHERE project_id = $1::uuid AND LOWER(name) IN ('done', 'done') LIMIT 1`,
@@ -1137,7 +1141,6 @@ export async function getProjectSettings({ projectId, requesterId }) {
       allow_member_add_board: true,
       allow_member_add_member: true,
       allow_member_review: false,
-      allow_member_move_task_to_done: false,
       allow_assign_task_to_member: false,
       allow_admin_add_member: true,
       allow_admin_remove_member: true,
@@ -1175,7 +1178,6 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
     "allow_member_add_board",
     "allow_member_add_member",
     "allow_member_review",
-    "allow_member_move_task_to_done",
     "allow_assign_task_to_member",
     "allow_admin_add_member",
     "allow_admin_remove_member",
@@ -1193,7 +1195,6 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
     allow_member_add_board: true,
     allow_member_add_member: true,
     allow_member_review: false,
-    allow_member_move_task_to_done: false,
     allow_assign_task_to_member: false,
     allow_admin_add_member: true,
     allow_admin_remove_member: true,
@@ -1259,7 +1260,6 @@ export async function updateProjectSettings({ projectId, requesterId, setting, v
       allow_member_add_board,
       allow_member_add_member,
       allow_member_review,
-      allow_member_move_task_to_done,
       allow_assign_task_to_member,
       allow_admin_add_member,
       allow_admin_remove_member,
@@ -2556,13 +2556,33 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
   const targetCategory = targetCategoryResult.rows[0];
   const targetCategoryName = String(targetCategory.name || "").trim().toLowerCase();
   const isDoneCategory = targetCategoryName === "done";
+  const isToDoSource = currentCategoryName === "to_do" || currentCategoryName === "todo";
+  const isToReviewSource = currentCategoryName === "to_review" || currentCategoryName === "to review";
+  const isInProgressSource = currentCategoryName === "in_progress" || currentCategoryName === "in progress";
+  const isToDoTarget = targetCategoryName === "to_do" || targetCategoryName === "todo";
 
-  if (isDoneCategory && !access.isOwner && !access.isAdmin && !access.isManager) {
-    const canMoveAssignedTaskToDone = access.isAssignee && access.settings && access.settings.allow_member_move_task_to_done === true;
-    if (!canMoveAssignedTaskToDone) {
-      const error = new Error("Forbidden: moving assigned tasks to Done is disabled for members in this project");
+  if (!access.isOwner && !access.isAdmin && !access.isManager && access.isAssignee) {
+    if (isDoneCategory && (isToDoSource || isInProgressSource)) {
+      const error = new Error("Members cannot move tasks directly to Done. Tasks must be reviewed first.");
       error.code = "TASK_FORBIDDEN";
       throw error;
+    }
+
+    // Check if moving FROM in progress TO done (always restricted for members)
+    if (isInProgressSource && isDoneCategory) {
+      const error = new Error("Members cannot move tasks directly from In Progress to Done. Tasks must be reviewed first.");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
+
+    // Check if moving FROM to_review to done or todo (needs allow_member_review permission)
+    if (isToReviewSource && (isDoneCategory || isToDoTarget)) {
+      const canApproveReview = access.settings && access.settings.allow_member_review === true;
+      if (!canApproveReview) {
+        const error = new Error("You don't have permission to approve or reject tasks.");
+        error.code = "TASK_FORBIDDEN";
+        throw error;
+      }
     }
   }
 
@@ -2577,6 +2597,12 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
   );
 
   const movedTask = movedTaskResult.rows[0];
+  if (!movedTask) {
+    const error = new Error("Failed to move task");
+    error.code = "MOVE_FAILED";
+    throw error;
+  }
+
   return {
     id: movedTask.id,
     categoryId: movedTask.category_id,

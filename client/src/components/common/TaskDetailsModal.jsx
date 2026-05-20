@@ -126,7 +126,7 @@ function normalizeTaskPriority(value) {
   return "unset";
 }
 
-export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersReviewTasks = false, canMembersMoveTaskToDone = false, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
+export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersReviewTasks = false, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
   const taskData = task || {};
   const currentUser = useMemo(() => getCurrentUser(), []);
   const currentUserIdValue = currentUserId || currentUser?.id || "";
@@ -389,18 +389,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     if (!reason) return alert("Please provide an approval note.");
     setApproveSubmitting(true);
     try {
-      const data = await approveTaskReview(task.id, reason);
-      const updated = data?.task || data;
-      if (updated && (updateTaskStatus instanceof Function)) {
-        const newCategoryId = updated?.category_id ?? updated?.categoryId;
-        if (newCategoryId) {
-          try {
-            await updateTaskStatus(task.id, newCategoryId);
-          } catch (syncErr) {
-            console.warn("Board sync after approve skipped:", syncErr?.message || syncErr);
-          }
-        }
-      }
+      await approveTaskReview(task.id, reason);
       const revs = await getTaskReviews(task.id);
       setReviews(revs?.reviews || revs || []);
       setShowApproveModal(false);
@@ -428,18 +417,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     if (!reason) return alert("Please provide a rejection reason.");
     setRejectSubmitting(true);
     try {
-      const data = await rejectTaskReview(task.id, reason);
-      const updated = data?.task || data;
-      if (updated && (updateTaskStatus instanceof Function)) {
-        const newCategoryId = updated?.category_id ?? updated?.categoryId;
-        if (newCategoryId) {
-          try {
-            await updateTaskStatus(task.id, newCategoryId);
-          } catch (syncErr) {
-            console.warn("Board sync after reject skipped:", syncErr?.message || syncErr);
-          }
-        }
-      }
+      await rejectTaskReview(task.id, reason);
       const revs = await getTaskReviews(task.id);
       setReviews(revs?.reviews || revs || []);
       setShowRejectModal(false);
@@ -547,36 +525,14 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     const trimmed = newComment.trim();
     if (!task?.id || !currentUserIdValue || !trimmed) return;
 
-    const tempId = `temp-comment-${Date.now()}`;
-    const optimisticUser = currentUser
-      ? {
-          id: currentUserIdValue,
-          firstName: currentUser.firstName || currentUser.first_name,
-          lastName: currentUser.lastName || currentUser.last_name,
-          email: currentUser.email,
-          role: currentUser.role,
-        }
-      : { id: currentUserIdValue };
-
-    const optimisticComment = {
-      id: tempId,
-      comment: trimmed,
-      created_at: new Date().toISOString(),
-      user: optimisticUser,
-      replies: [],
-      isPending: true,
-    };
-
     setCommentSubmitting(true);
     setCommentsError("");
-    setComments((prev) => [...prev, optimisticComment]);
-    setNewComment("");
 
     try {
       await addTaskComment?.(task.id, currentUserIdValue, trimmed);
+      setNewComment("");
       await loadComments();
     } catch (err) {
-      setComments((prev) => prev.filter((item) => String(item?.id) !== String(tempId)));
       setCommentsError(err?.message || "Unable to add comment.");
     } finally {
       setCommentSubmitting(false);
@@ -587,34 +543,8 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     const replyText = (replyInputs[commentId] || "").trim();
     if (!task?.id || !currentUserIdValue || !commentId || !replyText) return;
 
-    const tempId = `temp-reply-${commentId}-${Date.now()}`;
-    const optimisticUser = currentUser
-      ? {
-          id: currentUserIdValue,
-          firstName: currentUser.firstName || currentUser.first_name,
-          lastName: currentUser.lastName || currentUser.last_name,
-          email: currentUser.email,
-          role: currentUser.role,
-        }
-      : { id: currentUserIdValue };
-
-    const optimisticReply = {
-      id: tempId,
-      commentReply: replyText,
-      created_at: new Date().toISOString(),
-      user: optimisticUser,
-      isPending: true,
-    };
-
     setReplySubmittingId(String(commentId));
     setCommentsError("");
-    setComments((prev) =>
-      prev.map((item) => {
-        if (String(item?.id) !== String(commentId)) return item;
-        const replies = Array.isArray(item?.replies) ? item.replies : [];
-        return { ...item, replies: [...replies, optimisticReply] };
-      })
-    );
 
     try {
       await addTaskCommentReply?.(task.id, commentId, currentUserIdValue, replyText);
@@ -622,13 +552,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       setActiveReplyId("");
       await loadComments();
     } catch (err) {
-      setComments((prev) =>
-        prev.map((item) => {
-          if (String(item?.id) !== String(commentId)) return item;
-          const replies = Array.isArray(item?.replies) ? item.replies : [];
-          return { ...item, replies: replies.filter((reply) => String(reply?.id) !== String(tempId)) };
-        })
-      );
       setCommentsError(err?.message || "Unable to add reply.");
     } finally {
       setReplySubmittingId("");
@@ -763,8 +686,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       return;
     }
 
-    const previousTitle = taskTitle;
-    setTaskTitle(trimmed);
     setTaskTitleSaving(true);
     setTaskTitleError("");
     try {
@@ -773,7 +694,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       setTaskTitle(updated);
       setIsEditingTaskTitle(false);
     } catch (err) {
-      setTaskTitle(previousTitle);
       setTaskTitleError(err?.message || "Unable to update task name.");
     } finally {
       setTaskTitleSaving(false);
@@ -793,8 +713,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       return;
     }
 
-    const previousDesc = taskDesc;
-    setTaskDesc(trimmed);
     setTaskDescSaving(true);
     setTaskDescError("");
     try {
@@ -803,7 +721,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       setTaskDesc(updated);
       setIsEditingTaskDesc(false);
     } catch (err) {
-      setTaskDesc(previousDesc);
       setTaskDescError(err?.message || "Unable to update task description.");
     } finally {
       setTaskDescSaving(false);
@@ -869,9 +786,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const handleUpdateTaskPriority = async (nextPriority) => {
     if (!task?.id || !nextPriority) return;
 
-    const previousPriority = taskPriority;
     const normalized = normalizeTaskPriority(nextPriority);
-    setTaskPriority(normalized);
     setPriorityError("");
 
     if (!updateTaskPriority) return;
@@ -883,7 +798,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       setTaskPriority(saved);
     } catch (err) {
       setPriorityError(err?.message || "Unable to update task priority.");
-      setTaskPriority(previousPriority);
     } finally {
       setPrioritySubmitting(false);
     }
@@ -892,8 +806,38 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const handleUpdateTaskCategory = async (nextCategoryId) => {
     if (!task?.id || !nextCategoryId) return;
 
-    const previousCategoryId = taskCategoryId;
-    setTaskCategoryId(String(nextCategoryId));
+    const currentCategoryName = String(task?.categoryName || "").trim().toLowerCase();
+    const nextCategory = (taskCategories || []).find((cat) => String(cat?.id || "") === String(nextCategoryId || ""));
+    const nextCategoryName = String(nextCategory?.name || "").trim().toLowerCase();
+    const movingToDone = nextCategoryName === "done";
+    const movingToToDo = nextCategoryName === "to_do" || nextCategoryName === "todo";
+    const isFromTodo = currentCategoryName === "to_do" || currentCategoryName === "todo";
+    const isFromInProgress = currentCategoryName === "in_progress" || currentCategoryName === "in progress";
+    const isFromToReview = currentCategoryName === "to_review" || currentCategoryName === "to review";
+
+    // Check permission rules for members
+    if (!isAdminOrOwner && currentUserRole !== "manager") {
+      // Rule 0: TODO and In Progress cannot move directly to Done
+      if (movingToDone && (isFromTodo || isFromInProgress)) {
+        setTaskCategoryError("Members cannot move tasks directly to Done. Tasks must be reviewed first.");
+        return;
+      }
+
+      // Rule 1: Cannot move FROM in_progress TO done
+      if (isFromInProgress && movingToDone) {
+        setTaskCategoryError("Members cannot move tasks directly from In Progress to Done. Tasks must be reviewed first.");
+        return;
+      }
+
+      // Rule 2: Cannot move FROM to_review TO done or todo without permission
+      if (isFromToReview && (movingToDone || movingToToDo)) {
+        if (!canMembersReviewTasks) {
+          setTaskCategoryError("You don't have permission to approve or reject tasks.");
+          return;
+        }
+      }
+    }
+
     setTaskCategoryError("");
 
     if (!updateTaskStatus) return;
@@ -905,7 +849,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       setTaskCategoryId(String(savedCategoryId));
     } catch (err) {
       setTaskCategoryError(err?.message || "Unable to update task category.");
-      setTaskCategoryId(previousCategoryId);
     } finally {
       setTaskCategorySubmitting(false);
     }
@@ -914,13 +857,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const handleUpdateTargetDate = async (nextValue) => {
     if (!task?.id) return;
 
-    const previousTargetDate = targetDate;
-    const previousPastDue = isPastDue;
-    const parsed = nextValue ? new Date(nextValue) : null;
-    const nextPastDue = parsed ? parsed.getTime() < Date.now() : false;
-
-    setTargetDate(nextValue);
-    setIsPastDue(nextPastDue);
     setTargetDateError("");
 
     if (!updateTaskTargetDate) return;
@@ -934,8 +870,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       setIsPastDue(!!savedPastDue);
     } catch (err) {
       setTargetDateError(err?.message || "Unable to update target date.");
-      setTargetDate(previousTargetDate);
-      setIsPastDue(previousPastDue);
     } finally {
       setTargetDateSubmitting(false);
     }
@@ -1313,6 +1247,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                         const currentCategory = (taskCategories || []).find((cat) => String(cat?.id || "") === String(taskCategoryId || ""));
                         const currentCategoryName = String(currentCategory?.name || "").trim().toLowerCase();
                         const isTaskInDone = currentCategoryName === "done";
+                        const isTaskInToReview = currentCategoryName === "to_review" || currentCategoryName === "to review";
 
                         return (
                           <>
@@ -1330,10 +1265,12 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                                 const categoryId = String(category?.id || "");
                                 const categoryName = String(category?.name || "");
                                 const isDoneCategory = categoryName.trim().toLowerCase() === "done";
-                                const disableDoneForMember = isDoneCategory && !isAdminOrOwner && !(currentUserRole === "manager" || (currentUserRole === "member" && canMembersMoveTaskToDone && isCurrentUserAssigned));
+                                const isTodoCategory = categoryName.trim().toLowerCase() === "to_do" || categoryName.trim().toLowerCase() === "todo";
+                                const disableDoneForMember = isDoneCategory && !isAdminOrOwner && !(currentUserRole === "manager" || currentUserRole === "member");
+                                const disableTodoFromReview = isTodoCategory && isTaskInToReview && !isAdminOrOwner && !(currentUserRole === "manager" || (currentUserRole === "member" && canMembersReviewTasks));
 
                                 return (
-                                  <option key={categoryId || categoryName} value={categoryId} disabled={disableDoneForMember}>
+                                  <option key={categoryId || categoryName} value={categoryId} disabled={disableDoneForMember || disableTodoFromReview}>
                                     {formatCategoryLabel(categoryName)}
                                   </option>
                                 );

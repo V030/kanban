@@ -12,6 +12,66 @@ This document describes the actual API surface used by the frontend services. It
 - Successful responses usually return a top-level object with one or more named payload keys.
 - Most routes live under /auth even when they are not authentication endpoints. That is a historical routing choice and must be preserved for existing clients.
 
+## Realtime Events (SSE)
+
+### GET /auth/notifications/stream?token=<jwt>
+Purpose: subscribe to project and task lifecycle events over Server-Sent Events.
+
+The stream is user-scoped. The backend broadcasts to the connected users that should see the change, and the client turns each SSE message into a window event.
+
+Common event types:
+
+- `permissionUpdate` for project permission changes such as enabling or disabling review tasks.
+- `taskUpdate` for task rename, description, priority, target date, and status changes.
+- `approvalDecision` for approval and rejection decisions.
+- `commentUpdate` for new comments and replies.
+- `toast` for forbidden or validation feedback that should appear immediately.
+
+Payload schema:
+
+```json
+{
+  "eventType": "taskUpdate",
+  "projectId": "...",
+  "taskId": 123,
+  "userRole": "admin",
+  "reason": "Approved via drag",
+  "timestamp": "2026-05-20T12:00:00.000Z"
+}
+```
+
+Minimal React/TypeScript subscription example:
+
+```tsx
+useEffect(() => {
+  const source = new EventSource(`/auth/notifications/stream?token=${token}`);
+
+  const handleMessage = (event: MessageEvent) => {
+    const payload = JSON.parse(event.data) as {
+      eventType?: string;
+      projectId?: string;
+      taskId?: number;
+      reason?: string;
+      timestamp?: string;
+    };
+
+    if (payload.eventType === "permissionUpdate") {
+      reloadProjectSettings();
+      reloadBoard();
+      return;
+    }
+
+    if (payload.eventType === "taskUpdate" || payload.eventType === "approvalDecision" || payload.eventType === "commentUpdate") {
+      reloadBoard();
+      reloadTaskDetails(payload.taskId);
+    }
+  };
+
+  source.addEventListener("notification", handleMessage as EventListener);
+  return () => source.close();
+}, [token]);
+```
+
 ## Auth and Account
 
 ### POST /auth/login
@@ -252,7 +312,6 @@ Success example:
   "allow_member_add_board": true,
   "allow_member_add_member": true,
   "allow_member_review": false,
-  "allow_member_move_task_to_done": false,
   "allow_assign_task_to_member": false,
   "allow_admin_add_member": true,
   "allow_admin_remove_member": true,
@@ -425,7 +484,7 @@ Success example:
 ### PATCH /auth/project/tasks/:taskId/status
 Purpose: move a task to another column.
 
-Assigned members can move their own task to Done only when allow_member_move_task_to_done is enabled. Managers, admins, and owners keep their existing bypass access.
+When a task is in To Review, members need allow_member_review enabled to approve it to Done or reject it back to TODO. Managers, admins, and owners keep their existing bypass access.
 
 Request example:
 ```json

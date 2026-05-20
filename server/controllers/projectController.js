@@ -45,6 +45,7 @@ import { createProject as createProjectModel,
 
 import { getProjectMetrics as getProjectMetricsController } from "./metricsController.js";
 import { createNotification, getUserSummary, getProjectSummary, getTaskContext } from "../models/notificationModel.js";
+import { broadcastProjectEvent, broadcastToastEvent } from "../utils/realtimeBroadcaster.js";
 
 export { getProjectMetricsController as getProjectMetrics };
 
@@ -59,6 +60,44 @@ function buildNotificationRecipients({ creatorId, assigneeIds = [], actorId }) {
   const ids = new Set([creatorId, ...(assigneeIds || [])].filter(Boolean));
   if (actorId) ids.delete(actorId);
   return Array.from(ids);
+}
+
+function getMemberIds(members = []) {
+  return Array.from(
+    new Set(
+      (Array.isArray(members) ? members : [])
+        .map((member) => String(member?.id || member?.userId || member?.user_id || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+async function broadcastProjectMembersEvent({ projectId, requesterId, payload }) {
+  if (!projectId || !requesterId) return;
+
+  try {
+    const members = await getProjectMembersModel({ projectId, requesterId });
+    const recipientIds = getMemberIds(members);
+    if (recipientIds.length === 0) return;
+
+    broadcastProjectEvent(recipientIds, payload);
+  } catch (error) {
+    console.error("Project realtime broadcast error:", error);
+  }
+}
+
+function broadcastForbiddenToast(userId, payload = {}) {
+  if (!userId) return;
+
+  broadcastToastEvent(userId, {
+    message: payload.message || "You do not have permission to perform this action.",
+    toastType: "forbidden",
+    projectId: payload.projectId || null,
+    taskId: payload.taskId || null,
+    userRole: payload.userRole || null,
+    reason: payload.reason || null,
+    actorId: userId,
+  });
 }
 
 export async function createProject(req, res) {
@@ -521,6 +560,23 @@ export async function createNewTask(req, res) {
 
   try {
     const taskCreated = await createTaskModel(taskData);
+
+    try {
+      await broadcastProjectMembersEvent({
+        projectId,
+        requesterId: req.user.userId,
+        payload: {
+          eventType: "taskCreate",
+          projectId,
+          taskId: taskCreated?.id || null,
+          task: taskCreated,
+          userRole: req.user.role || null,
+        },
+      });
+    } catch (broadcastError) {
+      console.error("Task create realtime broadcast error:", broadcastError);
+    }
+
     return res.status(201).json({ message: "Task created successfully", task: taskCreated });
   } catch (error) {
     if (
@@ -567,6 +623,27 @@ export async function takeProjectTask(req, res) {
 
   try {
     const taskTaken = await takeProjectTaskModel({taskId: taskId, userId: req.user?.userId} );
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "taskAssigned",
+            changeType: "take",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            assigneeId: req.user.userId,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task take realtime broadcast error:", broadcastError);
+    }
+
     return res.status(201).json({ message: "Task taken successfully" });
   } catch (error) {
     console.error("Error taking task:", error);
@@ -601,6 +678,26 @@ export async function updateTaskStatus(req, res) {
       userId: req.user.userId,
       categoryId,
     });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "taskUpdate",
+            changeType: "status",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            task,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task status realtime broadcast error:", broadcastError);
+    }
 
     try {
       const actor = await getUserSummary(req.user.userId);
@@ -643,6 +740,11 @@ export async function updateTaskStatus(req, res) {
     }
 
     if (error?.code === "TASK_FORBIDDEN") {
+      broadcastForbiddenToast(req.user.userId, {
+        message: error.message,
+        taskId,
+        userRole: req.user.role || null,
+      });
       return res.status(403).json({ message: error.message });
     }
 
@@ -693,6 +795,27 @@ export async function approveTaskReview(req, res) {
     });
 
     try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "approvalDecision",
+            decision: "approved",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            reason: comment,
+            task: updated,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Review approved realtime broadcast error:", broadcastError);
+    }
+
+    try {
       const actor = await getUserSummary(req.user.userId);
       const taskContext = await getTaskContext(taskId);
       if (actor && taskContext) {
@@ -727,6 +850,11 @@ export async function approveTaskReview(req, res) {
     }
 
     if (error?.code === "TASK_FORBIDDEN") {
+      broadcastForbiddenToast(req.user.userId, {
+        message: error.message,
+        taskId,
+        userRole: req.user.role || null,
+      });
       return res.status(403).json({ message: error.message });
     }
 
@@ -747,6 +875,27 @@ export async function rejectTaskReview(req, res) {
 
   try {
     const updated = await rejectTaskReviewModel({ taskId, reviewerId: req.user.userId, comment: reviewRaw });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "approvalDecision",
+            decision: "rejected",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            reason: reviewRaw,
+            task: updated,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Review rejected realtime broadcast error:", broadcastError);
+    }
 
     try {
       const actor = await getUserSummary(req.user.userId);
@@ -782,7 +931,14 @@ export async function rejectTaskReview(req, res) {
       return res.status(400).json({ message: error.message });
     }
 
-    if (error?.code === "TASK_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "TASK_FORBIDDEN") {
+      broadcastForbiddenToast(req.user.userId, {
+        message: error.message,
+        taskId,
+        userRole: req.user.role || null,
+      });
+      return res.status(403).json({ message: error.message });
+    }
     if (error?.code === "TASK_NOT_FOUND") return res.status(404).json({ message: error.message });
 
     console.error("Reject task review error:", error);
@@ -882,6 +1038,27 @@ export async function updateTaskName(req, res) {
       requesterId: req.user.userId,
       name: trimmed,
     });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "taskUpdate",
+            changeType: "rename",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            task,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task name realtime broadcast error:", broadcastError);
+    }
+
     return res.status(200).json({ message: "Task name updated successfully", task });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_NAME" || error?.code === "INVALID_USER") {
@@ -893,6 +1070,11 @@ export async function updateTaskName(req, res) {
     }
 
     if (error?.code === "TASK_FORBIDDEN") {
+      broadcastForbiddenToast(req.user.userId, {
+        message: error.message,
+        taskId,
+        userRole: req.user.role || null,
+      });
       return res.status(403).json({ message: error.message });
     }
 
@@ -924,6 +1106,27 @@ export async function updateTaskDescription(req, res) {
       requesterId: req.user.userId,
       description: trimmed,
     });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "taskUpdate",
+            changeType: "description",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            task,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task description realtime broadcast error:", broadcastError);
+    }
+
     return res.status(200).json({ message: "Task description updated successfully", task });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_DESCRIPTION" || error?.code === "INVALID_USER") {
@@ -935,6 +1138,11 @@ export async function updateTaskDescription(req, res) {
     }
 
     if (error?.code === "TASK_FORBIDDEN") {
+      broadcastForbiddenToast(req.user.userId, {
+        message: error.message,
+        taskId,
+        userRole: req.user.role || null,
+      });
       return res.status(403).json({ message: error.message });
     }
 
@@ -970,9 +1178,29 @@ export async function updateProjectSettings(req, res) {
       value,
     });
 
+    await broadcastProjectMembersEvent({
+      projectId,
+      requesterId: req.user.userId,
+      payload: {
+        eventType: "permissionUpdate",
+        projectId,
+        setting,
+        value,
+        settings: updated,
+        userRole: req.user.role || null,
+      },
+    });
+
     return res.status(200).json(updated);
   } catch (error) {
-    if (error?.code === "PROJECT_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "PROJECT_FORBIDDEN") {
+      broadcastForbiddenToast(req.user.userId, {
+        message: error.message,
+        projectId,
+        userRole: req.user.role || null,
+      });
+      return res.status(403).json({ message: error.message });
+    }
     if (error?.code === "INVALID_PROJECT") return res.status(400).json({ message: error.message });
     if (error?.code === "INVALID_SETTINGS") return res.status(400).json({ message: error.message });
     console.error("Update project settings error:", error);
@@ -1128,6 +1356,26 @@ export async function assignTaskToOthers(req, res) {
       console.error("Task assign notification error:", notifyError);
     }
 
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "taskAssignmentChange",
+            changeType: "assign",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            memberId,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task assignment realtime broadcast error:", broadcastError);
+    }
+
     return res.status(201).json({
       message: "Member assigned to task successfully",
       assignment: assignedMember,
@@ -1165,6 +1413,26 @@ export async function createSubtask(req, res) {
       createdBy,
       status,
     });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "subtaskCreate",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            subtaskId: newSubtask?.id || null,
+            subtask: newSubtask,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Subtask create realtime broadcast error:", broadcastError);
+    }
 
     return res.status(201).json(newSubtask);
   } catch (err) {
@@ -1223,6 +1491,27 @@ export async function createTaskComment(req, res) {
       userId,
       comment,
     });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "commentUpdate",
+            changeType: "comment",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            commentId: createdComment?.id || null,
+            comment,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task comment realtime broadcast error:", broadcastError);
+    }
 
     try {
       const actor = await getUserSummary(req.user.userId);
@@ -1306,6 +1595,28 @@ export async function createTaskCommentReply(req, res) {
       userId,
       commentReply,
     });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "commentUpdate",
+            changeType: "reply",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            commentId,
+            replyId: createdReply?.id || null,
+            reply: commentReply,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task comment reply realtime broadcast error:", broadcastError);
+    }
 
     try {
       const actor = await getUserSummary(req.user.userId);
@@ -1564,6 +1875,26 @@ export async function unassignTaskFromMember(req, res) {
       console.error("Task unassign notification error:", notifyError);
     }
 
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "taskAssignmentChange",
+            changeType: "unassign",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            memberId,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task unassignment realtime broadcast error:", broadcastError);
+    }
+
     return res.status(200).json({
       message: "Member unassigned from task successfully",
       assignment: unassignedMember,
@@ -1592,6 +1923,26 @@ export async function unassignTaskFromSelf(req, res) {
       taskId,
       userId: req.user.userId,
     });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "taskAssignmentChange",
+            changeType: "unassign",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            userId: req.user.userId,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Task self-unassignment realtime broadcast error:", broadcastError);
+    }
 
     return res.status(200).json({
       message: "Task unassigned successfully",
@@ -1723,6 +2074,22 @@ export async function updateMemberRole(req, res) {
       newRole: role,
       requesterId: req.user.userId,
     });
+
+    try {
+      await broadcastProjectMembersEvent({
+        projectId,
+        requesterId: req.user.userId,
+        payload: {
+          eventType: "memberRoleUpdate",
+          projectId,
+          memberId,
+          newRole: role,
+          userRole: req.user.role || null,
+        },
+      });
+    } catch (broadcastError) {
+      console.error("Member role update realtime broadcast error:", broadcastError);
+    }
 
     return res.status(200).json({ message: "Member role updated successfully", ...result });
   } catch (error) {

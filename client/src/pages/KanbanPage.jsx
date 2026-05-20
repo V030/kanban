@@ -23,7 +23,6 @@ const DEFAULT_TASK_PERMISSIONS = {
 	allow_member_add_board: false,
 	allow_member_add_member: false,
 	allow_member_review: false,
-	allow_member_move_task_to_done: false,
 	allow_assign_task_to_member: false,
 	allow_admin_add_member: true,
 	allow_admin_remove_member: true,
@@ -185,11 +184,10 @@ function KanbanPage() {
 	}, [project, currentUser]);
 
 	const isAdminOrOwner = projectRole === "owner" || projectRole === "admin";
+
 	const canCreateTask = isAdminOrOwner || taskPermissions.allow_member_create_task;
 	const canTakeTask = isAdminOrOwner || taskPermissions.allow_member_take_task;
-	const canMembersAssignTaskToOthers = taskPermissions.allow_assign_task_to_member;
 	const canMembersReviewTasks = taskPermissions.allow_member_review;
-	const canMembersMoveTaskToDone = taskPermissions.allow_member_move_task_to_done;
 	const canEditProjectSettings = isAdminOrOwner;
 	const canEditProjectName = projectRole === "owner";
 
@@ -256,7 +254,7 @@ function KanbanPage() {
 			toast.showError(settingsError?.message || "Unable to load project settings.");
 			setTaskPermissions(DEFAULT_TASK_PERMISSIONS);
 		}
-	}, [projectId]);
+	}, [projectId, toast]);
 
 	useEffect(() => {
 		if (!projectId) {
@@ -352,12 +350,15 @@ function KanbanPage() {
 	useEffect(() => {
 		const handleRealtime = (event) => {
 			const detail = event?.detail || {};
-			const payload = detail.payload || {};
-			const type = String(detail.type || "").toLowerCase();
+			const payload = detail.payload || detail;
+			const type = String(detail.eventType || detail.type || payload.eventType || payload.type || "").toLowerCase();
 			if (!project?.id) return;
 			if (payload.projectId && String(payload.projectId) !== String(project.id)) return;
 
 			const relevant = new Set([
+				"permissionupdate",
+				"taskupdate",
+				"approvaldecision",
 				"task_assigned",
 				"task_unassigned",
 				"task_status_changed",
@@ -365,14 +366,27 @@ function KanbanPage() {
 				"review_rejected",
 				"task_comment",
 				"task_comment_reply",
+				"taskcreate",
+				"subtaskcreate",
+				"memberroleupdate",
+				"taskassignmentchange",
 			]);
 			if (!relevant.has(type)) return;
+
+			if (type === "permissionupdate") {
+				loadProjectSettings();
+			}
+
+			if (type === "memberroleupdate") {
+				loadProjectMembers();
+			}
+
 			loadTaskCategories({ silent: true });
 		};
 
 		window.addEventListener("notifications:push", handleRealtime);
 		return () => window.removeEventListener("notifications:push", handleRealtime);
-	}, [project?.id, loadTaskCategories]);
+	}, [project?.id, loadProjectSettings, loadTaskCategories, loadProjectMembers]);
 
 	const setTaskPending = useCallback((taskId, action) => {
 		if (!taskId) return;
@@ -486,23 +500,18 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[isAdminOrOwner, loadTaskCategories, findTaskLocation, pendingTaskActions, setTaskPending, clearTaskPending]
+		[isAdminOrOwner, loadTaskCategories, findTaskLocation, pendingTaskActions, setTaskPending, clearTaskPending, toast]
 	);
 
 	const handleSettingChange = useCallback(
 		async (settingName, nextValue) => {
 			if (!project?.id || !canEditProjectSettings) return;
-			const previousValue = taskPermissions?.[settingName];
-
-			setTaskPermissions((prev) => {
-				return { ...prev, [settingName]: nextValue };
-			});
 			setSettingsPending((prev) => ({ ...prev, [settingName]: true }));
 
 			try {
-				await updateProjectSettings(project.id, settingName, nextValue);
+				const updated = await updateProjectSettings(project.id, settingName, nextValue);
+				setTaskPermissions({ ...DEFAULT_TASK_PERMISSIONS, ...(updated || {}) });
 			} catch (err) {
-				setTaskPermissions((prev) => ({ ...prev, [settingName]: previousValue }));
 				toast.showError(err?.message || "Unable to update project settings.");
 				loadProjectSettings();
 			} finally {
@@ -513,7 +522,7 @@ function KanbanPage() {
 				});
 			}
 		},
-		[project?.id, canEditProjectSettings, taskPermissions, loadProjectSettings]
+		[project?.id, canEditProjectSettings, loadProjectSettings, toast]
 	);
 
 	const handleDeleteProject = useCallback(
@@ -533,7 +542,7 @@ function KanbanPage() {
 				setDeleteProjectPending(false);
 			}
 		},
-		[project?.id, projectRole, navigate]
+		[project?.id, projectRole, navigate, toast]
 	);
 
 	const handleReloadMembers = useCallback(async () => {
@@ -566,7 +575,7 @@ function KanbanPage() {
 				});
 			}
 		},
-		[handleReloadMembers, project?.id, projectMembers, projectRole]
+		[handleReloadMembers, project?.id, projectMembers, projectRole, toast]
 	);
 
 	const handleUpdateMemberRole = useCallback(
@@ -592,7 +601,7 @@ function KanbanPage() {
 				});
 			}
 		},
-		[handleReloadMembers, project?.id, projectMembers, projectRole]
+		[handleReloadMembers, project?.id, projectMembers, projectRole, toast]
 	);
 
 	const getTaskAssignee = useCallback(
@@ -691,7 +700,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending]
+		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending, toast]
 	);
 
 	const handleDragReviewConfirm = useCallback(
@@ -703,11 +712,6 @@ function KanbanPage() {
 			const reason = String(dragReviewReason || "").trim() || `${capitalizeFirst(action)} via drag`;
 
 			try {
-				const moved = moveTaskToCategory(taskCategoriesRef.current, taskId, targetColumn.id, {
-					categoryId: targetColumn.id,
-					isPending: true,
-				});
-				setTaskCategories(moved.next);
 				setTaskPending(taskId, "move");
 
 				if (action === "approve") {
@@ -753,25 +757,51 @@ function KanbanPage() {
 		}
 		
 		const targetCategoryName = String(column?.title || column?.name || "").trim().toLowerCase();
+		const isInProgressSource = sourceColumnName === "in_progress" || sourceColumnName === "in progress";
+		const isToReviewSource = sourceColumnName === "to_review" || sourceColumnName === "to review";
+		const isDoneTarget = targetCategoryName === "done";
+		const isToDoTarget = targetCategoryName === "to_do" || targetCategoryName === "todo";
 		
-		// If dragging from To Review to To Do or Done, show approval/rejection modal
-		if (sourceColumnName === "to_review" || sourceColumnName === "to review") {
-			if (targetCategoryName === "to_do" || targetCategoryName === "todo") {
+		// For non-admins/owners/managers, enforce member_mark_done rules
+		if (!isAdminOrOwner && projectRole !== "manager") {
+			// Rule 0: TODO and In Progress cannot move directly to Done
+			if (isDoneTarget && (sourceColumnName === "todo" || sourceColumnName === "to_do" || isInProgressSource)) {
+				toast.showError("Members cannot move tasks directly to Done. Tasks must be reviewed first.");
+				return;
+			}
+
+			// Rule 1: Cannot move FROM in_progress TO done
+			if (isInProgressSource && isDoneTarget) {
+				toast.showError("Members cannot move tasks directly from In Progress to Done. Tasks must be reviewed first.");
+				return;
+			}
+			
+			// Rule 2: Cannot move FROM to_review TO done or todo without permission
+			if (isToReviewSource && (isDoneTarget || isToDoTarget)) {
+				if (!canMembersReviewTasks) {
+					toast.showError("You don't have permission to approve or reject reviewed tasks in this project.");
+					return;
+				}
+			}
+		}
+		
+		// If dragging from To Review to To Do or Done, show approval/rejection modal (if allowed)
+		if (isToReviewSource && (isToDoTarget || isDoneTarget)) {
+			// Check permission for members
+			if (!isAdminOrOwner && projectRole !== "manager" && !canMembersReviewTasks) {
+				toast.showError("You don't have permission to approve or reject tasks.");
+				return;
+			}
+			
+			if (isToDoTarget) {
 				// Moving back to To Do = reject
 				setDragReviewModal({ isOpen: true, taskId, targetColumn: column, action: "reject" });
 				setDragReviewReason("");
 				return;
-			} else if (targetCategoryName === "done") {
+			} else if (isDoneTarget) {
 				// Moving to Done = approve
 				setDragReviewModal({ isOpen: true, taskId, targetColumn: column, action: "approve" });
 				setDragReviewReason("");
-				return;
-			}
-		}
-		
-		if (targetCategoryName === "done" && !isAdminOrOwner && projectRole !== "manager") {
-			const canMoveAssignedTaskToDone = canMembersMoveTaskToDone && isTaskAssignedToMe(currentLocation.task);
-			if (!canMoveAssignedTaskToDone) {
 				return;
 			}
 		}
@@ -796,10 +826,6 @@ function KanbanPage() {
 			await loadTaskCategories({ silent: true });
 		} catch (dropError) {
 			toast.showError(dropError?.message || "Unable to move task to this category.");
-			setTaskCategories((prev) => {
-				const reverted = moveTaskToCategory(prev, taskId, currentLocation.categoryId, currentLocation.task);
-				return reverted.next;
-			});
 		} finally {
 			clearTaskPending(taskId);
 		}
@@ -838,7 +864,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending]
+		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending, toast]
 	);
 
 
@@ -1268,7 +1294,7 @@ function KanbanPage() {
 									<div className="tf-status-line">
 										{(() => {
 											const statusClass = getStatusPillClass(columnName);
-											const statusLabel = statusClass === "pending" ? "To Review" : statusClass.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+											void statusClass;
 										})()}
 									</div>
 

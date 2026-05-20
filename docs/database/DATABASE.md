@@ -91,7 +91,6 @@ Important columns:
 - allow_member_add_board
 - allow_member_add_member
 - allow_member_review
-- allow_member_move_task_to_done
 - allow_assign_task_to_member
 - allow_admin_add_member
 - allow_admin_remove_member

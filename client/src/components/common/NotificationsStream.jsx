@@ -1,9 +1,47 @@
 import { useEffect, useRef } from "react";
+import { useToast } from "../../hooks/useToast";
 import { getToken } from "../../services/authService";
 
 export default function NotificationsStream() {
   const streamRef = useRef(null);
+  const toast = useToast();
   const token = getToken();
+
+  const handleIncomingPayload = (payload) => {
+    if (!payload || typeof payload !== "object") return;
+
+    window.dispatchEvent(new CustomEvent("notifications:push", { detail: payload }));
+    window.dispatchEvent(new CustomEvent("realtime:event", { detail: payload }));
+    window.dispatchEvent(new Event("notifications:updated"));
+
+    if (String(payload.eventType || "").toLowerCase() !== "toast") return;
+
+    const message = String(payload.message || "").trim();
+    if (!message) return;
+
+    const toastType = String(payload.toastType || "info").toLowerCase();
+    if (toastType === "forbidden") {
+      toast.showForbidden(message);
+      return;
+    }
+
+    if (toastType === "validation") {
+      toast.showValidationError(message);
+      return;
+    }
+
+    if (toastType === "warning") {
+      toast.showWarning(message);
+      return;
+    }
+
+    if (toastType === "success") {
+      toast.showSuccess(message);
+      return;
+    }
+
+    toast.showInfo(message);
+  };
 
   useEffect(() => {
     if (!token) return undefined;
@@ -16,8 +54,7 @@ export default function NotificationsStream() {
       if (!event?.data) return;
       try {
         const payload = JSON.parse(event.data);
-        window.dispatchEvent(new CustomEvent("notifications:push", { detail: payload }));
-        window.dispatchEvent(new Event("notifications:updated"));
+        handleIncomingPayload(payload);
       } catch {
         // Ignore malformed events.
       }
