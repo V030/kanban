@@ -1,5 +1,6 @@
 import {
   getNotificationsForUser,
+  getNotificationsForUserCursor,
   getUnreadCountForUser,
   markNotificationRead,
   markAllNotificationsRead,
@@ -12,8 +13,28 @@ export async function getNotifications(req, res) {
 
   const limit = Number(req.query?.limit ?? 50);
   const offset = Number(req.query?.offset ?? 0);
+  const cursor = req.query?.cursor || null;
 
   try {
+    if (cursor) {
+      // Cursor-based pagination path
+      const { rows, hasMore } = await getNotificationsForUserCursor({ userId: req.user.userId, limit, cursor });
+      const notifications = rows || [];
+      let nextCursor = null;
+      if (hasMore && notifications.length > 0) {
+        const last = notifications[notifications.length - 1];
+        try {
+          const payload = JSON.stringify({ createdAt: last.created_at, id: last.id });
+          nextCursor = Buffer.from(payload, "utf8").toString("base64");
+        } catch (e) {
+          nextCursor = null;
+        }
+      }
+
+      return res.status(200).json({ notifications, nextCursor, hasMore: Boolean(hasMore) });
+    }
+
+    // Fallback: offset-based behavior for backwards compatibility
     const notifications = await getNotificationsForUser({ userId: req.user.userId, limit, offset });
     return res.status(200).json({ notifications });
   } catch (error) {

@@ -18,6 +18,8 @@ import {
   updateTaskName,
   assignTaskToOthers,
   unassignTaskFromMember,
+  takeTask,
+  unassignTask,
   getProjectTags,
   getTaskTags,
   createTaskTag,
@@ -34,19 +36,21 @@ export default function TaskDetailsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { taskId, projectId } = useParams();
-  const { showError, showNotFound } = useToast();
+  const { showError, showNotFound, showSuccess } = useToast();
 
   const initialTask = location.state?.task || null;
   const initialProject = location.state?.project || null;
   const initialMembers = location.state?.projectMembers || [];
   const hasInitialIsAdmin = Object.prototype.hasOwnProperty.call(location.state || {}, "isAdminOrOwner");
-  const hasInitialCanAssign = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersAssignTaskToOthers");
+  
   const hasInitialCanReview = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersReviewTasks");
   const hasInitialCanDelete = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersDeleteTask");
   const initialIsAdmin = location.state?.isAdminOrOwner || false;
   const initialCanAssign = location.state?.canMembersAssignTaskToOthers || false;
   const initialCanReview = location.state?.canMembersReviewTasks || false;
   const initialCanDelete = location.state?.canMembersDeleteTask || false;
+  const initialCanCreateTag = location.state?.canMembersCreateTag || false;
+  const initialCanManageTasks = location.state?.canAdminsManageTasks ?? false;
 
   const [task, setTask] = useState(initialTask);
   const [project, setProject] = useState(initialProject);
@@ -55,8 +59,11 @@ export default function TaskDetailsPage() {
   const [taskLoading, setTaskLoading] = useState(false);
   const [isAdminOrOwner, setIsAdminOrOwner] = useState(initialIsAdmin);
   const [canMembersAssignTaskToOthers, setCanMembersAssignTaskToOthers] = useState(initialCanAssign);
+  const [canMembersTakeTask, setCanMembersTakeTask] = useState(false);
   const [canMembersReviewTasks, setCanMembersReviewTasks] = useState(initialCanReview);
   const [canMembersDeleteTask, setCanMembersDeleteTask] = useState(initialCanDelete);
+  const [canMembersCreateTag, setCanMembersCreateTag] = useState(initialCanCreateTag);
+  const [canAdminsManageTasks, setCanAdminsManageTasks] = useState(initialCanManageTasks);
 
   const currentUser = getCurrentUser();
 
@@ -83,11 +90,15 @@ export default function TaskDetailsPage() {
     try {
       const settings = await getProjectSettings(resolvedProjectId);
       const nextCanAssign = !!settings?.allow_assign_task_to_member;
+      const nextCanTake = !!settings?.allow_member_take_task;
       const nextCanReview = !!settings?.allow_member_review;
       const nextCanDelete = !!settings?.allow_member_delete_task;
-      if (!hasInitialCanAssign) {
-        setCanMembersAssignTaskToOthers(nextCanAssign);
-      }
+      const nextCanCreateTag = !!settings?.allow_member_create_tag;
+      const nextCanManageTasks = !!settings?.allow_admin_manage_tasks;
+      setCanMembersAssignTaskToOthers(nextCanAssign);
+      setCanMembersTakeTask(nextCanTake);
+      setCanMembersCreateTag(nextCanCreateTag);
+      setCanAdminsManageTasks(nextCanManageTasks);
       if (!hasInitialCanReview) {
         setCanMembersReviewTasks(nextCanReview);
       }
@@ -95,9 +106,10 @@ export default function TaskDetailsPage() {
         setCanMembersDeleteTask(nextCanDelete);
       }
     } catch (err) {
-      if (!hasInitialCanAssign) {
-        setCanMembersAssignTaskToOthers(false);
-      }
+      setCanMembersAssignTaskToOthers(false);
+      setCanMembersTakeTask(false);
+      setCanMembersCreateTag(false);
+      setCanAdminsManageTasks(false);
       if (!hasInitialCanReview) {
         setCanMembersReviewTasks(false);
       }
@@ -105,7 +117,7 @@ export default function TaskDetailsPage() {
         setCanMembersDeleteTask(false);
       }
     }
-  }, [hasInitialCanAssign, hasInitialCanReview, hasInitialCanDelete, project?.id, projectId]);
+  }, [hasInitialCanReview, hasInitialCanDelete, project?.id, projectId]);
 
   useEffect(() => {
     const projectIdToUse = projectId || project?.id;
@@ -159,7 +171,7 @@ export default function TaskDetailsPage() {
           const role = String(found.requesterRole || "").toLowerCase();
           setIsAdminOrOwner(role === "owner" || role === "admin");
         }
-        if (!hasInitialCanAssign && found.allowAssignTaskToOthers !== undefined) {
+        if (found.allowAssignTaskToOthers !== undefined) {
           setCanMembersAssignTaskToOthers(!!found.allowAssignTaskToOthers);
         }
       }
@@ -189,7 +201,7 @@ export default function TaskDetailsPage() {
         setTaskLoading(false);
       }
     }
-  }, [hasInitialCanAssign, hasInitialIsAdmin, navigate, project?.id, projectId, showError, showNotFound]);
+  }, [hasInitialIsAdmin, navigate, project?.id, projectId, showError, showNotFound]);
 
   useEffect(() => {
     if (!taskId) return;
@@ -284,15 +296,21 @@ export default function TaskDetailsPage() {
 
   const handleDeleteTask = async (tId) => {
     if (!tId) return;
-    await deleteTask(tId);
+    try {
+      await deleteTask(tId);
+      showSuccess("Task removed successfully.");
 
-    if (projectId || project?.id) {
-      const pId = projectId || project.id;
-      navigate(`/main-page/projects/${pId}/kanban`, { replace: true });
-      return;
+      if (projectId || project?.id) {
+        const pId = projectId || project.id;
+        navigate(`/main-page/projects/${pId}/kanban`, { replace: true });
+        return;
+      }
+
+      navigate("/main-page/my-tasks", { replace: true });
+    } catch (error) {
+      showError(error?.message || "Unable to delete task.");
+      throw error;
     }
-
-    navigate("/main-page/my-tasks", { replace: true });
   };
 
   const handleClose = () => {
@@ -334,10 +352,6 @@ export default function TaskDetailsPage() {
             <h1 className="page-title">Task Details</h1>
             <p className="page-subtitle">Review task information and manage assignee view.</p>
           </div>
-
-          <button type="button" className="tdm-close-btn" onClick={handleClose} aria-label="Close task details">
-            &times;
-          </button>
         </div>
       </header>
 
@@ -349,10 +363,15 @@ export default function TaskDetailsPage() {
         projectId={project?.id}
         isAdminOrOwner={isAdminOrOwner}
         canMembersAssignTaskToOthers={canMembersAssignTaskToOthers}
+        canMembersTakeTask={canMembersTakeTask}
         canMembersReviewTasks={canMembersReviewTasks}
         canMembersDeleteTask={canMembersDeleteTask}
+        canMembersCreateTag={canMembersCreateTag}
+        canAdminsManageTasks={canAdminsManageTasks}
         assignMemberToTask={handleAssignMemberToTask}
         unassignMemberFromTask={handleUnassignMemberFromTask}
+        takeSelfTask={async (tId) => takeTask(tId)}
+        unassignSelfTask={async (tId) => unassignTask(tId)}
         createSubtasks={async ({ subtaskData }) => createSubtask(subtaskData)}
         fetchTaskComments={async (tId) => getTaskComments(tId)}
         addTaskComment={async (tId, userId, comment) => createTaskComment(tId, userId, comment)}

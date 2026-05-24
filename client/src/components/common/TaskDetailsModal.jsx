@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "../../services/authService";
 import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask } from "../../services/projectService";
 import { SkeletonCommentInline } from "./SkeletonComponents";
-import { SendIcon, ClearDateIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon } from "./AppIcons";
+import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon } from "./AppIcons";
 import "../styles/TaskDetailsModal.css";
 import "../styles/SkeletonLoading.css";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
@@ -106,17 +106,6 @@ function getReviewEntryComment(review) {
   return String(raw).trim();
 }
 
-function formatCategoryLabel(value) {
-  return String(value || "")
-    .replace(/_/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => capitalizeFirst(part))
-    .join(" ");
-}
-
 const TASK_PRIORITY_OPTIONS = ["unset", "low", "medium", "high", "urgent"];
 
 function normalizeTaskPriority(value) {
@@ -127,7 +116,7 @@ function normalizeTaskPriority(value) {
   return "unset";
 }
 
-export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersReviewTasks = false, canMembersDeleteTask = false, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
+export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersTakeTask = false, canMembersReviewTasks = false, canMembersDeleteTask = false, canMembersCreateTag = false, canAdminsManageTasks = false, assignMemberToTask, unassignMemberFromTask, takeSelfTask, unassignSelfTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
   const taskData = task || {};
   const currentUser = useMemo(() => getCurrentUser(), []);
   const currentUserIdValue = currentUserId || currentUser?.id || "";
@@ -191,37 +180,71 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const [rejectReason, setRejectReason] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const isCurrentUserAssigned = useMemo(() => {
-    if (!currentUserIdValue) return false;
-    return assignees.some((member) => String(member?.id || member?.user_id || "") === String(currentUserIdValue));
-  }, [assignees, currentUserIdValue]);
-  const canEditTaskTitle = useMemo(() => {
-    if (!currentUserIdValue) return false;
-    const creatorId = taskData?.createdBy || taskData?.created_by;
-    if (creatorId && String(creatorId) === String(currentUserIdValue)) return true;
-    return assignees.some((member) => String(member?.id || member?.user_id || "") === String(currentUserIdValue));
-  }, [assignees, currentUserIdValue, taskData?.createdBy, taskData?.created_by]);
   const currentMemberEntry = useMemo(() => {
     if (!Array.isArray(projectMembers)) return null;
     return projectMembers.find((m) => String(m?.id) === String(currentUserIdValue));
   }, [projectMembers, currentUserIdValue]);
 
   const currentUserRole = String(currentMemberEntry?.role || "").toLowerCase();
+  const isCurrentUserAssigned = useMemo(() => {
+    if (!currentUserIdValue) return false;
+    return assignees.some((member) => String(member?.id || member?.user_id || "") === String(currentUserIdValue));
+  }, [assignees, currentUserIdValue]);
+  const canEditTaskTitle = useMemo(() => {
+    if (currentUserRole === "owner") return true;
+    if (currentUserRole === "admin") return canAdminsManageTasks;
+    if (!currentUserIdValue) return false;
+    const creatorId = taskData?.createdBy || taskData?.created_by;
+    if (creatorId && String(creatorId) === String(currentUserIdValue)) return true;
+    return assignees.some((member) => String(member?.id || member?.user_id || "") === String(currentUserIdValue));
+  }, [assignees, canAdminsManageTasks, currentUserIdValue, currentUserRole, taskData?.createdBy, taskData?.created_by]);
+  const canManageAdminTaskActions = currentUserRole === "owner" || (currentUserRole === "admin" && canAdminsManageTasks);
   const canReview = isAdminOrOwner || currentUserRole === "manager" || (currentUserRole === "member" && canMembersReviewTasks);
-  const canChangeTaskCategory = isAdminOrOwner || currentUserRole === "manager" || isCurrentUserAssigned;
+  const canManageTags = isAdminOrOwner || (currentUserRole === "member" && canMembersCreateTag);
+  const canChangeTaskCategory = canManageAdminTaskActions || currentUserRole === "manager" || (currentUserRole === "member" && isCurrentUserAssigned);
+
+  const taskMenuStatusOptions = useMemo(() => {
+    const normalizedCategories = (taskCategories || []).map((category) => ({
+      id: String(category?.id || ""),
+      name: String(category?.name || "").trim().toLowerCase(),
+    }));
+
+    return [
+      { key: "todo", label: "Todo", names: ["todo", "to_do"] },
+      { key: "in_progress", label: "In Progress", names: ["in_progress", "in progress"] },
+      { key: "done", label: "Done", names: ["done"] },
+      { key: "cancelled", label: "Cancelled", names: ["cancelled", "canceled"] },
+    ].map((entry) => {
+      const category = normalizedCategories.find((item) => entry.names.includes(item.name));
+      return {
+        key: entry.key,
+        label: entry.label,
+        categoryId: category?.id || "",
+        disabled: !category?.id,
+      };
+    });
+  }, [taskCategories]);
   const taskTitleRef = useRef(null);
   const taskDescRef = useRef(null);
+  const taskTargetDateRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState(null);
   const dropdownRef = useRef(null);
   const menuButtonRef = useRef(null);
 
+  useEffect(() => {
+    if (!canManageAdminTaskActions && menuOpen) {
+      setMenuOpen(false);
+    }
+  }, [canManageAdminTaskActions, menuOpen]);
+
   const updateMenuPosition = useCallback(() => {
     const button = menuButtonRef.current;
+    const dropdown = dropdownRef.current;
     if (!button) return;
 
     const rect = button.getBoundingClientRect();
-    const dropdownWidth = 240;
+    const dropdownWidth = dropdown?.offsetWidth || 320;
     const gap = 8;
     const viewportPadding = 8;
     const maxLeft = Math.max(viewportPadding, window.innerWidth - dropdownWidth - viewportPadding);
@@ -562,6 +585,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const handleAddTag = async (tagName) => {
     const name = (tagName || tagInput || "").trim();
     if (!task?.id || !name) return;
+    if (!canManageTags) {
+      setTagError("Tag editing is disabled for your project role.");
+      return;
+    }
     if ((tags || []).length >= 5) {
       setTagError("A task may have up to 5 tags");
       return;
@@ -597,6 +624,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const handleDeleteTag = async (tag) => {
     if (!tag?.id || !task?.id) return;
+    if (!canManageTags) {
+      setTagError("Tag editing is disabled for your project role.");
+      return;
+    }
     const tagId = tag.id;
     const previousTags = Array.isArray(tags) ? [...tags] : [];
 
@@ -681,6 +712,11 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       return;
     }
 
+    if (currentUserRole === "admin" && !canAdminsManageTasks) {
+      setTaskTitleError("Task management is disabled for admins in this project.");
+      return;
+    }
+
     if (!task?.id || taskTitleSaving || !updateTaskName) {
       setIsEditingTaskTitle(false);
       setTaskTitle(trimmed);
@@ -705,6 +741,11 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     const trimmed = taskDescDraft.replace(/[\r\n]+/g, " ").trim();
     if (!trimmed) {
       setTaskDescError("Task description cannot be empty.");
+      return;
+    }
+
+    if (currentUserRole === "admin" && !canAdminsManageTasks) {
+      setTaskDescError("Task management is disabled for admins in this project.");
       return;
     }
 
@@ -756,6 +797,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const handleDeleteTask = async () => {
     if (!task?.id || !onDeleteTask || deleteTaskSubmitting) return;
+    if (currentUserRole === "admin" && !canAdminsManageTasks) {
+      setDeleteTaskError("Task management is disabled for admins in this project.");
+      return;
+    }
 
     setDeleteTaskError("");
     setDeleteTaskSubmitting(true);
@@ -786,6 +831,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const handleUpdateTaskPriority = async (nextPriority) => {
     if (!task?.id || !nextPriority) return;
+    if (currentUserRole === "admin" && !canAdminsManageTasks) {
+      setPriorityError("Task management is disabled for admins in this project.");
+      return;
+    }
 
     const normalized = normalizeTaskPriority(nextPriority);
     setPriorityError("");
@@ -806,6 +855,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const handleUpdateTaskCategory = async (nextCategoryId) => {
     if (!task?.id || !nextCategoryId) return;
+    if (currentUserRole === "admin" && !canAdminsManageTasks) {
+      setTaskCategoryError("Task management is disabled for admins in this project.");
+      return;
+    }
 
     const currentCategoryName = String(task?.categoryName || "").trim().toLowerCase();
     const nextCategory = (taskCategories || []).find((cat) => String(cat?.id || "") === String(nextCategoryId || ""));
@@ -857,6 +910,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const handleUpdateTargetDate = async (nextValue) => {
     if (!task?.id) return;
+    if (currentUserRole === "admin" && !canAdminsManageTasks) {
+      setTargetDateError("Task management is disabled for admins in this project.");
+      return;
+    }
 
     setTargetDateError("");
 
@@ -906,6 +963,9 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     const memberId = resolvedMemberId || `${index}-${getMemberLabel(member)}`;
     const isAssigned = resolvedMemberId ? localAssignedIds.includes(resolvedMemberId) : false;
     const isPending = resolvedMemberId ? assignmentPendingIds[resolvedMemberId] : false;
+    const isCurrentUserRow = resolvedMemberId && String(resolvedMemberId) === String(currentUserIdValue);
+    const canToggleSelf = isCurrentUserRow && (isAdminOrOwner || canMembersTakeTask);
+    const canToggleOthers = !isCurrentUserRow && (isAdminOrOwner || (canMembersTakeTask && canMembersAssignTaskToOthers));
     const roleLabel = member?.role || member?.projectRole || member?.project_role;
     const emailLabel = member?.email;
 
@@ -932,7 +992,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
           </div>
         </div>
 
-        {(canMembersAssignTaskToOthers || isAdminOrOwner) && (
+        {(canToggleOthers || canToggleSelf) && (
           <button
             type="button"
             className={`tdm-assign-btn ${isAssigned ? "is-assigned" : ""}`}
@@ -945,7 +1005,13 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 setAssignment(member, shouldAssign);
                 setAssignmentPendingIds((prev) => ({ ...prev, [resolvedMemberId]: true }));
 
-                if (shouldAssign) {
+                if (isCurrentUserRow) {
+                  if (shouldAssign) {
+                    await takeSelfTask?.(task.id);
+                  } else {
+                    await unassignSelfTask?.(task.id);
+                  }
+                } else if (shouldAssign) {
                   await assignMemberToTask?.(task.id, member.id);
                 } else {
                   await unassignMemberFromTask?.(task.id, member.id);
@@ -969,7 +1035,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
             }}
             disabled={isPending}
           >
-            {isPending ? "Updating..." : (isAssigned ? "Assigned" : "Assign")}
+            {isPending ? "Updating..." : (isCurrentUserRow ? (isAssigned ? "Assigned" : "Take") : (isAssigned ? "Assigned" : "Assign"))}
           </button>
         )}
       </li>
@@ -1162,17 +1228,19 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
               <div className="tdm-section-header">
                 <h3 className="tdm-task-title-label">Task</h3>
                 <div className="task-actions-wrap">
-                
-                <button
-                  className="task-more-btn"
-                  onClick={() => setMenuOpen(prev => !prev)}
-                  aria-expanded={menuOpen}
-                  aria-haspopup="true"
-                  title="More actions"
-                  ref={menuButtonRef}
-                >
-                  ⋯
-                </button>
+
+                {canManageAdminTaskActions && (
+                  <button
+                    className="task-more-btn"
+                    onClick={() => setMenuOpen(prev => !prev)}
+                    aria-expanded={menuOpen}
+                    aria-haspopup="true"
+                    title="More actions"
+                    ref={menuButtonRef}
+                  >
+                    ⋯
+                  </button>
+                )}
 
                 {menuOpen && (
                   <div
@@ -1182,41 +1250,17 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     aria-label="Task actions"
                     style={menuPosition ? { top: `${menuPosition.top}px`, left: `${menuPosition.left}px` } : undefined}
                   >
-                    <div className="dropdown-section">
-                      <p className="dropdown-label">Target Date</p>
-                      <div className="tdm-target-row">
-                        <input
-                          type="date"
-                          className="tdm-input tdm-target-input"
-                          value={toDateInputValue(targetDate)}
-                          onChange={(event) => {
-                            const next = event.target.value || null;
-                            handleUpdateTargetDate(next);
-                            // keep dropdown open for quick edits
-                          }}
-                          disabled={targetDateSubmitting}
-                        />
-
-                        <button
-                          type="button"
-                          className="tdm-target-clear"
-                          onClick={() => handleUpdateTargetDate(null)}
-                          disabled={targetDateSubmitting || !targetDate}
-                          aria-label="Clear date"
-                        >
-                          <ClearDateIcon size={18} />
-                        </button>
+                    <div className="dropdown-row dropdown-row--select">
+                      <div className="dropdown-label-row">
+                        <span className="dropdown-label-dot" aria-hidden="true" />
+                        <span className="dropdown-label-text">Priority</span>
                       </div>
-                    </div>
-
-                    <div className="dropdown-section">
-                      <p className="dropdown-label">Priority</p>
                       <select
                         id={`task-priority-${taskData.id || "unknown"}`}
-                        className="tdm-priority-select"
+                        className="tdm-menu-select"
                         value={taskPriority}
                         onChange={(event) => handleUpdateTaskPriority(event.target.value)}
-                        disabled={prioritySubmitting}
+                        disabled={prioritySubmitting || (currentUserRole === "admin" && !canAdminsManageTasks)}
                       >
                         {TASK_PRIORITY_OPTIONS.map((priorityOption) => (
                           <option key={priorityOption} value={priorityOption}>
@@ -1226,94 +1270,79 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                       </select>
                     </div>
 
-                    <div className="dropdown-section">
-                      <p className="dropdown-label">Mark as</p>
-                      {(() => {
-                        const currentCategory = (taskCategories || []).find((cat) => String(cat?.id || "") === String(taskCategoryId || ""));
-                        const currentCategoryName = String(currentCategory?.name || "").trim().toLowerCase();
-                        const isTaskInDone = currentCategoryName === "done";
-                        const isTaskInToReview = currentCategoryName === "to_review" || currentCategoryName === "to review";
-
-                        return (
-                          <>
-                            <select
-                              id={`task-category-${taskData.id || "unknown"}`}
-                              className="tdm-priority-select"
-                              value={taskCategoryId || ""}
-                              onChange={(event) => handleUpdateTaskCategory(event.target.value)}
-                              disabled={isTaskInDone || taskCategorySubmitting || !canChangeTaskCategory || (Array.isArray(taskCategories) && taskCategories.length === 0)}
-                            >
-                              <option value="" disabled>
-                                Select status
-                              </option>
-                              {(taskCategories || []).map((category) => {
-                                const categoryId = String(category?.id || "");
-                                const categoryName = String(category?.name || "");
-                                const isDoneCategory = categoryName.trim().toLowerCase() === "done";
-                                const isTodoCategory = categoryName.trim().toLowerCase() === "to_do" || categoryName.trim().toLowerCase() === "todo";
-                                const disableDoneForMember = isDoneCategory && !isAdminOrOwner && !(currentUserRole === "manager" || currentUserRole === "member");
-                                const disableTodoFromReview = isTodoCategory && isTaskInToReview && !isAdminOrOwner && !(currentUserRole === "manager" || (currentUserRole === "member" && canMembersReviewTasks));
-
-                                return (
-                                  <option key={categoryId || categoryName} value={categoryId} disabled={disableDoneForMember || disableTodoFromReview}>
-                                    {formatCategoryLabel(categoryName)}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                            {isTaskInDone && (
-                              <p className="tdm-dropdown-note">Tasks in Done cannot be moved to another status.</p>
-                            )}
-                            {!canChangeTaskCategory && (
-                              <p className="tdm-dropdown-note">Assigned users only.</p>
-                            )}
-                            {canChangeTaskCategory && !isAdminOrOwner && (
-                              <p className="tdm-dropdown-note">
-                                Assigned members can move tasks to Done only when project settings allow it.
-                              </p>
-                            )}
-                            {taskCategoryError && <p className="tdm-dropdown-note">Status update failed.</p>}
-                            {taskCategorySubmitting && <p className="tdm-dropdown-note">Updating...</p>}
-                          </>
-                        );
-                      })()}
+                    <div className="dropdown-row dropdown-row--select">
+                      <div className="dropdown-label-row">
+                        <span className="dropdown-label-dot" aria-hidden="true" />
+                        <span className="dropdown-label-text">Status</span>
+                      </div>
+                      <select
+                        id={`task-category-${taskData.id || "unknown"}`}
+                        className="tdm-menu-select"
+                        value={taskCategoryId || ""}
+                        onChange={(event) => handleUpdateTaskCategory(event.target.value)}
+                        disabled={taskCategorySubmitting || !canChangeTaskCategory || (Array.isArray(taskCategories) && taskCategories.length === 0)}
+                        aria-invalid={!!taskCategoryError}
+                        title={taskCategoryError || ""}
+                      >
+                        <option value="" disabled>
+                          Select status
+                        </option>
+                        {taskMenuStatusOptions.map((statusOption) => (
+                          <option key={statusOption.key} value={statusOption.categoryId} disabled={statusOption.disabled}>
+                            {statusOption.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
-                                    <div className="dropdown-section">
-                                      <p className="dropdown-label">Review History</p>
-                                      <button
-                                        type="button"
-                                        className="tdm-manage-tags-btn tdm-review-history-btn"
-                                        onClick={() => { setMenuOpen(false); setShowReviewModal(true); }}
-                                      >
-                                        View review history
-                                      </button>
-                                    </div>
+                    <div className="task-dropdown-divider" />
 
-                    <div className="dropdown-section">
-                      <p className="dropdown-label">Assignees</p>
+                    <div className="dropdown-row dropdown-row--date">
+                      <div className="dropdown-label-row">
+                        <span className="dropdown-label-dot" aria-hidden="true" />
+                        <span className="dropdown-label-text">Set target date</span>
+                      </div>
+                      <input
+                        ref={taskTargetDateRef}
+                        type="date"
+                        className="tdm-menu-date-input"
+                        value={toDateInputValue(targetDate)}
+                        onChange={(event) => {
+                          const next = event.target.value || null;
+                          handleUpdateTargetDate(next);
+                        }}
+                        disabled={targetDateSubmitting || (currentUserRole === "admin" && !canAdminsManageTasks)}
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      className="task-dropdown-item"
+                      onClick={() => { setMenuOpen(false); setShowReviewModal(true); }}
+                    >
+                      Review history
+                    </button>
+
+                    <button
+                      type="button"
+                      className="task-dropdown-item"
+                      onClick={() => { setMenuOpen(false); setShowAssigneesModal(true); }}
+                    >
+                      Assignees
+                    </button>
+
+                    <div className="task-dropdown-divider" />
+
+                    {(currentUserRole === "member" ? canMembersDeleteTask : canManageAdminTaskActions) && onDeleteTask && (
                       <button
                         type="button"
-                        className="tdm-view-assignees-btn"
-                        onClick={() => { setMenuOpen(false); setShowAssigneesModal(true); }}
+                        className="task-dropdown-item task-dropdown-item--danger"
+                        onClick={openDeleteConfirm}
+                        disabled={deleteTaskSubmitting}
+                        title={deleteTaskError || "Remove task"}
                       >
-                        View Assignees
+                        Remove task
                       </button>
-                    </div>
-
-                    {(isAdminOrOwner || canMembersDeleteTask) && onDeleteTask && (
-                      <div className="dropdown-section">
-                        <p className="dropdown-label">Remove Task</p>
-                        <button
-                          type="button"
-                          className="tdm-delete-task-btn"
-                          onClick={openDeleteConfirm}
-                          disabled={deleteTaskSubmitting}
-                        >
-                          Remove Task
-                        </button>
-                        {deleteTaskError && <p className="tdm-delete-task-error">{deleteTaskError}</p>}
-                      </div>
                     )}
                   </div>
                 )}
@@ -1421,22 +1450,26 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                   <span key={t.id || t.tagName} className="tdm-tag">
                     <span className="tdm-tag-name">{t.tagName || t.tag_name}</span>
                     {t?.isPending && <span className="tdm-tag-pending">Saving...</span>}
-                    <button
-                      type="button"
-                      className="tdm-tag-remove"
-                      onClick={() => handleDeleteTag(t)}
-                      disabled={deletingTagId === t.id || t?.isPending}
-                      aria-label={`Remove tag ${t.tagName || t.tag_name}`}
-                    >
-                      ×
-                    </button>
+                    {canManageTags && (
+                      <button
+                        type="button"
+                        className="tdm-tag-remove"
+                        onClick={() => handleDeleteTag(t)}
+                        disabled={deletingTagId === t.id || t?.isPending}
+                        aria-label={`Remove tag ${t.tagName || t.tag_name}`}
+                      >
+                        ×
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
 
-              <button type="button" className="tdm-manage-tags-btn" onClick={() => setShowTagsModal(true)}>
-                Manage Tags
-              </button>
+              {canManageTags && (
+                <button type="button" className="tdm-manage-tags-btn" onClick={() => setShowTagsModal(true)}>
+                  Manage Tags
+                </button>
+              )}
               {canReview && (Array.isArray(taskCategories) ? taskCategories.find(c => String(c.id) === String(taskCategoryId) && String((c.name||c.name).toLowerCase()).includes('review')) : false) ? (
                 <div className="tdm-review-actions">
                   <button type="button" className="tdm-approve-btn" onClick={openApproveModal}>Approve</button>
@@ -1748,19 +1781,21 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
             {tagError && <p className="tdm-tag-error">{tagError}</p>}
 
             <div className="tdm-tag-composer">
-              <input
-                type="text"
-                placeholder="Type tag and press Enter"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={async (e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    await handleAddTag(tagInput);
-                  }
-                }}
-                className="tdm-input tdm-tag-input"
-              />
+              {canManageTags && (
+                <input
+                  type="text"
+                  placeholder="Type tag and press Enter"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      await handleAddTag(tagInput);
+                    }
+                  }}
+                  className="tdm-input tdm-tag-input"
+                />
+              )}
 
               <div className="tdm-current-tags">
                 {(tags || []).length === 0 ? (
@@ -1773,15 +1808,17 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                       <span key={id} className="tdm-tag tdm-current-tag">
                         <span className="tdm-tag-name">{name}</span>
                         {t?.isPending && <span className="tdm-tag-pending">Saving...</span>}
-                        <button
-                          type="button"
-                          className="tdm-tag-remove"
-                          onClick={() => handleDeleteTag(t)}
-                          disabled={deletingTagId === t.id || t?.isPending}
-                          aria-label={`Remove tag ${name}`}
-                        >
-                          ×
-                        </button>
+                        {canManageTags && (
+                          <button
+                            type="button"
+                            className="tdm-tag-remove"
+                            onClick={() => handleDeleteTag(t)}
+                            disabled={deletingTagId === t.id || t?.isPending}
+                            aria-label={`Remove tag ${name}`}
+                          >
+                            ×
+                          </button>
+                        )}
                       </span>
                     );
                   })
@@ -1795,6 +1832,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 {(projectTagSuggestions || []).map((s, i) => {
                   const name = s?.tagName || s?.tag_name || s?.name || String(s);
                   const key = s?.id || name + "-" + i;
+                  if (!canManageTags) return null;
                   return (
                     <button
                       key={key}

@@ -216,14 +216,61 @@ export async function getTaskById({ taskId, requesterId }) {
   };
 }
 
-export async function getMyTasks({ requesterId }) {
+function encodeMyTasksCursor(row) {
+  if (!row) return null;
+  return Buffer.from(JSON.stringify({
+    projectName: row.project_name,
+    statusPosition: row.status_position,
+    statusName: row.status_name,
+    taskPosition: row.position,
+    createdAt: row.created_at,
+    id: row.id,
+  }), "utf8").toString("base64");
+}
+
+function decodeMyTasksCursor(cursor) {
+  if (!cursor) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(String(cursor), "base64").toString("utf8"));
+    return {
+      projectName: String(decoded.projectName || ""),
+      statusPosition: Number.isFinite(Number(decoded.statusPosition)) ? Number(decoded.statusPosition) : null,
+      statusName: String(decoded.statusName || ""),
+      taskPosition: Number.isFinite(Number(decoded.taskPosition)) ? Number(decoded.taskPosition) : null,
+      createdAt: decoded.createdAt || null,
+      id: decoded.id || null,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function getMyTasks({ requesterId, limit = 50, cursor = null }) {
   const normalizedRequesterId = (requesterId || "").trim();
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+  const decodedCursor = decodeMyTasksCursor(cursor);
 
   if (!normalizedRequesterId) {
     const error = new Error("requesterId is required");
     error.code = "INVALID_USER";
     throw error;
   }
+
+  const cursorClause = decodedCursor
+    ? `
+      AND (
+        p.name > $2
+        OR (p.name = $2 AND tc."position" > $3)
+        OR (p.name = $2 AND tc."position" = $3 AND tc.name > $4)
+        OR (p.name = $2 AND tc."position" = $3 AND tc.name = $4 AND t."position" > $5)
+        OR (p.name = $2 AND tc."position" = $3 AND tc.name = $4 AND t."position" = $5 AND t.created_at > $6)
+        OR (p.name = $2 AND tc."position" = $3 AND tc.name = $4 AND t."position" = $5 AND t.created_at = $6 AND t.id > $7)
+      )`
+    : "";
+
+  const queryParams = decodedCursor
+    ? [normalizedRequesterId, decodedCursor.projectName, decodedCursor.statusPosition, decodedCursor.statusName, decodedCursor.taskPosition, decodedCursor.createdAt, decodedCursor.id, safeLimit + 1]
+    : [normalizedRequesterId, safeLimit + 1];
 
   const result = await pool.query(
     `
@@ -280,12 +327,26 @@ export async function getMyTasks({ requesterId }) {
     LEFT JOIN project_members pm_req ON pm_req.project_id = p.id AND pm_req.user_id = $1::uuid
     LEFT JOIN users u ON t.created_by = u.id
     WHERE my_assignee.user_id = $1::uuid
+    ${cursorClause}
     ORDER BY p.name ASC, tc."position" ASC, tc.name ASC, t."position" ASC, t.created_at ASC, t.id ASC
+    LIMIT $${decodedCursor ? 8 : 2}
     `,
-    [normalizedRequesterId]
+    queryParams
   );
 
-  return result.rows.map((row) => ({
+  const rows = result.rows;
+  const hasMore = rows.length > safeLimit;
+  const pageRows = hasMore ? rows.slice(0, safeLimit) : rows;
+
+  return {
+    rows: pageRows,
+    hasMore,
+    nextCursor: hasMore ? encodeMyTasksCursor(pageRows[pageRows.length - 1]) : null,
+  };
+}
+
+export function mapMyTasksRows(rows = []) {
+  return rows.map((row) => ({
     id: row.id,
     boardId: row.board_id,
     categoryId: row.category_id,
@@ -758,10 +819,18 @@ export async function createTask(taskData) {
 
 
     const access = await getProjectPermissionContext({ projectId, requesterId: createdBy });
-    if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_create_task) {
-      const error = new Error("Forbidden: task creation is disabled for members in this project");
-      error.code = "PROJECT_FORBIDDEN";
-      throw error;
+    if (!access.isOwner) {
+      if (access.isAdmin) {
+        if (!access.settings.allow_admin_manage_tasks) {
+          const error = new Error("Forbidden: task creation is disabled for admins in this project");
+          error.code = "PROJECT_FORBIDDEN";
+          throw error;
+        }
+      } else if (!access.settings.allow_member_create_task) {
+        const error = new Error("Forbidden: task creation is disabled for members in this project");
+        error.code = "PROJECT_FORBIDDEN";
+        throw error;
+      }
     }
 
     if (!projectId) {
@@ -1940,7 +2009,24 @@ export async function createTaskCategory(input) {
   return { id: row.id, projectId: row.project_id, name: row.name, position: row.position };
 }
 
-export async function assignTaskToOthers({ taskId, memberId }) {
+export async function assignTaskToOthers({ taskId, memberId, requesterId }) {
+  const access = await getTaskPermissionContext({ taskId, requesterId });
+  const isSelfAssignment = String(memberId || "") === String(requesterId || "");
+  const canSelfTake = access.isOwner || access.isAdmin || access.settings.allow_member_take_task;
+  const canAssignOthers = access.isOwner || access.isAdmin || access.isManager || (access.settings.allow_member_take_task && access.settings.allow_assign_task_to_member);
+
+  if (isSelfAssignment && !canSelfTake) {
+    const error = new Error("Forbidden: self-assigning tasks is disabled for your role in this project");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
+  if (!isSelfAssignment && !canAssignOthers) {
+    const error = new Error("Forbidden: assigning members to tasks is disabled for your role in this project");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
   const assignTask = await pool.query(
     `
     INSERT INTO task_assignees (task_id, user_id)
@@ -1958,7 +2044,14 @@ export async function assignTaskToOthers({ taskId, memberId }) {
   };
 }
 
-export async function unassignTaskFromMember({ taskId, memberId }) {
+export async function unassignTaskFromMember({ taskId, memberId, requesterId }) {
+  const access = await getTaskPermissionContext({ taskId, requesterId });
+  if (!access.isOwner && !access.isAdmin && !access.isManager) {
+    const error = new Error("Forbidden: you do not have permission to unassign other members from this task");
+    error.code = "PROJECT_FORBIDDEN";
+    throw error;
+  }
+
   const deleteResult = await pool.query(
     `
     DELETE FROM task_assignees
@@ -2050,10 +2143,18 @@ export async function deleteTask({ taskId, requesterId }) {
   }
 
   const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
-  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_delete_task) {
-    const error = new Error("Forbidden: deleting tasks is disabled for members in this project");
-    error.code = "TASK_FORBIDDEN";
-    throw error;
+  if (!access.isOwner) {
+    if (access.isAdmin) {
+      if (!access.settings.allow_admin_manage_tasks) {
+        const error = new Error("Forbidden: deleting tasks is disabled for admins in this project");
+        error.code = "TASK_FORBIDDEN";
+        throw error;
+      }
+    } else if (!access.settings.allow_member_delete_task) {
+      const error = new Error("Forbidden: deleting tasks is disabled for members in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
   }
 
   const client = await pool.connect();
@@ -2187,6 +2288,12 @@ export async function createTaskTag({ taskId, tagName, projectId, requesterId })
   }
 
   if (!access.isOwner && !access.isAdmin) {
+    if (!access.settings.allow_member_create_tag) {
+      const error = new Error("Forbidden: members cannot create tags in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
+
     const isCreatorOrAssignee = access.isCreator || access.isAssignee;
     if (!isCreatorOrAssignee) {
       const error = new Error("Forbidden: only the task creator or assignees can create tags");
@@ -2262,6 +2369,12 @@ export async function deleteTaskTag({ tagId, requesterId }) {
 
   const taskAccess = await getTaskPermissionContext({ taskId: tagAccessRow.task_id, requesterId: normalizedRequesterId });
   if (!taskAccess.isOwner && !taskAccess.isAdmin) {
+    if (!taskAccess.settings.allow_member_create_tag) {
+      const error = new Error("Forbidden: members cannot delete tags in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
+
     const isCreatorOrAssignee = taskAccess.isCreator || taskAccess.isAssignee;
     if (!isCreatorOrAssignee) {
       const error = new Error("Forbidden: only the task creator or assignees can delete tags");
@@ -2321,10 +2434,18 @@ export async function updateTaskPriority({ taskId, requesterId, priority }) {
 
   // Database enum may still use "critical"; map "urgent" to keep API/UI language consistent.
   const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
-  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_edit_task) {
-    const error = new Error("Forbidden: editing task priority is disabled for members in this project");
-    error.code = "TASK_FORBIDDEN";
-    throw error;
+  if (!access.isOwner) {
+    if (access.isAdmin) {
+      if (!access.settings.allow_admin_manage_tasks) {
+        const error = new Error("Forbidden: editing tasks is disabled for admins in this project");
+        error.code = "TASK_FORBIDDEN";
+        throw error;
+      }
+    } else if (!access.settings.allow_member_edit_task) {
+      const error = new Error("Forbidden: editing task priority is disabled for members in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
   }
 
   const dbPriority = normalizedPriority === "urgent" ? "critical" : normalizedPriority;
@@ -2376,10 +2497,18 @@ export async function updateTaskName({ taskId, requesterId, name }) {
   }
 
   const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
-  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_edit_task) {
-    const error = new Error("Forbidden: editing tasks is disabled for members in this project");
-    error.code = "TASK_FORBIDDEN";
-    throw error;
+  if (!access.isOwner) {
+    if (access.isAdmin) {
+      if (!access.settings.allow_admin_manage_tasks) {
+        const error = new Error("Forbidden: editing tasks is disabled for admins in this project");
+        error.code = "TASK_FORBIDDEN";
+        throw error;
+      }
+    } else if (!access.settings.allow_member_edit_task) {
+      const error = new Error("Forbidden: editing tasks is disabled for members in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
   }
 
   const updateResult = await pool.query(
@@ -2420,10 +2549,18 @@ export async function updateTaskDescription({ taskId, requesterId, description }
   }
 
   const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
-  if (!access.isOwner && !access.isAdmin && !access.settings.allow_member_edit_task) {
-    const error = new Error("Forbidden: editing tasks is disabled for members in this project");
-    error.code = "TASK_FORBIDDEN";
-    throw error;
+  if (!access.isOwner) {
+    if (access.isAdmin) {
+      if (!access.settings.allow_admin_manage_tasks) {
+        const error = new Error("Forbidden: editing tasks is disabled for admins in this project");
+        error.code = "TASK_FORBIDDEN";
+        throw error;
+      }
+    } else if (!access.settings.allow_member_edit_task) {
+      const error = new Error("Forbidden: editing tasks is disabled for members in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
   }
 
   const updateResult = await pool.query(
@@ -2440,13 +2577,35 @@ export async function updateTaskDescription({ taskId, requesterId, description }
   return { id: updated.id, description: updated.description };
 }
 
-export async function updateTaskTargetDate({ taskId, targetDate }) {
+export async function updateTaskTargetDate({ taskId, requesterId, targetDate }) {
   const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = (requesterId || "").trim();
 
   if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
     const error = new Error("taskId is required");
     error.code = "INVALID_TASK";
     throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+  if (!access.isOwner) {
+    if (access.isAdmin) {
+      if (!access.settings.allow_admin_manage_tasks) {
+        const error = new Error("Forbidden: editing tasks is disabled for admins in this project");
+        error.code = "TASK_FORBIDDEN";
+        throw error;
+      }
+    } else if (!access.settings.allow_member_edit_task) {
+      const error = new Error("Forbidden: editing tasks is disabled for members in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
   }
 
   const normalizedTargetDate = targetDate === null ? null : String(targetDate || "").trim();
@@ -2530,6 +2689,12 @@ export async function updateTaskStatus({ taskId, userId, categoryId }) {
   }
 
   const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedUserId });
+  if (access.isAdmin && !access.settings.allow_admin_manage_tasks) {
+    const error = new Error("Forbidden: editing tasks is disabled for admins in this project");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
   if (!access.isOwner && !access.isAdmin && !access.isManager && !access.isAssignee) {
     const error = new Error("Forbidden: only assigned users can move this task");
     error.code = "TASK_FORBIDDEN";

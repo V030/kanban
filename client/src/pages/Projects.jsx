@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
+import HeroActionButton from "../components/common/HeroActionButton";
+import { CreateProjectIcon, ProjectInvitationsIcon } from "../components/common/AppIcons";
 import CreateProjectModal from "../components/common/CreateProjectModal";
 import AddMemberModal from "../components/common/AddMemberModal";
 import ProjectInvitesModal from "../components/common/ProjectInvitesModal";
@@ -153,12 +155,19 @@ function Projects() {
             </div>
 
             <div className="projects-header-actions">
-              <button type="button" className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-                Create Project
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setIsInvitesOpen(true)}>
-                Project Invitations
-              </button>
+              <HeroActionButton
+                icon={<CreateProjectIcon />}
+                label="Create Project"
+                variant="primary"
+                onClick={() => setIsCreateModalOpen(true)}
+              />
+
+              <HeroActionButton
+                icon={<ProjectInvitationsIcon />}
+                label="Invitations"
+                variant="secondary"
+                onClick={() => setIsInvitesOpen(true)}
+              />
             </div>
           </div>
 
@@ -179,7 +188,11 @@ function Projects() {
             <p>{projects.length} total</p>
           </div>
 
-          {loading && <p className="status-text">Loading your projects...</p>}
+          {loading && (
+            <div style={{ textAlign: "center" }}>
+              <p className="status-text">Loading your projects...</p>
+            </div>
+          )}
 
           {!loading && projects.length === 0 && (
             <div className="empty-state-card">
@@ -222,7 +235,11 @@ function Projects() {
             <p>{memberProjects.length} total</p>
           </div>
 
-          {memberLoading && <p className="status-text">Loading shared projects...</p>}
+          {memberLoading && (
+            <div style={{ textAlign: "center" }}>
+              <p className="status-text">Loading shared projects...</p>
+            </div>
+          )}
 
           {!memberLoading && memberProjects.length === 0 && (
             <div className="empty-state-card">
@@ -248,6 +265,10 @@ function Projects() {
               </table>
             </div>
           )}
+        
+          <div className="page-footer-strip">
+            <p>Projects sync automatically as you create or join boards.</p>
+          </div>
         </section>
 
         <AddMemberModal

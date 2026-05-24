@@ -8,13 +8,15 @@
 /* ── Shell ───────────────────────────────────────────────── */
 .friends-shell {
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   padding: 0;
-  border-radius: 16px;
+  padding-bottom: 15px;
+  border-radius: 26px;
   border: 1px solid rgba(176, 196, 216, 0.5);
   background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(245,249,253,0.97) 100%);
   backdrop-filter: blur(2px);
   box-shadow: var(--shadow-md);
+  margin-top: -6px;
 }
 
 /* ── Tabs ─────────────────────────────────────────────────── */

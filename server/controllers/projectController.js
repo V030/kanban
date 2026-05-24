@@ -16,6 +16,7 @@ import { createProject as createProjectModel,
          updateProjectDescription as updateProjectDescriptionModel,
          takeProjectTask as takeProjectTaskModel,
          getMyTasks as getMyTasksModel,
+         mapMyTasksRows,
          updateTaskStatus as updateTaskStatusModel,
          createReview as createReviewModel,
          getReviewsByTask as getReviewsByTaskModel,
@@ -45,6 +46,7 @@ import { createProject as createProjectModel,
 
 import { getProjectMetrics as getProjectMetricsController } from "./metricsController.js";
 import { createNotification, getUserSummary, getProjectSummary, getTaskContext } from "../models/notificationModel.js";
+import { getTaskPermissionContext } from "../utils/projectPermissions.js";
 import { broadcastProjectEvent, broadcastToastEvent } from "../utils/realtimeBroadcaster.js";
 
 export { getProjectMetricsController as getProjectMetrics };
@@ -482,8 +484,15 @@ export async function getMyTasks(req, res) {
   }
 
   try {
-    const tasks = await getMyTasksModel({ requesterId: req.user.userId });
-    return res.status(200).json({ tasks });
+    const limit = Number(req.query?.limit || 50);
+    const cursor = req.query?.cursor ? String(req.query.cursor) : null;
+    const paged = await getMyTasksModel({ requesterId: req.user.userId, limit, cursor });
+    const tasks = mapMyTasksRows(paged.rows || []);
+    return res.status(200).json({
+      tasks,
+      hasMore: Boolean(paged.hasMore),
+      nextCursor: paged.nextCursor || null,
+    });
   } catch (error) {
     if (error?.code === "INVALID_USER") {
       return res.status(400).json({ message: error.message });
@@ -633,7 +642,7 @@ export async function takeProjectTask(req, res) {
   }
 
   try {
-    const taskTaken = await takeProjectTaskModel({taskId: taskId, userId: req.user?.userId} );
+    const taskTaken = await takeProjectTaskModel({ taskId: taskId, userId: req.user?.userId });
 
     try {
       const taskContext = await getTaskContext(taskId);
@@ -658,6 +667,10 @@ export async function takeProjectTask(req, res) {
     return res.status(201).json({ message: "Task taken successfully" });
   } catch (error) {
     console.error("Error taking task:", error);
+
+    if (error?.code === "PROJECT_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
+    }
 
     if (error.message.includes("required")) {
       return res.status(400).json({ message: error.message });
@@ -1011,15 +1024,23 @@ export async function updateTaskTargetDate(req, res) {
   }
 
   try {
-    const task = await updateTaskTargetDateModel({ taskId, targetDate: targetDate ?? null });
+    const task = await updateTaskTargetDateModel({ taskId, requesterId: req.user.userId, targetDate: targetDate ?? null });
     return res.status(200).json({ message: "Target date updated successfully", task });
   } catch (error) {
     if (error?.code === "INVALID_TASK") {
       return res.status(400).json({ message: error.message });
     }
 
+    if (error?.code === "INVALID_USER") {
+      return res.status(400).json({ message: error.message });
+    }
+
     if (error?.code === "TASK_NOT_FOUND") {
       return res.status(404).json({ message: error.message });
+    }
+
+    if (error?.code === "TASK_FORBIDDEN") {
+      return res.status(403).json({ message: error.message });
     }
 
     console.error("Update target date error:", error);
@@ -1343,9 +1364,23 @@ export async function assignTaskToOthers(req, res) {
   }
 
   try {
+    const access = await getTaskPermissionContext({ taskId: Number(taskId), requesterId: req.user.userId });
+    const isSelfAssignment = String(memberId) === String(req.user.userId);
+    const canSelfTake = access.isOwner || access.isAdmin || access.settings.allow_member_take_task;
+    const canAssignOthers = access.isOwner || access.isAdmin || access.isManager || (access.settings.allow_member_take_task && access.settings.allow_assign_task_to_member);
+
+    if (isSelfAssignment && !canSelfTake) {
+      return res.status(403).json({ message: "Forbidden: self-assigning tasks is disabled for your role in this project" });
+    }
+
+    if (!isSelfAssignment && !canAssignOthers) {
+      return res.status(403).json({ message: "Forbidden: assigning members to tasks is disabled for your role in this project" });
+    }
+
     const assignedMember = await assignTaskToOthersModel({
-      taskId, 
+      taskId,
       memberId,
+      requesterId: req.user.userId,
     });
 
     try {
@@ -1742,6 +1777,8 @@ export async function createTaskTag(req, res) {
       return res.status(400).json({ message: error.message });
     }
 
+    if (error?.code === "TASK_FORBIDDEN") return res.status(403).json({ message: error.message });
+
     if (error?.code === "TAG_EXISTS") return res.status(409).json({ message: error.message });
     if (error?.code === "MAX_TAGS") return res.status(400).json({ message: error.message });
 
@@ -1769,6 +1806,7 @@ export async function deleteTaskTag(req, res) {
     return res.status(200).json({ tag: deleted });
   } catch (error) {
     if (error?.code === "INVALID_TAG" || error?.code === "TAG_NOT_FOUND") return res.status(404).json({ message: error.message });
+    if (error?.code === "TASK_FORBIDDEN") return res.status(403).json({ message: error.message });
     console.error("Delete task tag error:", error);
     return res.status(500).json({ message: error?.message || "Unable to delete tag" });
   }
@@ -1863,9 +1901,16 @@ export async function unassignTaskFromMember(req, res) {
   }
 
   try {
+    // permission check: only owners/admins/managers may unassign other members
+    const access = await getTaskPermissionContext({ taskId: Number(taskId), requesterId: req.user.userId });
+    if (!access.isOwner && !access.isAdmin && !access.isManager) {
+      return res.status(403).json({ message: "Forbidden: you do not have permission to unassign other members from this task" });
+    }
+
     const unassignedMember = await unassignTaskFromMemberModel({
       taskId,
       memberId,
+      requesterId: req.user.userId,
     });
 
     try {

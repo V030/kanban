@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../services/notificationService";
+import HeroActionButton from "../components/common/HeroActionButton";
+import { BrowseProjectsIcon, MarkAllReadIcon } from "../components/common/AppIcons";
+import useInfiniteList from "../hooks/useInfiniteList";
 import { NotificationIcon } from "../components/common/NotificationIcons";
 import "../components/styles/WorkspacePages.css";
 import "../components/styles/NotificationsPage.css";
@@ -91,95 +94,74 @@ function Notifications() {
     const navigate = useNavigate();
     const toast = useToast();
     const [activeFilter, setActiveFilter] = useState("all");
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(false);
     const notificationsRef = useRef([]);
 
-    const loadNotifications = useCallback(async (options = {}) => {
-        const silent = options.silent === true;
-        if (!silent) {
-            setLoading(true);
-        }
-        try {
-            const data = await getNotifications();
-            const rows = Array.isArray(data?.notifications) ? data.notifications : [];
-            setNotifications(rows.map(normalizeNotification));
-            window.dispatchEvent(new Event("notifications:updated"));
-        } catch (error) {
-            toast.showError(error?.message || "Unable to load notifications.");
-            setNotifications([]);
-        } finally {
-            if (!silent) {
-                setLoading(false);
-            }
-        }
-    }, [toast]);
+    const fetchNotifications = useCallback(({ limit, cursor, signal }) => {
+        // call service; it will return either { notifications } (offset) or { notifications, nextCursor, hasMore }
+        return getNotifications(limit, 0, cursor, signal);
+    }, []);
+
+    const {
+        items: notifications,
+        loading,
+        sentinelRef,
+        reset,
+        hasMore,
+        isFetchingNextPage,
+        prependItems,
+        updateItem,
+        updateItems,
+    } = useInfiniteList(fetchNotifications, { limit: 20, autoLoad: true });
+
+    // Note: `useInfiniteList` handles loading; normalizeNotification is applied below when rendering
 
     useEffect(() => {
-        loadNotifications();
-    }, [loadNotifications]);
+        // nothing else needed; hook auto-loads initial page
+    }, []);
+
+    const normalizedList = useMemo(() => (Array.isArray(notifications) ? notifications.map(normalizeNotification) : []), [notifications]);
 
     useEffect(() => {
-        notificationsRef.current = notifications;
-    }, [notifications]);
+        notificationsRef.current = normalizedList;
+    }, [normalizedList]);
 
     useEffect(() => {
         const handlePush = (event) => {
-            const incoming = normalizeNotification(event?.detail);
-            if (!incoming?.id) return;
-            setNotifications((current) => {
-                const exists = current.some((notification) => notification.id === incoming.id);
-                if (exists) {
-                    return current.map((notification) =>
-                        notification.id === incoming.id ? { ...notification, ...incoming } : notification
-                    );
-                }
-                return [incoming, ...current];
-            });
+            const incomingRaw = event?.detail;
+            if (!incomingRaw?.id) return;
+            // Prepend raw server notification row; UI normalizes when rendering
+            prependItems([incomingRaw]);
         };
 
         window.addEventListener("notifications:push", handlePush);
         return () => window.removeEventListener("notifications:push", handlePush);
-    }, []);
+    }, [prependItems]);
 
     useEffect(() => {
         const intervalId = setInterval(() => {
-            loadNotifications({ silent: true });
+            // periodic refresh: reset will re-fetch initial page
+            reset();
         }, 60000);
 
         return () => clearInterval(intervalId);
-    }, [loadNotifications]);
+    }, [reset]);
 
-    const unreadCount = useMemo(
-        () => notifications.filter((notification) => notification.unread).length,
-        [notifications]
-    );
-
-    const projectCount = useMemo(
-        () => notifications.filter((notification) => notification.category === "Projects").length,
-        [notifications]
-    );
+    const unreadCount = useMemo(() => normalizedList.filter((notification) => notification.unread).length, [normalizedList]);
+    const projectCount = useMemo(() => normalizedList.filter((notification) => notification.category === "Projects").length, [normalizedList]);
 
     const filteredNotifications = useMemo(() => {
-        if (activeFilter === "unread") {
-            return notifications.filter((notification) => notification.unread);
-        }
-
-        if (activeFilter === "projects") {
-            return notifications.filter((notification) => notification.category === "Projects");
-        }
-
-        return notifications;
-    }, [activeFilter, notifications]);
+        if (activeFilter === "unread") return normalizedList.filter((notification) => notification.unread);
+        if (activeFilter === "projects") return normalizedList.filter((notification) => notification.category === "Projects");
+        return normalizedList;
+    }, [activeFilter, normalizedList]);
 
     const markAllAsRead = () => {
         (async () => {
             try {
                 await markAllNotificationsRead();
-                setNotifications((current) => current.map((notification) => ({
-                    ...notification,
-                    unread: false,
-                })));
+                // optimistic update: mark all known items as read
+                const mapped = notifications.map((n) => ({ id: n.id, status: 'read' }));
+                updateItems(mapped);
                 window.dispatchEvent(new Event("notifications:updated"));
             } catch (error) {
                 toast.showError(error?.message || "Unable to mark notifications as read.");
@@ -207,16 +189,12 @@ function Notifications() {
         if (!id) return;
         try {
             await markNotificationRead(id);
-            setNotifications((current) => current.map((notification) => (
-                notification.id === id
-                    ? { ...notification, unread: false }
-                    : notification
-            )));
+            updateItem(id, { status: 'read' });
             window.dispatchEvent(new Event("notifications:updated"));
         } catch (error) {
             toast.showError(error?.message || "Unable to update notification.");
         }
-    }, [toast]);
+    }, [toast, updateItem]);
 
     const handleOpenNotification = useCallback(async (notification) => {
         const targetUrl = getNotificationTargetUrl(notification);
@@ -234,26 +212,25 @@ function Notifications() {
                     <div>
                         <h1 className="page-title">Notifications</h1>
                         <p className="page-subtitle">
-                            Track project activity, mentions, and workspace updates without leaving the app shell.
+                            Track project activity, mentions, and workspace updates.
                         </p>
                     </div>
 
                     <div className="notifications-header-actions">
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
+                        <HeroActionButton
+                            icon={<BrowseProjectsIcon />}
+                            label="Projects"
+                            variant="secondary"
                             onClick={() => navigate("/main-page/projects")}
-                        >
-                            Open Projects
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-primary"
+                        />
+
+                        <HeroActionButton
+                            icon={<MarkAllReadIcon />}
+                            label="Mark All Read"
+                            variant="primary"
                             onClick={markAllAsRead}
                             disabled={unreadCount === 0}
-                        >
-                            Mark All Read
-                        </button>
+                        />
                     </div>
                 </div>
             </header>
@@ -266,7 +243,7 @@ function Notifications() {
                             ? unreadCount
                             : filter.key === "projects"
                                 ? projectCount
-                                : notifications.length;
+                                : normalizedList.length;
 
                         return (
                             <button
@@ -283,7 +260,7 @@ function Notifications() {
                 </div>
 
                 {loading ? (
-                    <div className="empty-state-card">
+                    <div className="empty-state-card" style={{ textAlign: "center" }}>
                         <h3>Loading notifications</h3>
                         <p>Fetching the latest updates from your workspace.</p>
                     </div>
@@ -336,6 +313,21 @@ function Notifications() {
                                 </div>
                             </article>
                         ))}
+
+                        {/* sentinel for intersection observer */}
+                        <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
+
+                        {isFetchingNextPage && (
+                            <div className="page-footer-strip">
+                                <p>Loading more…</p>
+                            </div>
+                        )}
+
+                        {!hasMore && (
+                            <div className="page-footer-strip">
+                                <p>No more notifications</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </section>

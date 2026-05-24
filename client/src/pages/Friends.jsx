@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useToast } from "../hooks/useToast";
+import HeroActionButton from "../components/common/HeroActionButton";
+import { AddFriendIcon } from "../components/common/AppIcons";
 import FriendsList from "../components/common/FriendsList";
 import IncomingFriendRequests from "../components/common/IncomingFriendRequests";
 import SentFriendRequests from "../components/common/SentFriendRequests";
@@ -186,9 +188,12 @@ function Friends() {
             <p className="page-subtitle">Manage network, requests, and outgoing invitations.</p>
           </div>
 
-          <button type="button" className="btn btn-primary" onClick={() => setIsAddFriendOpen(true)}>
-            Add Friend
-          </button>
+          <HeroActionButton
+            icon={<AddFriendIcon />}
+            label="Add Friend"
+            variant="primary"
+            onClick={() => setIsAddFriendOpen(true)}
+          />
         </div>
       </header>
 
@@ -220,12 +225,17 @@ function Friends() {
         <div className="friends-tab-content">
           {activeTab === "friends" ? (
             friendsLoading ? (
-              <div className="skeleton-list">
-                <SkeletonAvatarWithText />
-                <SkeletonAvatarWithText />
-                <SkeletonAvatarWithText />
-                <SkeletonAvatarWithText />
-              </div>
+              <>
+                <div style={{ textAlign: "center" }}>
+                  <p className="status-text">Loading friends...</p>
+                </div>
+                <div className="skeleton-list">
+                  <SkeletonAvatarWithText />
+                  <SkeletonAvatarWithText />
+                  <SkeletonAvatarWithText />
+                  <SkeletonAvatarWithText />
+                </div>
+              </>
             ) : (
               <FriendsList
                 friends={friends}
@@ -266,6 +276,11 @@ function Friends() {
               </section>
             </div>
           )}
+        </div>
+      
+        <div className="page-footer-strip">
+          <p>Friend requests and network updates stay in sync in real time.</p>
+          
         </div>
       </section>
 

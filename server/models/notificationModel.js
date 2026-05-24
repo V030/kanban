@@ -181,6 +181,63 @@ export async function getNotificationsForUser({ userId, limit = 50, offset = 0 }
   return result.rows || [];
 }
 
+// Cursor-based notifications retrieval (cursor is base64(JSON.stringify({ createdAt, id })))
+export async function getNotificationsForUserCursor({ userId, limit = 50, cursor = null }) {
+  const normalizedUserId = (userId || "").trim();
+  if (!normalizedUserId) return { rows: [], hasMore: false };
+
+  const safeLimit = Number.isFinite(Number(limit)) ? Math.min(Number(limit), 200) : 50;
+
+  // If no cursor provided, query newest first
+  if (!cursor) {
+    const result = await pool.query(
+      `
+      SELECT id, type, message, payload, recipient_user_id, url, status, created_at, updated_at
+      FROM notifications
+      WHERE recipient_user_id = $1::uuid
+      ORDER BY created_at DESC, id DESC
+      LIMIT $2
+      `,
+      [normalizedUserId, safeLimit + 1]
+    );
+
+    const rows = result.rows || [];
+    const hasMore = rows.length > safeLimit;
+    return { rows: rows.slice(0, safeLimit), hasMore };
+  }
+
+  // decode cursor (expected base64 of JSON { createdAt, id })
+  let decoded = null;
+  try {
+    const raw = Buffer.from(String(cursor), "base64").toString("utf8");
+    decoded = JSON.parse(raw);
+  } catch (err) {
+    // invalid cursor; return empty result to be safe
+    return { rows: [], hasMore: false };
+  }
+
+  const createdAt = decoded?.createdAt || null;
+  const id = decoded?.id || null;
+
+  if (!createdAt || !id) return { rows: [], hasMore: false };
+
+  const result = await pool.query(
+    `
+    SELECT id, type, message, payload, recipient_user_id, url, status, created_at, updated_at
+    FROM notifications
+    WHERE recipient_user_id = $1::uuid
+      AND (created_at < $2::timestamptz OR (created_at = $2::timestamptz AND id < $3::uuid))
+    ORDER BY created_at DESC, id DESC
+    LIMIT $4
+    `,
+    [normalizedUserId, createdAt, id, safeLimit + 1]
+  );
+
+  const rows = result.rows || [];
+  const hasMore = rows.length > safeLimit;
+  return { rows: rows.slice(0, safeLimit), hasMore };
+}
+
 export async function getUnreadCountForUser(userId) {
   const normalizedUserId = (userId || "").trim();
   if (!normalizedUserId) return 0;

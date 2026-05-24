@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMyTasks } from "../services/projectService";
 import { getCurrentUser, hydrateUserFromToken } from "../services/authService";
-import { useToast } from "../hooks/useToast";
+import useInfiniteList from "../hooks/useInfiniteList";
+import HeroActionButton from "../components/common/HeroActionButton";
+import { FilterIcon, RefreshIcon, BrowseProjectsIcon } from "../components/common/AppIcons";
 import "../components/styles/WorkspacePages.css";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
 
@@ -57,53 +59,49 @@ function statusPillClass(statusName) {
 
 function MyTasks() {
     const navigate = useNavigate();
-    const toast = useToast();
-    const [tasks, setTasks] = useState([]);
-    const [loading, setLoading] = useState(false);
+    // useInfiniteList will be the single source of truth for task rows
     const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
 
-    const loadTasks = useCallback(async (options = {}) => {
-        const silent = options.silent === true;
-        if (!silent) {
-            setLoading(true);
-        }
-
-        try {
-            const data = await getMyTasks();
-            const rawTasks = Array.isArray(data?.tasks) ? data.tasks : [];
-            setTasks(rawTasks.map(normalizeTask));
-        } catch (requestError) {
-            toast.showError(requestError?.message || "Unable to load assigned tasks.");
-            setTasks([]);
-        } finally {
-            if (!silent) {
-                setLoading(false);
-            }
-        }
-    }, [toast]);
-
-    useEffect(() => {
-        loadTasks();
-    }, [loadTasks]);
-
-    useEffect(() => {
-        const handleRealtime = (event) => {
-            const detail = event?.detail || {};
-            const type = String(detail.type || "").toLowerCase();
-            const relevant = new Set([
-                "task_assigned",
-                "task_unassigned",
-                "task_status_changed",
-                "review_approved",
-                "review_rejected",
-            ]);
-            if (!relevant.has(type)) return;
-            loadTasks({ silent: true });
+    // fetcher for useInfiniteList: adapt existing service to hook shape
+    const fetchTasks = useCallback(async ({ limit, cursor, signal }) => {
+        const data = await getMyTasks(limit, 0, cursor, signal);
+        const rawTasks = Array.isArray(data?.tasks) ? data.tasks : [];
+        return {
+            items: rawTasks,
+            nextCursor: data?.nextCursor || null,
+            hasMore: Boolean(data?.hasMore),
         };
+    }, []);
 
+    const {
+        items: tasksRaw,
+        loading,
+        sentinelRef,
+        reset,
+        hasMore,
+        isLoadingMore,
+    } = useInfiniteList(fetchTasks, { limit: 50, autoLoad: true });
+
+    const handleRealtime = useCallback((event) => {
+        const detail = event?.detail || {};
+        const type = String(detail.type || "").toLowerCase();
+        const relevant = new Set([
+            "task_assigned",
+            "task_unassigned",
+            "task_status_changed",
+            "review_approved",
+            "review_rejected",
+        ]);
+        if (!relevant.has(type)) return;
+        // reset will re-fetch the initial page; prefer reset over re-creating
+        // inline fetches to keep the hook lifecycle stable.
+        reset();
+    }, [reset]);
+
+    useEffect(() => {
         window.addEventListener("notifications:push", handleRealtime);
         return () => window.removeEventListener("notifications:push", handleRealtime);
-    }, [loadTasks]);
+    }, [handleRealtime]);
 
     useEffect(() => {
         let isMounted = true;
@@ -120,10 +118,12 @@ function MyTasks() {
 
     const currentUserDisplay = useMemo(() => getCurrentUserDisplay(currentUser), [currentUser]);
 
+    const normalizedTasks = useMemo(() => (Array.isArray(tasksRaw) ? tasksRaw.map(normalizeTask) : []), [tasksRaw]);
+
     const groupedProjects = useMemo(() => {
         const projectMap = new Map();
 
-        tasks.forEach((task) => {
+        normalizedTasks.forEach((task) => {
             const project = task?.project || {};
             const projectId = String(project?.id || task?.projectId || "unknown");
             const projectName = project?.name || task?.projectName || "Unknown project";
@@ -174,7 +174,7 @@ function MyTasks() {
                         }),
                     })),
             }));
-    }, [tasks]);
+    }, [normalizedTasks]);
 
     const totalTaskCount = useMemo(
         () => groupedProjects.reduce((sum, p) => sum + p.statuses.reduce((s2, st) => s2 + st.tasks.length, 0), 0),
@@ -202,20 +202,21 @@ function MyTasks() {
                     </div>
 
                     <div className="tasks-top-controls">
-                        <div className="controls-right">
-                            <button type="button" className="btn btn-ghost">Filter</button>
-                            <button type="button" className="btn btn-ghost">Sort</button>
-                            <button type="button" className="btn btn-secondary" onClick={loadTasks}>Refresh</button>
-                            <button type="button" className="btn btn-primary" onClick={() => navigate("/main-page/projects")}>
-                                Browse Projects
-                            </button>
+                            <div className="controls-right">
+                            <HeroActionButton icon={<FilterIcon />} label="Filter" variant="ghost" onClick={() => {}} />
+                            <HeroActionButton icon={<RefreshIcon />} label="Refresh" variant="secondary" onClick={reset} />
+                            <HeroActionButton icon={<BrowseProjectsIcon />} label="Browse Projects" variant="primary" onClick={() => navigate("/main-page/projects")} />
                         </div>
                     </div>
                 </div>
             </header>
 
             {/* ── Loading / error ── */}
-            {loading && <p className="status-text">Loading tasks…</p>}
+            {loading && (
+                <div style={{ textAlign: "center" }}>
+                    <p className="status-text">Loading tasks…</p>
+                </div>
+            )}
 
             {/* ── Empty state ── */}
             {!loading && groupedProjects.length === 0 && (
@@ -350,6 +351,20 @@ function MyTasks() {
                             ))}
                         </div>
                     ))}
+
+                    <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
+
+                    {isLoadingMore && (
+                        <div style={{ textAlign: "center" }}>
+                            <p className="status-text">Loading more tasks…</p>
+                        </div>
+                    )}
+
+                    {!hasMore && (
+                        <div style={{ textAlign: "center" }}>
+                            <p className="status-text">No more tasks to load.</p>
+                        </div>
+                    )}
                 </div>
             )}
         </section>

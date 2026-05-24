@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 
 import { getCurrentUser } from "../services/authService";
 import { getFriends } from "../services/friendService";
+import { getNotifications } from "../services/notificationService";
 import {
     getMemberProjects,
     getProjectInvitations,
     getProjects,
+    getMyTasks,
 } from "../services/projectService";
 import { useToast } from "../hooks/useToast";
-import { DashboardIcon, FolderIcon, TeamIcon, TasksIcon, NotificationsIcon, RefreshIcon } from "../components/common/AppIcons";
+import HeroActionButton from "../components/common/HeroActionButton";
+import { CalendarIcon, FolderIcon, NotificationsIcon, RefreshIcon, TeamIcon } from "../components/common/AppIcons";
 
 import {
     SkeletonCard,
@@ -20,22 +23,300 @@ import "../components/styles/WorkspacePages.css";
 import "../components/styles/DashboardTheme.css";
 import "../components/styles/SkeletonLoading.css";
 
+function buildAvatarColor(seed = "") {
+    let hash = 0;
+    const text = String(seed || "").trim().toLowerCase();
+
+    for (let index = 0; index < text.length; index += 1) {
+        hash = (hash * 31 + text.charCodeAt(index)) % 360;
+    }
+
+    return `hsl(${hash}, 72%, 42%)`;
+}
+
+function getInitials(name = "") {
+    return String(name || "")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase() || "?";
+}
+
+function formatRelativeTime(value) {
+    const timestamp = new Date(value || 0).getTime();
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+        return "Just now";
+    }
+
+    const diffMs = Date.now() - timestamp;
+    const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
+
+    if (diffMinutes < 60) {
+        return `${diffMinutes}m ago`;
+    }
+
+    const diffHours = Math.max(1, Math.round(diffMinutes / 60));
+    if (diffHours < 24) {
+        return `${diffHours}h ago`;
+    }
+
+    const diffDays = Math.max(1, Math.round(diffHours / 24));
+    return `${diffDays}d ago`;
+}
+
+function formatDueDate(value) {
+    if (!value) return "No due date";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "No due date";
+
+    return new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+    }).format(date);
+}
+
+function getDueTone(value) {
+    if (!value) return "muted";
+
+    const dueDate = new Date(value);
+    if (Number.isNaN(dueDate.getTime())) return "muted";
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+    if (dueDate < startOfToday) return "urgent";
+    if (dueDate < startOfTomorrow) return "warning";
+    return "muted";
+}
+
+function formatStatusLabel(status = "todo") {
+    return String(status || "todo")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function getStatusTone(status = "todo") {
+    const normalized = String(status || "todo").toLowerCase();
+    if (normalized === "blocked") return "blocked";
+    if (normalized === "in_review") return "in_review";
+    if (normalized === "in_progress") return "in_progress";
+    return "todo";
+}
+
+function getTaskSortRank(task) {
+    const status = String(task?.status || "todo").toLowerCase();
+    const priority = String(task?.priority || "").toLowerCase();
+    const parsedDueDate = task?.dueDate ? new Date(task.dueDate).getTime() : Number.POSITIVE_INFINITY;
+    const dueDate = Number.isFinite(parsedDueDate) ? parsedDueDate : Number.POSITIVE_INFINITY;
+
+    const statusRank = {
+        blocked: 4,
+        in_review: 3,
+        in_progress: 2,
+        todo: 1,
+    }[status] || 1;
+
+    const priorityRank = {
+        urgent: 4,
+        high: 3,
+        medium: 2,
+        low: 1,
+        unset: 0,
+    }[priority] || 0;
+
+    return {
+        statusRank,
+        priorityRank,
+        dueDate,
+    };
+}
+
+function normalizeActivityItem(notification) {
+    const message = String(notification?.message || "").trim();
+    const type = String(notification?.type || "").toLowerCase();
+    const timestamp = notification?.created_at || notification?.createdAt || notification?.updated_at || notification?.updatedAt || Date.now();
+
+    const actionTextMap = {
+        task_assigned: "assigned a task",
+        task_unassigned: "removed a task",
+        task_status_changed: "updated a task",
+        review_approved: "approved a review",
+        review_rejected: "rejected a review",
+        task_comment: "commented on a task",
+        task_comment_reply: "replied to a comment",
+    };
+
+    const actionText = actionTextMap[type] || "updated activity";
+    const actorMatch = message.match(/^(.+?)\s+(?:assigned you to|unassigned you from|moved|approved|rejected|commented on|replied on)\b/i);
+    const projectMatch = message.match(/\bin\s+(.+?)(?:[:.])\s*$/i) || message.match(/\bin\s+(.+?)\s*$/i);
+    const userName = actorMatch?.[1]?.trim() || message.split(" ").slice(0, 2).join(" ") || "Someone";
+    const projectName = projectMatch?.[1]?.trim() || "Project";
+
+    return {
+        id: notification?.id,
+        user: {
+            name: userName,
+            avatarInitials: getInitials(userName),
+            color: buildAvatarColor(userName),
+        },
+        actionText,
+        projectName,
+        timestamp,
+        progress: notification?.progress || null,
+    };
+}
+
+function normalizePriorityTask(task, fallbackUser = null) {
+    const assignee = Array.isArray(task?.assignees) && task.assignees.length > 0
+        ? task.assignees[0]
+        : task?.creator || fallbackUser || null;
+
+    const assigneeName = [assignee?.firstName, assignee?.lastName].filter(Boolean).join(" ").trim()
+        || assignee?.displayName
+        || assignee?.name
+        || "You";
+
+    return {
+        id: task?.id,
+        title: task?.title || "Untitled task",
+        status: String(task?.statusKey || task?.status?.name || task?.status || "todo").toLowerCase(),
+        projectName: task?.projectName || task?.project?.name || "Project",
+        dueDate: task?.targetDate || task?.dueDate || null,
+        priority: String(task?.priority || "").toLowerCase(),
+        assignee: {
+            name: assigneeName,
+            avatarInitials: getInitials(assigneeName),
+            color: buildAvatarColor(assigneeName),
+        },
+    };
+}
+
+function DashboardItemAvatar({ name, initials, color, size = 30 }) {
+    return (
+        <span
+            className="dashboard-avatar"
+            style={{ background: color, width: size, height: size, minWidth: size, minHeight: size }}
+            aria-hidden="true"
+        >
+            {initials || getInitials(name)}
+        </span>
+    );
+}
+
+function DashboardPanelHeader({ title, actionLabel, onAction }) {
+    return (
+        <div className="panel-heading dashboard-panel-heading">
+            <h3>{title}</h3>
+            <button type="button" className="btn btn-ghost dashboard-panel-action" onClick={onAction}>
+                {actionLabel}
+            </button>
+        </div>
+    );
+}
+
+function ActivityProgress({ progress, accentColor }) {
+    if (!progress || progress.percent == null) return null;
+
+    const percent = Math.max(0, Math.min(100, Number(progress.percent) || 0));
+    const remainingTasks = Number(progress.remainingTasks || 0);
+
+    return (
+        <div className="dashboard-progress-wrap">
+            <div className="dashboard-progress-track" aria-hidden="true">
+                <div className="dashboard-progress-fill" style={{ width: `${percent}%`, background: accentColor }} />
+            </div>
+            <p className="dashboard-progress-text">
+                {percent}% complete · {remainingTasks} tasks remaining
+            </p>
+        </div>
+    );
+}
+
+function DashboardActivityCard({ activity }) {
+    return (
+        <article className="dashboard-activity-card">
+            <DashboardItemAvatar
+                name={activity.user.name}
+                initials={activity.user.avatarInitials}
+                color={activity.user.color}
+            />
+            <div className="dashboard-activity-copy">
+                <p className="dashboard-activity-title">
+                    <strong>{activity.user.name}</strong> {activity.actionText}
+                </p>
+                <p className="dashboard-activity-meta">
+                    {activity.projectName} · {formatRelativeTime(activity.timestamp)}
+                </p>
+                <ActivityProgress progress={activity.progress} accentColor={activity.user.color} />
+            </div>
+        </article>
+    );
+}
+
+function DashboardTaskCard({ task }) {
+    const tone = getStatusTone(task.status);
+    const dueTone = getDueTone(task.dueDate);
+    const dueLabel = formatDueDate(task.dueDate);
+
+    return (
+        <article className="dashboard-task-card">
+            <span className="dashboard-task-checkbox" aria-hidden="true" />
+            <div className="dashboard-task-copy">
+                <p className="dashboard-task-title">{task.title}</p>
+                <div className="dashboard-task-meta-row">
+                    <span className={`pill dashboard-task-status ${tone}`}>{formatStatusLabel(task.status)}</span>
+                    <span className="dashboard-task-project-tag">{task.projectName}</span>
+                    <span className={`dashboard-task-due dashboard-task-due--${dueTone}`}>
+                        <CalendarIcon size={14} />
+                        <span>{dueLabel}</span>
+                    </span>
+                </div>
+            </div>
+            <DashboardItemAvatar
+                name={task.assignee.name}
+                initials={task.assignee.avatarInitials}
+                color={task.assignee.color}
+            />
+        </article>
+    );
+}
+
 function Dashboard() {
     const navigate = useNavigate();
     const toast = useToast();
 
     const currentUser = useMemo(() => getCurrentUser(), []);
+    const currentUserDisplay = useMemo(() => {
+        const firstName = currentUser?.firstName || currentUser?.first_name || "";
+        const lastName = currentUser?.lastName || currentUser?.last_name || "";
+        const name = [firstName, lastName].filter(Boolean).join(" ").trim() || "You";
+
+        return {
+            name,
+            initials: getInitials(name),
+            color: buildAvatarColor(name),
+        };
+    }, [currentUser]);
 
     const [loading, setLoading] = useState(true);
 
     const [ownedProjects, setOwnedProjects] = useState([]);
     const [memberProjects, setMemberProjects] = useState([]);
+    const [recentActivity, setRecentActivity] = useState([]);
+    const [priorityTasks, setPriorityTasks] = useState([]);
 
     const [friendCount, setFriendCount] = useState(0);
     const [inviteCount, setInviteCount] = useState(0);
 
     const loadDashboard = useCallback(async () => {
         setLoading(true);
+        setRecentActivity([]);
+        setPriorityTasks([]);
 
         try {
             const [owned, member, friends, invites] = await Promise.all([
@@ -45,11 +326,50 @@ function Dashboard() {
                 getProjectInvitations(),
             ]);
 
+            const [activityResult, tasksResult] = await Promise.allSettled([
+                getNotifications(20),
+                getMyTasks(20),
+            ]);
+
             setOwnedProjects(owned.projects || []);
             setMemberProjects(member.projects || []);
 
             setFriendCount((friends.friends || []).length);
             setInviteCount((invites.projectInvitations || []).length);
+
+            const activityItems = activityResult.status === "fulfilled"
+                ? (activityResult.value?.notifications || [])
+                    .map(normalizeActivityItem)
+                    .filter((item) => {
+                        const timestamp = new Date(item.timestamp || 0).getTime();
+                        const hoursAgo = 1000 * 60 * 60 * 24;
+                        return Number.isFinite(timestamp) && (Date.now() - timestamp) <= hoursAgo;
+                    })
+                    .slice(0, 4)
+                : [];
+
+            const taskItems = tasksResult.status === "fulfilled"
+                ? (tasksResult.value?.tasks || [])
+                    .map((task) => normalizePriorityTask(task, currentUserDisplay))
+                    .sort((left, right) => {
+                        const leftRank = getTaskSortRank(left);
+                        const rightRank = getTaskSortRank(right);
+
+                        if (rightRank.statusRank !== leftRank.statusRank) {
+                            return rightRank.statusRank - leftRank.statusRank;
+                        }
+
+                        if (rightRank.priorityRank !== leftRank.priorityRank) {
+                            return rightRank.priorityRank - leftRank.priorityRank;
+                        }
+
+                        return leftRank.dueDate - rightRank.dueDate;
+                    })
+                    .slice(0, 5)
+                : [];
+
+            setRecentActivity(activityItems);
+            setPriorityTasks(taskItems);
         } catch (requestError) {
             toast.showError(
                 requestError?.message ||
@@ -58,7 +378,7 @@ function Dashboard() {
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, [currentUserDisplay, toast]);
 
     useEffect(() => {
         loadDashboard();
@@ -68,12 +388,6 @@ function Dashboard() {
         ...ownedProjects,
         ...memberProjects,
     ];
-
-    const openProjectBoard = (project) => {
-        if (!project || !project.id) return;
-
-        navigate(`/main-page/projects/${project.id}/kanban`);
-    };
 
     const greetingName =
         `${currentUser?.firstName || currentUser?.first_name || ""}
@@ -90,48 +404,33 @@ function Dashboard() {
 
                 <div className="dashboard-hero-content">
 
-                    <div>
-                        <h1 className="page-title">
+                    <div className="dashboard-hero-copy">
+                        <h1 className="dashboard-hero-title">
                             Hey there, <span className="greeting-name">{greetingName}!</span>
                         </h1>
 
-                        <p className="page-subtitle">
-                            {/* Track project momentum, collaboration activity,
-                            and pending work across your workspace. */}
-                            <strong>
-                                {totalProjects}
-                            </strong>{" "}
-                            active projects currently visible across your
-                            workspace. Maintain clarity with concise task
-                            naming, structured ownership, and focused
-                            workflow states.
+                        <p className="dashboard-hero-subtitle">
+                            <strong>{totalProjects}</strong> active projects currently visible across your workspace. Maintain clarity with concise task naming, structured ownership, and focused workflow states.
                         </p>
-
                     </div>
 
                     <div className="dashboard-hero-actions">
 
-                        <button
-                            type="button"
-                            className="dashboard-hero-icon-button"
-                            aria-label="Refresh dashboard"
-                            title="Refresh dashboard"
+                        <HeroActionButton
+                            icon={<RefreshIcon />}
+                            label="Refresh"
+                            variant="secondary"
                             onClick={loadDashboard}
-                        >
-                            <RefreshIcon />
-                        </button>
+                            title="Refresh dashboard"
+                        />
 
-                        <button
-                            type="button"
-                            className="dashboard-hero-icon-button"
-                            aria-label="Open projects hub"
+                        <HeroActionButton
+                            icon={<FolderIcon />}
+                            label="Projects"
+                            variant="secondary"
+                            onClick={() => navigate("/main-page/projects")}
                             title="Open projects hub"
-                            onClick={() =>
-                                navigate("/main-page/projects")
-                            }
-                        >
-                            <FolderIcon />
-                        </button>
+                        />
 
                     </div>
 
@@ -239,230 +538,73 @@ function Dashboard() {
             {/* MAIN GRID */}
             <section className="dashboard-grid">
 
-                {/* PROJECT PANEL */}
-                <article className="dashboard-panel">
+                {/* RECENT ACTIVITY */}
+                <article className="dashboard-panel dashboard-panel--activity">
 
-                    <div className="panel-heading">
+                    <DashboardPanelHeader
+                        title="Recent activity"
+                        actionLabel="View all"
+                        onAction={() => navigate("/main-page/notifications")}
+                    />
 
-                        <h3>
-                            Project Snapshot
-                        </h3>
-
-                        <button
-                            type="button"
-                            className="btn btn-ghost"
-                            onClick={() =>
-                                navigate("/main-page/projects")
-                            }
-                        >
-                            Manage
-                        </button>
-
+                    <div className="dashboard-panel-body">
+                        {loading ? (
+                            <div className="skeleton-list dashboard-panel-skeleton-list">
+                                <SkeletonRow showAvatar lineCount={2} />
+                                <SkeletonRow showAvatar lineCount={2} />
+                                <SkeletonRow showAvatar lineCount={2} />
+                                <SkeletonRow showAvatar lineCount={2} />
+                            </div>
+                        ) : recentActivity.length > 0 ? (
+                            <div className="dashboard-activity-list">
+                                {recentActivity.map((activity) => (
+                                    <DashboardActivityCard key={activity.id} activity={activity} />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="dashboard-panel-empty">
+                                <h4>No recent activity</h4>
+                                <p>Nothing has changed across your workspace in the last 24 hours.</p>
+                            </div>
+                        )}
                     </div>
 
-                    {loading && (
-                        <div className="skeleton-list">
-
-                            <SkeletonRow
-                                showAvatar={false}
-                                lineCount={2}
-                            />
-
-                            <SkeletonRow
-                                showAvatar={false}
-                                lineCount={2}
-                            />
-
-                            <SkeletonRow
-                                showAvatar={false}
-                                lineCount={2}
-                            />
-
-                            <SkeletonRow
-                                showAvatar={false}
-                                lineCount={2}
-                            />
-
-                            <SkeletonRow
-                                showAvatar={false}
-                                lineCount={2}
-                            />
-
-                        </div>
-                    )}
-
-                    {!loading &&
-                        allProjects.length === 0 && (
-                            <div className="empty-state-card">
-
-                                <h3>
-                                    No projects yet
-                                </h3>
-
-                                <p>
-                                    Create your first project
-                                    to start organizing tasks
-                                    with your team.
-                                </p>
-
-                                <div className="empty-state-actions">
-
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        onClick={() =>
-                                            navigate(
-                                                "/main-page/projects"
-                                            )
-                                        }
-                                    >
-                                        Go to Projects
-                                    </button>
-
-                                </div>
-
-                            </div>
-                        )}
-
-                    {!loading &&
-                        allProjects.length > 0 && (
-                            <div className="project-peek-list">
-
-                                {allProjects
-                                    .slice(0, 6)
-                                    .map((project) => (
-
-                                        <button
-                                            key={project.id}
-                                            type="button"
-                                            className="project-peek-item"
-                                            onClick={() =>
-                                                openProjectBoard(project)
-                                            }
-                                        >
-
-                                            <div className="project-peek-meta">
-
-                                                <strong>
-                                                    {project.name}
-                                                </strong>
-
-                                                <p>
-                                                    {project.description ||
-                                                        "No description yet."}
-                                                </p>
-
-                                            </div>
-
-                                            <span
-                                                className={`pill ${
-                                                    project.joined_at
-                                                        ? "member"
-                                                        : "owner"
-                                                }`}
-                                            >
-                                                {project.joined_at
-                                                    ? "Member"
-                                                    : "Owner"}
-                                            </span>
-
-                                        </button>
-                                    ))}
-
-                            </div>
-                        )}
+                    <div className="dashboard-panel-footer">
+                        Updates from the last 24 hours across all {allProjects.length} projects
+                    </div>
 
                 </article>
 
-                {/* FOCUS PANEL */}
-                <article className="dashboard-panel">
+                {/* MY PRIORITY TASKS */}
+                <article className="dashboard-panel dashboard-panel--tasks">
 
-                    <div className="panel-heading">
+                    <DashboardPanelHeader
+                        title="My priority tasks"
+                        actionLabel="View all"
+                        onAction={() => navigate("/main-page/my-tasks")}
+                    />
 
-                        <h3>
-                            Quick Focus
-                        </h3>
-
-                    </div>
-
-                    <div className="focus-grid">
-
-                        <button
-                            type="button"
-                            className="focus-tile focus-tile--primary"
-                            onClick={() => navigate("/main-page/kanban")}
-                        >
-                            <span className="focus-tile__icon focus-tile__icon--teal" aria-hidden="true">
-                                <DashboardIcon />
-                            </span>
-                            <span className="focus-tile__label">Open Board</span>
-                            <span className="focus-tile__sub">Current project</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            className="focus-tile"
-                            onClick={() => navigate("/main-page/my-tasks")}
-                        >
-                            <span className="focus-tile__icon focus-tile__icon--amber" aria-hidden="true">
-                                <TasksIcon />
-                            </span>
-                            <span className="focus-tile__label">My Tasks</span>
-                            <span className="focus-tile__sub">Review all</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            className="focus-tile"
-                            onClick={() => navigate("/main-page/projects")}
-                        >
-                            <span className="focus-tile__icon focus-tile__icon--purple" aria-hidden="true">
-                                <FolderIcon />
-                            </span>
-                            <span className="focus-tile__label">Projects</span>
-                            <span className="focus-tile__sub">All workspaces</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            className="focus-tile"
-                            onClick={() => navigate("/main-page/friends")}
-                        >
-                            <span className="focus-tile__icon focus-tile__icon--blue" aria-hidden="true">
-                                <TeamIcon />
-                            </span>
-                            <span className="focus-tile__label">Members</span>
-                            <span className="focus-tile__sub">
-                                {friendCount > 0 ? `${friendCount} in network` : "Manage team"}
-                            </span>
-                        </button>
-
-                        <button
-                            type="button"
-                            className="focus-tile"
-                            onClick={() => navigate("/main-page/notifications")}
-                        >
-                            <span className="focus-tile__icon focus-tile__icon--coral" aria-hidden="true">
-                                <NotificationsIcon />
-                            </span>
-                            <span className="focus-tile__label">Invites</span>
-                            <span className="focus-tile__sub">
-                                {inviteCount > 0 ? `${inviteCount} pending` : "No pending"}
-                            </span>
-                        </button>
-
-                        <button
-                            type="button"
-                            className="focus-tile"
-                            onClick={loadDashboard}
-                        >
-                            <span className="focus-tile__icon focus-tile__icon--green" aria-hidden="true">
-                                <RefreshIcon />
-                            </span>
-                            <span className="focus-tile__label">Refresh</span>
-                            <span className="focus-tile__sub">Sync data</span>
-                        </button>
-
+                    <div className="dashboard-panel-body">
+                        {loading ? (
+                            <div className="skeleton-list dashboard-panel-skeleton-list">
+                                <SkeletonRow showAvatar lineCount={2} />
+                                <SkeletonRow showAvatar lineCount={2} />
+                                <SkeletonRow showAvatar lineCount={2} />
+                                <SkeletonRow showAvatar lineCount={2} />
+                                <SkeletonRow showAvatar lineCount={2} />
+                            </div>
+                        ) : priorityTasks.length > 0 ? (
+                            <div className="dashboard-task-list">
+                                {priorityTasks.map((task) => (
+                                    <DashboardTaskCard key={task.id} task={task} />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="dashboard-panel-empty">
+                                <h4>No priority tasks</h4>
+                                <p>Tasks assigned to you will appear here when they need attention.</p>
+                            </div>
+                        )}
                     </div>
 
                 </article>

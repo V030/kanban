@@ -53,9 +53,9 @@
   padding: 24px;
   border-radius: 28px;
 
-  border: 1px solid rgba(176, 196, 216, 0.56);
+  border: 1px solid rgba(153, 206, 214, 0.48);
 
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
+  background: linear-gradient(135deg, rgba(229, 250, 248, 0.98) 0%, rgba(233, 245, 255, 0.98) 58%, rgba(243, 248, 255, 0.98) 100%);
   backdrop-filter: blur(2px);
 
   box-shadow: var(--shadow-md);
@@ -66,9 +66,30 @@
   z-index: 2;
 
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
+}
+
+.workspace-hero-content > div:first-child {
+  flex: 1 1 480px;
+  min-width: 0;
+}
+
+.workspace-hero .page-title {
+  font-size: 32px;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.workspace-hero .page-subtitle {
+  margin-top: 8px;
+  max-width: 480px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
 }
 
 .workspace-hero-glow {
@@ -80,10 +101,53 @@
 .tasks-header-actions,
 .profile-header-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   flex-shrink: 0;
-  align-items: flex-start;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+/* Hero action button: icon + label */
+.hero-action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.workspace-hero .hero-action-button {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(149, 168, 182, 0.42);
+  color: #52606d;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.workspace-hero .hero-action-button:hover:not(:disabled) {
+  background: rgba(248, 250, 252, 0.92);
+  border-color: rgba(125, 146, 165, 0.48);
+  color: #2f3a45;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.workspace-hero .hero-action-button .hero-action-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.workspace-hero .hero-action-button .hero-action-label {
+  font-weight: 600;
+}
+
+.hero-action-button .hero-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-action-button .hero-action-label {
+  display: inline-block;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1536,6 +1600,27 @@
   border: 1px solid #fecaca;
   border-radius: 8px;
   padding: 8px 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE FOOTER STRIP
+═══════════════════════════════════════════════════════════════ */
+.page-footer-strip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-top: none;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  background: transparent;
+  border-radius: 0 0 18px 18px;
+}
+
+.page-footer-strip p {
+  margin: 0;
 }
 
 /* ═══════════════════════════════════════════════════════════════

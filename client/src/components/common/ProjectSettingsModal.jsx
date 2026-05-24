@@ -213,15 +213,6 @@ export default function ProjectSettingsModal({
                     disabled={!canEditPermissions}
                     pending={!!pendingSettings.allow_admin_manage_tasks}
                   />
-                  <ToggleRow
-                    id="allow-admin-create-tag"
-                    label="Create tags"
-                    description="Allow admins to create tags on tasks."
-                    checked={settings.allow_admin_create_tag}
-                    onChange={(v) => onSettingChange("allow_admin_create_tag", v)}
-                    disabled={!canEditPermissions}
-                    pending={!!pendingSettings.allow_admin_create_tag}
-                  />
                 </div>
               </>
             )}
@@ -295,6 +286,15 @@ export default function ProjectSettingsModal({
                     pending={!!pendingSettings.allow_member_review}
                   />
                   <ToggleRow
+                    id="allow-member-create-tag"
+                    label="Create tags"
+                    description="Allow members to create tags on tasks."
+                    checked={settings.allow_member_create_tag}
+                    onChange={(v) => onSettingChange("allow_member_create_tag", v)}
+                    disabled={!canEditPermissions}
+                    pending={!!pendingSettings.allow_member_create_tag}
+                  />
+                  <ToggleRow
                     id="allow-assign-task-to-member"
                     label="Assign tasks to others"
                     description="Allow project members to assign tasks to other members."
@@ -305,7 +305,7 @@ export default function ProjectSettingsModal({
                   />
                 </div>
                 <p className="ps-member-note">
-                  Members can create tags only when they created the task or are assigned to it. Admins and owners can create tags normally.
+                  Members can create tags on tasks they created or are assigned to when this setting is enabled.
                 </p>
               </>
             )}

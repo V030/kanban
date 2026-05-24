@@ -15,14 +15,14 @@
   overflow: hidden;
   flex-shrink: 0;
 
-  padding: 24px;
+  padding: 22px 24px 24px;
   border-radius: 28px;
 
-  border: 1px solid rgba(176, 196, 216, 0.56);
+  border: 1px solid rgba(153, 206, 214, 0.48);
 
   min-height: auto;
 
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
+  background: linear-gradient(135deg, rgba(229, 250, 248, 0.98) 0%, rgba(233, 245, 255, 0.98) 58%, rgba(243, 248, 255, 0.98) 100%);
   
   backdrop-filter: blur(2px);
 
@@ -35,13 +35,13 @@
 
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
 }
 
-.dashboard-hero-content > div:first-child {
-  flex: 1 1 420px;
+.dashboard-hero-copy {
+  flex: 1 1 480px;
   min-width: 0;
 }
 
@@ -85,7 +85,7 @@
   border: 1px solid rgba(20,184,166,.18);
 }
 
-.page-title {
+.dashboard-hero-title {
   font-size: clamp(2rem, 3vw, 3rem);
   line-height: 1.05;
   letter-spacing: -0.04em;
@@ -95,54 +95,49 @@
 }
 
 .greeting-name {
-  color: var(--color-primary);
+  color: #0f9a92;
 }
 
-.page-subtitle {
-  margin-top: 5px;
+.dashboard-hero-subtitle {
+  margin-top: 8px;
 
-  max-width: 700px;
+  max-width: 480px;
 
   color: var(--color-text-secondary);
-  font-size: 0.98rem;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .dashboard-hero-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-left: auto;
+  align-self: flex-end;
+  justify-content: flex-end;
 }
 
-.dashboard-hero-icon-button {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  color: #9aa4b2;
-  cursor: pointer;
-  transition: color 150ms ease, transform 150ms ease;
-  padding: 0;
+.dashboard-hero .hero-action-button {
+  min-height: 38px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(149, 168, 182, 0.42);
+  color: #52606d;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
-.dashboard-hero-icon-button svg {
+.dashboard-hero .hero-action-button:hover {
+  background: rgba(248, 250, 252, 0.92);
+  border-color: rgba(125, 146, 165, 0.48);
+  color: #2f3a45;
+}
+
+.dashboard-hero .hero-action-button .hero-action-icon svg {
   width: 20px;
   height: 20px;
-  display: block;
 }
 
-.dashboard-hero-icon-button:hover {
-  color: var(--color-primary);
-  transform: translateY(-1px);
-}
-
-.dashboard-hero-icon-button:focus-visible {
-  outline: 2px solid rgba(20, 184, 166, 0.38);
-  outline-offset: 2px;
+.dashboard-hero .hero-action-button .hero-action-label {
+  font-weight: 600;
 }
 
 /* ───────────────── STATS ───────────────── */
@@ -175,10 +170,6 @@
 }
 
 /* Owned Projects - Teal accent */
-.stat-card:nth-child(1) {
-
-}
-
 .stat-card:nth-child(1) .stat-label {
   color: #0d9488;
 }
@@ -192,10 +183,6 @@
 }
 
 /* Shared Projects - Purple/Blue accent */
-.stat-card:nth-child(2) {
-
-}
-
 .stat-card:nth-child(2) .stat-label {
   color: #7c3aed;
 }
@@ -209,10 +196,6 @@
 }
 
 /* Pending Invites - Amber accent */
-.stat-card:nth-child(3) {
-
-}
-
 .stat-card:nth-child(3) .stat-label {
   color: #d97706;
 }
@@ -226,10 +209,6 @@
 }
 
 /* Connections - Emerald accent */
-.stat-card:nth-child(4) {
-
-}
-
 .stat-card:nth-child(4) .stat-label {
   color: #059669;
 }
@@ -311,6 +290,7 @@
 .dashboard-grid {
   display: grid;
   gap: 16px;
+  align-items: stretch;
 
   grid-template-columns:
     minmax(0, 1.45fr)
@@ -326,6 +306,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
 
   padding: 24px;
   border-radius: 28px;
@@ -352,6 +333,230 @@
   text-transform: uppercase;
 
   color: #9ca3af;
+}
+
+.dashboard-panel-heading {
+  gap: 12px;
+}
+
+.dashboard-panel-action {
+  white-space: nowrap;
+}
+
+.dashboard-panel-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dashboard-panel-footer {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.dashboard-panel-empty {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 220px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: 16px;
+}
+
+.dashboard-panel-empty h4 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-panel-empty p {
+  margin: 8px 0 0;
+  max-width: 28ch;
+  line-height: 1.55;
+}
+
+.dashboard-panel-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .88);
+  overflow: hidden;
+}
+
+.dashboard-activity-list,
+.dashboard-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-activity-card,
+.dashboard-task-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(176, 196, 216, 0.48);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 250, 253, 0.96) 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.dashboard-activity-card {
+  min-height: 92px;
+}
+
+.dashboard-activity-copy,
+.dashboard-task-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dashboard-activity-title,
+.dashboard-task-title {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.dashboard-activity-title strong {
+  color: var(--color-text-primary);
+}
+
+.dashboard-activity-meta {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.dashboard-progress-wrap {
+  margin-top: 10px;
+}
+
+.dashboard-progress-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.dashboard-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.dashboard-progress-text {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.dashboard-task-card {
+  align-items: center;
+}
+
+.dashboard-task-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(100, 116, 139, 0.5);
+  background: transparent;
+  flex: 0 0 18px;
+  margin-top: 2px;
+}
+
+.dashboard-task-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.dashboard-task-project-tag {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dashboard-task-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dashboard-task-due--urgent {
+  color: #dc2626;
+}
+
+.dashboard-task-due--warning {
+  color: #d97706;
+}
+
+.dashboard-task-due--muted {
+  color: var(--color-text-secondary);
+}
+
+.dashboard-task-status.pill.todo {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.18);
+}
+
+.dashboard-task-status.pill.in_progress {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.dashboard-task-status.pill.in_review {
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+  border-color: rgba(124, 58, 237, 0.18);
+}
+
+.dashboard-task-status.pill.blocked {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+.dashboard-panel--activity,
+.dashboard-panel--tasks {
+  min-height: 100%;
 }
 
 /* ───────────────── PROJECT LIST ───────────────── */
@@ -534,6 +739,15 @@
 
   .dashboard-stats {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-activity-card,
+  .dashboard-task-card {
+    padding: 12px;
+  }
+
+  .dashboard-panel-empty {
+    min-height: 160px;
   }
 
   .dashboard-page {

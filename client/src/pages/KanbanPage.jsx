@@ -18,7 +18,7 @@ import normalizeProfileImage from "../utils/normalizeProfileImage";
 
 const DEFAULT_TASK_PERMISSIONS = {
 	allow_member_create_task: false,
-	allow_member_take_task: true,
+	allow_member_take_task: false,
 	allow_member_edit_task: false,
 	allow_member_delete_task: false,
 	allow_member_add_board: false,
@@ -184,12 +184,15 @@ function KanbanPage() {
 		return "member";
 	}, [project, currentUser]);
 
-	const isAdminOrOwner = projectRole === "owner" || projectRole === "admin";
+	const isOwner = projectRole === "owner";
+	const isAdmin = projectRole === "admin";
+	const isAdminOrOwner = isOwner || isAdmin;
+	const canAdminManageTasks = isOwner || (isAdmin && taskPermissions.allow_admin_manage_tasks);
 
-	const canCreateTask = isAdminOrOwner || taskPermissions.allow_member_create_task;
+	const canCreateTask = canAdminManageTasks || taskPermissions.allow_member_create_task;
 	const canTakeTask = isAdminOrOwner || taskPermissions.allow_member_take_task;
 	const canMembersReviewTasks = taskPermissions.allow_member_review;
-	const canDeleteTask = isAdminOrOwner || taskPermissions.allow_member_delete_task;
+	const canDeleteTask = canAdminManageTasks || taskPermissions.allow_member_delete_task;
 	const canEditProjectSettings = isAdminOrOwner;
 	const canEditProjectName = projectRole === "owner";
 
@@ -510,7 +513,7 @@ function KanbanPage() {
 	const handleRemoveTask = useCallback(
 		async (task) => {
 			if (!task?.id) return;
-			if (!isAdminOrOwner) return;
+			if (!canAdminManageTasks) return;
 			if (pendingTaskActions[String(task.id)]) return;
 			const taskId = task.id;
 			const currentLocation = findTaskLocation(taskCategoriesRef.current, taskId);
@@ -554,7 +557,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[isAdminOrOwner, loadTaskCategories, findTaskLocation, pendingTaskActions, setTaskPending, clearTaskPending, toast]
+		[canAdminManageTasks, loadTaskCategories, findTaskLocation, pendingTaskActions, setTaskPending, clearTaskPending, toast]
 	);
 
 	const handleSettingChange = useCallback(
@@ -716,11 +719,13 @@ function KanbanPage() {
 			const columnName = String(column?.title || column?.name || "").trim().toLowerCase();
 			// Tasks in Done column cannot be dragged by anyone
 			if (columnName === "done") return false;
+			if (isAdmin && !taskPermissions.allow_admin_manage_tasks) return false;
+			if (isOwner) return true;
 			// Otherwise check if task is assigned to me (original logic)
 			if (isTaskAssignedToMe) return isTaskAssignedToMe(task);
 			return true;
 		},
-		[isTaskAssignedToMe]
+		[isAdmin, isOwner, isTaskAssignedToMe, taskPermissions.allow_admin_manage_tasks]
 	);
 
 	const handleTakeTask = useCallback(
@@ -844,7 +849,7 @@ function KanbanPage() {
 		const isToDoTarget = targetCategoryName === "to_do" || targetCategoryName === "todo";
 		
 		// For non-admins/owners/managers, enforce member_mark_done rules
-		if (!isAdminOrOwner && projectRole !== "manager") {
+		if (!canAdminManageTasks && projectRole !== "manager") {
 			// Rule 0: TODO and In Progress cannot move directly to Done
 			if (isDoneTarget && (sourceColumnName === "todo" || sourceColumnName === "to_do" || isInProgressSource)) {
 				toast.showError("Members cannot move tasks directly to Done. Tasks must be reviewed first.");
@@ -869,7 +874,7 @@ function KanbanPage() {
 		// If dragging from To Review to To Do or Done, show approval/rejection modal (if allowed)
 		if (isToReviewSource && (isToDoTarget || isDoneTarget)) {
 			// Check permission for members
-			if (!isAdminOrOwner && projectRole !== "manager" && !canMembersReviewTasks) {
+			if (!canAdminManageTasks && projectRole !== "manager" && !canMembersReviewTasks) {
 				toast.showError("You don't have permission to approve or reject tasks.");
 				return;
 			}
@@ -1291,6 +1296,7 @@ function KanbanPage() {
 						navigate(`/main-page/projects/${projectId}/kanban/tasks/${task.id}`, {
 							state: {
 								isAdminOrOwner,
+								canAdminsManageTasks: canAdminManageTasks,
 								canMembersAssignTaskToOthers: taskPermissions.allow_assign_task_to_member,
 								canMembersReviewTasks,
 								canMembersDeleteTask: canDeleteTask,
@@ -1311,7 +1317,7 @@ function KanbanPage() {
 						const isDone = columnName === "done";
 							const showTakeTask = canTakeTask && !isAssignedToMe && !isDone;
 						const showUnassignTask = canTakeTask && isAssignedToMe && !isDone && !isToReview;
-						const showRemoveTask = isDone && isAdminOrOwner;
+						const showRemoveTask = isDone && canAdminManageTasks;
 						const pendingAction = pendingTaskActions[String(task?.id)] || (task?.isPending ? "create" : "");
 						const isPending = Boolean(pendingAction);
 						const pendingLabel = (() => {

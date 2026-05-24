@@ -87,10 +87,19 @@ export async function getProjectTasks(projectId) {
   });
 }
 
-export async function getMyTasks() {
-  return fetchWithAuth(`${API_URL}/auth/tasks/my-tasks`, {
+export async function getMyTasks(limit = 50, offset = 0, cursor = null, signal = undefined) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (cursor) {
+    params.set("cursor", String(cursor));
+  } else {
+    params.set("offset", String(offset || 0));
+  }
+
+  return fetchWithAuth(`${API_URL}/auth/tasks/my-tasks?${params.toString()}`, {
     method: "GET",
     cache: "no-cache",
+    signal,
     headers: { "Cache-Control": "no-store" },
   });
 }

@@ -71,6 +71,32 @@ export function RefreshIcon({ className = "", size = 24 }) {
   );
 }
 
+export function TrendUpIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M3 14.5 8.5 9l3.5 3.5 5.5-5.5v3L12 15l-3.5-3.5L5 15H3v-0.5z" />
+      <path d="M14.5 6H17v2.5" />
+    </IconShell>
+  );
+}
+
+export function ChevronDownIcon({ className = "", size = 16 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M5 7.5 10 12.5 15 7.5l1.4 1.4-6.4 6.4-6.4-6.4L5 7.5z" />
+    </IconShell>
+  );
+}
+
+export function CalendarIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M5 3a1 1 0 0 1 1 1v1h8V4a1 1 0 1 1 2 0v1h1.5A1.5 1.5 0 0 1 19 6.5v10A1.5 1.5 0 0 1 17.5 18h-15A1.5 1.5 0 0 1 1 16.5v-10A1.5 1.5 0 0 1 2.5 5H4V4a1 1 0 0 1 1-1Zm11.5 6h-13v7.5h13V9Z" />
+      <path d="M5 8h2v2H5V8Zm4 0h2v2H9V8Zm4 0h2v2h-2V8ZM5 12h2v2H5v-2Zm4 0h2v2H9v-2Zm4 0h2v2h-2v-2Z" />
+    </IconShell>
+  );
+}
+
 export function MetricsIcon({ className = "", size = 24 }) {
   return (
     <IconShell className={className} size={size}>
@@ -148,6 +174,55 @@ export function AddMemberIcon({ className = "", size = 24 }) {
   return (
     <IconShell className={className} size={size}>
       <path d="M8 11.5A3.5 3.5 0 1 0 8 4.5a3.5 3.5 0 0 0 0 7ZM2.5 18.5A5.5 5.5 0 0 1 8 13h.1c1.58 0 3.01.61 4.08 1.6A5.5 5.5 0 0 1 17 13h.1A5 5 0 0 1 22 18v.5a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1v-.5Zm13-9.5h2v-2h2v2h2v2h-2v2h-2v-2h-2v-2Z" />
+    </IconShell>
+  );
+}
+
+// --- Additional header icons (20px variants) ---
+export function CreateProjectIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M10 4a6 6 0 1 0 0 12A6 6 0 0 0 10 4zm1 3v2h2v2h-2v2h-2v-2H7V9h2V7h2z" />
+    </IconShell>
+  );
+}
+
+export function ProjectInvitationsIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 10c-2.67 0-5.33-1.34-6-4h12c-.67 2.66-3.33 4-6 4z" />
+    </IconShell>
+  );
+}
+
+export function AddFriendIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M8 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 2c2.67 0 5.33 1.34 6 4H2c.67-2.66 3.33-4 6-4zm7-1v2h2v2h-2v2h-2v-2h-2v-2h2V10h2z" />
+    </IconShell>
+  );
+}
+
+export function MarkAllReadIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm-1 11-3-3 1.41-1.41L9 10.17l4.59-4.58L15 7l-6 6z" />
+    </IconShell>
+  );
+}
+
+export function FilterIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M3 4h14l-5 6v4l-4 2v-6L3 4z" />
+    </IconShell>
+  );
+}
+
+export function BrowseProjectsIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <path d="M2 4a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4z" />
     </IconShell>
   );
 }

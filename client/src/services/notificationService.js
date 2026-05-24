@@ -2,14 +2,17 @@ import { fetchWithAuth } from "./authService";
 
 const API_URL = "http://localhost:5000";
 
-export async function getNotifications(limit = 50, offset = 0) {
+export async function getNotifications(limit = 50, offset = 0, cursor = null, signal = undefined) {
   const params = new URLSearchParams({
     limit: String(limit),
-    offset: String(offset),
   });
+
+  if (cursor) params.set("cursor", String(cursor));
+  else params.set("offset", String(offset));
 
   return fetchWithAuth(`${API_URL}/auth/notifications?${params.toString()}`, {
     method: "GET",
+    signal,
   });
 }
 

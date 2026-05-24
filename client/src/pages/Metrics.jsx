@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
-import { ChartEmptyIcon, InsightTrendIcon } from "../components/common/AppIcons";
+import HeroActionButton from "../components/common/HeroActionButton";
+import { ChartEmptyIcon, ChevronDownIcon, RefreshIcon, TrendUpIcon } from "../components/common/AppIcons";
+import "../components/styles/WorkspacePages.css";
 import "../components/styles/Metrics.css";
 import "../components/styles/SkeletonLoading.css";
-import { getProjectMetrics, getProjects } from "../services/projectService";
+import { getProjectMetrics, getProjects, getMemberProjects } from "../services/projectService";
 
 // ── Chart helpers ────────────────────────────────────────────────
 
@@ -256,7 +258,6 @@ function KpiCard({ title, value, trend, trendTone = "neutral", meta }) {
 // ── Main page ────────────────────────────────────────────────────
 
 export default function Metrics() {
-  const location = useLocation();
   const { projectId: routeProjectId } = useParams();
   const toast = useToast();
   const isMountedRef = useRef(true);
@@ -267,6 +268,23 @@ export default function Metrics() {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const resolveProjectName = useCallback(async (pid) => {
+    if (!pid) return "";
+
+    const [ownedProjects, memberProjects] = await Promise.all([
+      getProjects(),
+      getMemberProjects(),
+    ]);
+
+    const allProjects = [
+      ...(ownedProjects?.projects || []),
+      ...(memberProjects?.projects || []),
+    ];
+
+    const matchedProject = allProjects.find((project) => String(project?.id) === String(pid));
+    return matchedProject?.name || "";
+  }, []);
+
   const loadMetrics = useCallback(async (options = {}) => {
     const silent = options.silent === true;
     if (!silent) {
@@ -275,26 +293,54 @@ export default function Metrics() {
 
     try {
       let pid = projectId;
+      let resolvedProjectName = "";
+
       if (!pid) {
-        const projectData = await getProjects();
-        pid = projectData.projects?.[0]?.id;
+        const [ownedProjects, memberProjects] = await Promise.all([
+          getProjects(),
+          getMemberProjects(),
+        ]);
+
+        const allProjects = [
+          ...(ownedProjects?.projects || []),
+          ...(memberProjects?.projects || []),
+        ];
+
+        const fallbackProject = allProjects[0];
+        pid = fallbackProject?.id || null;
+
         if (pid) {
           setProjectId(pid);
-          setProjectName(projectData.projects?.[0]?.name || "");
+          resolvedProjectName = fallbackProject?.name || "";
+          if (resolvedProjectName) {
+            setProjectName(resolvedProjectName);
+          }
         }
       }
+
+      if (!resolvedProjectName && pid) {
+        resolvedProjectName = await resolveProjectName(pid);
+        if (resolvedProjectName && isMountedRef.current) {
+          setProjectName(resolvedProjectName);
+        }
+      }
+
       if (!pid) {
         toast.showWarning("No project available");
         return;
       }
+
       const data = await getProjectMetrics(pid, windowDays);
+      if (data?.project_name && isMountedRef.current) {
+        setProjectName(data.project_name);
+      }
       if (isMountedRef.current) setMetrics(data);
     } catch (err) {
       if (isMountedRef.current) toast.showError(err?.message || "Unable to load metrics");
     } finally {
       if (isMountedRef.current && !silent) setLoading(false);
     }
-  }, [projectId, windowDays, toast]);
+  }, [projectId, resolveProjectName, toast, windowDays]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -405,47 +451,47 @@ export default function Metrics() {
   return (
     <section className="page-shell metrics-page">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="metrics-header">
-        <div className="metrics-title-row">
-          <div>
-            <h1 className="metrics-title">Metrics &amp; Analytics</h1>
-            {projectName ? <p className="metrics-project-name">{projectName}</p> : null}
+      <header className="workspace-hero metrics-hero">
+        <div className="workspace-hero-content metrics-hero-content">
+          <div className="metrics-hero-copy">
+            <p className="metrics-eyebrow">Metrics &amp; Analytics</p>
+            <h1 className="metrics-title">{projectName || "Project Metrics"}</h1>
+            <div className="metrics-insight-badge" role="note" aria-label="Performance insight">
+              <TrendUpIcon className="metrics-insight-icon" />
+              <span>
+                Performance Insight: Team efficiency improved by 12% this month. Great job keeping the WIP limits in check.
+              </span>
+            </div>
           </div>
           <div className="metrics-actions">
             <label className="metrics-filter-label" htmlFor="window-select">Period</label>
-            <select
-              id="window-select"
-              className="metrics-filter"
-              value={windowDays}
-              onChange={(e) => setWindowDays(Number(e.target.value))}
-            >
-              <option value={7}>Last 7 days</option>
-              <option value={14}>Last 14 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={90}>Last 90 days</option>
-            </select>
-            <button
-              type="button"
-              className="metrics-refresh-btn"
-              onClick={loadMetrics}
-              disabled={loading}
-              aria-label="Refresh metrics"
-              title="Refresh metrics"
-            >
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
+            <div className="metrics-controls-row">
+              <div className="metrics-select-shell">
+                <select
+                  id="window-select"
+                  className="metrics-filter"
+                  value={windowDays}
+                  onChange={(e) => setWindowDays(Number(e.target.value))}
+                >
+                  <option value={7}>Last 7 days</option>
+                  <option value={14}>Last 14 days</option>
+                  <option value={30}>Last 30 days</option>
+                  <option value={90}>Last 90 days</option>
+                </select>
+                <ChevronDownIcon className="metrics-select-icon" />
+              </div>
+              <HeroActionButton
+                icon={<RefreshIcon />}
+                label={loading ? "Refreshing..." : "Refresh"}
+                variant="secondary"
+                onClick={loadMetrics}
+                disabled={loading}
+                title="Refresh metrics"
+              />
+            </div>
           </div>
         </div>
-
-        <div className="insight-banner">
-          <div className="insight-icon" aria-hidden>
-            <InsightTrendIcon />
-          </div>
-          <div>
-            Performance Insight: Team efficiency improved by 12% this month. Great job keeping the WIP limits in check.
-          </div>
-        </div>
-      </div>
+      </header>
 
       {/* ── Body ───────────────────────────────────────────────── */}
         {/* KPI cards */}

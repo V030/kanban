@@ -24,9 +24,9 @@ function redirectToLoginPage() {
 }
 
 /**
- * Centralized handler for auth failures (401/403).
- * Ensures consistent logout behavior across the client regardless of server status code.
- * @param {number} status - HTTP status code (401 or 403)
+ * Centralized handler for unauthorized requests.
+ * Only true authentication failures should clear the token.
+ * @param {number} status - HTTP status code
  */
 function handleAuthFailure(status) {
   console.log(`Auth failure detected (${status}). Logging out...`);
@@ -82,11 +82,17 @@ export async function fetchWithAuth(url, options = {}) {
     handleNetworkFailure(error);
   }
   
-  // Handle auth failures: both 401 (no token) and 403 (invalid/expired token)
-  // These are treated equivalently as session-expired states requiring re-login
-  if (response.status === 401 || response.status === 403) {
+  // Handle auth failures: only 401 means the session/token is no longer valid.
+  // 403 means the user is authenticated but not authorized, so keep the token.
+  if (response.status === 401) {
     handleAuthFailure(response.status);
     throw new Error("Session expired. Please log in again.");
+  }
+
+  if (response.status === 403) {
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage || "Forbidden");
+    throw new Error(userFriendlyMessage);
   }
   
   if (!response.ok) {
