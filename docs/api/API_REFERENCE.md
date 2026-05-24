@@ -1,6 +1,11 @@
 # API Reference
 
-Last updated: 2026-05-18
+Last updated: 2026-05-21
+
+Recent updates (2026-05-21):
+- Notification URLs used by the frontend are now project-scoped. Examples and client routing reference `/main-page/projects/:projectId/kanban/tasks/:taskId` instead of the older `/main-page/kanban/task/:taskId` style. The client also performs a payload-based fallback when older notifications still contain legacy URLs.
+- The server includes a self-notification guard for assign/unassign flows so owners/admins are not notified when they perform an action on themselves.
+- SVG assets used across the UI were centralized into a single `AppIcons` module; documentation examples now reference shared icon names rather than inline SVG snippets.
 
 This document describes the actual API surface used by the frontend services. It includes examples so humans and AI agents can infer request shapes without reverse-engineering components.
 
@@ -781,7 +786,7 @@ Success example:
         "comment": "Please fix the API response."
       },
       "recipient_user_id": "b7f3...",
-      "url": "/main-page/kanban/task/42",
+      "url": "/main-page/projects/e7c1.../kanban/tasks/42",
       "status": "unread",
       "created_at": "2026-05-18T08:30:00.000Z",
       "updated_at": "2026-05-18T08:30:00.000Z"
@@ -841,7 +846,7 @@ Message format principle:
 - Notifications are contextual and descriptive: who did what where.
 - Task and review notifications include task title and project name.
 - Comment/reply/review-note content is included and truncated when long.
-- task-related notifications include url = /main-page/kanban/task/:taskId so the UI can open task details directly.
+- task-related notifications include url = /main-page/projects/:projectId/kanban/tasks/:taskId so the UI can open task details directly.
 
 ## Metrics
 

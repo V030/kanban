@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { RemoveMemberIcon } from "./AppIcons";
 import "../styles/ProjectMembersList.css";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
 
@@ -157,11 +158,7 @@ export default function ProjectMembersList({
                         aria-label="Remove from project"
                         title="Remove"
                       >
-                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none">
-                          <path d="M12 11a3 3 0 100-6 3 3 0 000 6z" fill="currentColor" />
-                          <path d="M4 20a8 8 0 0116 0H4z" fill="currentColor" />
-                          <rect x="17" y="10" width="5" height="2" rx="1" fill="currentColor" />
-                        </svg>
+                          <RemoveMemberIcon size={18} />
                       </button>
                     </div>
                   )}

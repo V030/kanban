@@ -95,6 +95,17 @@ const ERROR_MESSAGE_MAP = {
   'unable to add comment': 'Unable to add comment. Please try again.',
   'unable to add reply': 'Unable to add reply. Please try again.',
 
+  // Feedback errors
+  'feedback sent successfully': 'Feedback sent successfully!',
+  'feedback message is required': 'Please enter a feedback message.',
+  'feedback category is required': 'Please choose a feedback category.',
+  'invalid feedback category': 'Please choose a valid feedback category.',
+  'subject is required': 'Please enter a subject.',
+  'feedback message must be at least': 'Please write a more detailed feedback message.',
+  'feedback message must be': 'Your feedback message is too long.',
+  'too many feedback submissions. please try again later': 'You are sending feedback too quickly. Please wait a moment and try again.',
+  'feedback email service is not configured': 'Feedback email service is not available right now.',
+
   // Tag errors
   'tag already exists for this task': 'This tag already exists for this task.',
   'unable to create tag': 'Unable to create tag. Please try again.',

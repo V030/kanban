@@ -7,11 +7,12 @@ import ColumnsReorderModal from "../components/common/ColumnsReorderModal";
 import ProjectSettingsModal from "../components/common/ProjectSettingsModal";
 import ProjectMembersModal from "../components/common/ProjectMembersModal";
 import { SkeletonColumn } from "../components/common/SkeletonComponents";
+import { TeamIcon, SettingsIcon, MetricsIcon, ReorderIcon, SaveIcon, CancelIcon, DragHandleIcon } from "../components/common/AppIcons";
 import "../components/styles/KanbanPage.css";
 import "../components/styles/ColumnsReorderModal.css";
 import "../components/styles/SkeletonLoading.css";
 import "../components/styles/WorkspacePages.css";
-import { getCurrentUser } from "../services/authService";
+import { getCurrentUser, hydrateUserFromToken } from "../services/authService";
 import { getProjects, getMemberProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, approveTaskReview, rejectTaskReview, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
 
@@ -188,6 +189,7 @@ function KanbanPage() {
 	const canCreateTask = isAdminOrOwner || taskPermissions.allow_member_create_task;
 	const canTakeTask = isAdminOrOwner || taskPermissions.allow_member_take_task;
 	const canMembersReviewTasks = taskPermissions.allow_member_review;
+	const canDeleteTask = isAdminOrOwner || taskPermissions.allow_member_delete_task;
 	const canEditProjectSettings = isAdminOrOwner;
 	const canEditProjectName = projectRole === "owner";
 
@@ -220,13 +222,23 @@ function KanbanPage() {
 			const data = await getTaskCategories(projectId);
 			setTaskCategories(data.categories || []);
 		} catch (err) {
+			// Check if this is a project-access error
+			const errorMsg = String(err?.message || "").toLowerCase();
+			if (errorMsg.includes("not found") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
+				console.warn(`Access to project ${projectId} denied or project not found during category load.`);
+				if (!silent) {
+					navigate("/projects", { replace: true });
+				}
+				return;
+			}
+			
 			toast.showError(err?.message || "Error fetching task categories for this project.");
 		} finally {
 			if (!silent) {
 				setLoading(false);
 			}
 		}
-	}, [projectId, toast]);
+	}, [projectId, navigate, toast]);
 
 	const loadProjectMembers = useCallback(async () => {
 		if (!projectId) return;
@@ -237,12 +249,20 @@ function KanbanPage() {
 			const data = await getProjectMembers(projectId);
 			setProjectMembers(data.members || []);
 		} catch (membersRequestError) {
+			// Check if this is a project-access error (project deleted or access revoked)
+			const errorMsg = String(membersRequestError?.message || "").toLowerCase();
+			if (errorMsg.includes("not found") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
+				console.warn(`Access to project ${projectId} denied or project not found. Redirecting to projects list.`);
+				navigate("/projects", { replace: true });
+				return;
+			}
+			
 			toast.showError(membersRequestError?.message || "Unable to load project members.");
 			setProjectMembers([]);
 		} finally {
 			setMembersLoading(false);
 		}
-	}, [projectId, toast]);
+	}, [projectId, navigate, toast]);
 
 	const loadProjectSettings = useCallback(async () => {
 		if (!projectId) return;
@@ -251,10 +271,18 @@ function KanbanPage() {
 			const settings = await getProjectSettings(projectId);
 			setTaskPermissions({ ...DEFAULT_TASK_PERMISSIONS, ...settings });
 		} catch (settingsError) {
+			// Check if this is a project-access error
+			const errorMsg = String(settingsError?.message || "").toLowerCase();
+			if (errorMsg.includes("not found") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
+				console.warn(`Access to project ${projectId} denied during settings load.`);
+				navigate("/projects", { replace: true });
+				return;
+			}
+			
 			toast.showError(settingsError?.message || "Unable to load project settings.");
 			setTaskPermissions(DEFAULT_TASK_PERMISSIONS);
 		}
-	}, [projectId, toast]);
+	}, [projectId, navigate, toast]);
 
 	useEffect(() => {
 		if (!projectId) {
@@ -307,13 +335,19 @@ function KanbanPage() {
 				const matchedProject = allProjects.find(p => String(p.id) === String(routeProjectId));
 				if (matchedProject && matchedProject.name) {
 					setProject(matchedProject);
+				} else {
+					// Project was not found in user's accessible projects.
+					// This could mean it was deleted, access was revoked, or the ID is invalid.
+					console.warn(`Project ${routeProjectId} not found in accessible projects. Redirecting to projects list.`);
+					navigate("/projects", { replace: true });
 				}
 			} catch (err) {
 				console.error("Unable to fetch project details:", err);
-				// Keep the minimal project object with just the ID
+				// On error, treat as project not accessible and redirect
+				navigate("/projects", { replace: true });
 			}
 		})();
-	}, [routeProjectId, project?.name]);
+	}, [routeProjectId, project?.name, navigate]);
 
 	// load categories whenever the selected project changes
 	useEffect(() => {
@@ -370,6 +404,7 @@ function KanbanPage() {
 				"subtaskcreate",
 				"memberroleupdate",
 				"taskassignmentchange",
+				"user_role_changed",
 			]);
 			if (!relevant.has(type)) return;
 
@@ -377,8 +412,10 @@ function KanbanPage() {
 				loadProjectSettings();
 			}
 
-			if (type === "memberroleupdate") {
+			if (type === "memberroleupdate" || type === "user_role_changed") {
 				loadProjectMembers();
+				// Refresh project settings on role changes
+				loadProjectSettings();
 			}
 
 			loadTaskCategories({ silent: true });
@@ -387,6 +424,23 @@ function KanbanPage() {
 		window.addEventListener("notifications:push", handleRealtime);
 		return () => window.removeEventListener("notifications:push", handleRealtime);
 	}, [project?.id, loadProjectSettings, loadTaskCategories, loadProjectMembers]);
+
+	// Listen for auth updates (e.g., role changes) and refresh capabilities
+	useEffect(() => {
+		const handleAuthUpdate = async (event) => {
+			console.log("Auth update detected:", event?.detail?.reason);
+			// Re-hydrate user from server to get fresh permission state
+			await hydrateUserFromToken();
+			// Refresh project settings and members to reflect new permissions
+			await Promise.all([
+				loadProjectSettings(),
+				loadProjectMembers(),
+			]);
+		};
+
+		window.addEventListener("auth:user-updated", handleAuthUpdate);
+		return () => window.removeEventListener("auth:user-updated", handleAuthUpdate);
+	}, [loadProjectSettings, loadProjectMembers]);
 
 	const setTaskPending = useCallback((taskId, action) => {
 		if (!taskId) return;
@@ -512,8 +566,16 @@ function KanbanPage() {
 				const updated = await updateProjectSettings(project.id, settingName, nextValue);
 				setTaskPermissions({ ...DEFAULT_TASK_PERMISSIONS, ...(updated || {}) });
 			} catch (err) {
-				toast.showError(err?.message || "Unable to update project settings.");
-				loadProjectSettings();
+				const errorMsg = String(err?.message || "").toLowerCase();
+				// Check if this is a permission-denied error
+				if (errorMsg.includes("permission") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
+					toast.showError("Your permissions have changed. This action is no longer allowed.");
+					// Refresh permissions and re-check
+					await loadProjectSettings();
+				} else {
+					toast.showError(err?.message || "Unable to update project settings.");
+					loadProjectSettings();
+				}
 			} finally {
 				setSettingsPending((prev) => {
 					const next = { ...prev };
@@ -686,7 +748,16 @@ function KanbanPage() {
 				await takeTask(taskId);
 				await loadTaskCategories({ silent: true });
 			} catch (err) {
-				toast.showError(err?.message || "Unable to create task.");
+				const errorMsg = String(err?.message || "").toLowerCase();
+				// Check if this is a permission-denied error
+				if (errorMsg.includes("permission") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
+					toast.showError("Your permissions have changed. This action is no longer allowed.");
+					// Refresh permissions to sync with server state
+					await Promise.all([loadProjectSettings(), loadProjectMembers()]);
+				} else {
+					toast.showError(err?.message || "Unable to take this task.");
+				}
+				// Rollback optimistic assignment
 				setLocalTaskAssignees((prev) => {
 					const next = { ...prev };
 					if (previousAssignee) {
@@ -700,7 +771,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending, toast]
+		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, loadProjectSettings, loadProjectMembers, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending, toast]
 	);
 
 	const handleDragReviewConfirm = useCallback(
@@ -724,6 +795,16 @@ function KanbanPage() {
 				setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null });
 				setDragReviewReason("");
 			} catch (err) {
+				const errorMsg = String(err?.message || "").toLowerCase();
+				// Check if this is a permission-denied error
+				if (errorMsg.includes("permission") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
+					toast.showError("Your permissions have changed. This action is no longer allowed.");
+					// Refresh permissions to sync with server state
+					await Promise.all([loadProjectSettings(), loadProjectMembers()]);
+				} else {
+					toast.showError(err?.message || "Unable to complete this action.");
+				}
+				// Revert the optimistic board state
 				setTaskCategories((prev) => {
 					const currentLoc = findTaskLocation(prev, taskId);
 					if (!currentLoc) return prev;
@@ -735,7 +816,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[dragReviewModal, dragReviewReason, moveTaskToCategory, setTaskPending, clearTaskPending, findTaskLocation, loadTaskCategories]
+		[dragReviewModal, dragReviewReason, moveTaskToCategory, setTaskPending, clearTaskPending, findTaskLocation, loadTaskCategories, loadProjectSettings, loadProjectMembers, toast]
 	);
 
 	const capitalizeFirst = (str) => {
@@ -810,6 +891,8 @@ function KanbanPage() {
 			categoryId: column.id,
 			isPending: true,
 		});
+		// Capture pre-move state for potential rollback
+		const preMoveState = moved.prev;
 		setTaskCategories(moved.next);
 		setTaskPending(taskId, "move");
 
@@ -826,6 +909,8 @@ function KanbanPage() {
 			await loadTaskCategories({ silent: true });
 		} catch (dropError) {
 			toast.showError(dropError?.message || "Unable to move task to this category.");
+			// Restore the pre-move state on failure
+			setTaskCategories(preMoveState);
 		} finally {
 			clearTaskPending(taskId);
 		}
@@ -1081,9 +1166,7 @@ function KanbanPage() {
 									{projectNameSaving ? (
 										<span className="kanban-inline-btn-spinner" aria-hidden="true" />
 									) : (
-										<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-											<path d="M9 16.2l-3.5-3.5 1.4-1.4L9 13.4l8.1-8.1 1.4 1.4z" />
-										</svg>
+											<SaveIcon />
 									)}
 								</button>
 								<button
@@ -1093,9 +1176,7 @@ function KanbanPage() {
 									title="Cancel editing project name"
 									aria-label="Cancel editing project name"
 								>
-									<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-										<path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" />
-									</svg>
+									<CancelIcon />
 								</button>
 							</div>
 						)}
@@ -1127,9 +1208,7 @@ function KanbanPage() {
 									{projectDescSaving ? (
 										<span className="kanban-inline-btn-spinner" aria-hidden="true" />
 									) : (
-										<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-											<path d="M9 16.2l-3.5-3.5 1.4-1.4L9 13.4l8.1-8.1 1.4 1.4z" />
-										</svg>
+											<SaveIcon />
 									)}
 								</button>
 								<button
@@ -1139,9 +1218,7 @@ function KanbanPage() {
 									title="Cancel editing project description"
 									aria-label="Cancel editing project description"
 								>
-									<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-										<path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" />
-									</svg>
+									<CancelIcon />
 								</button>
 							</div>
 						)}
@@ -1155,9 +1232,7 @@ function KanbanPage() {
 						title="Project Members"
 						aria-label="Project Members"
 					>
-						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-							<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-						</svg>
+							<TeamIcon />
 					</button>
 					<button
 						className="kanban-icon-btn"
@@ -1165,9 +1240,7 @@ function KanbanPage() {
 						title="Project Settings"
 						aria-label="Project Settings"
 					>
-						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-							<path d="M19.14 12.94a7.14 7.14 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.44 7.44 0 0 0-1.63-.95l-.36-2.53a.5.5 0 0 0-.49-.41h-3.84a.5.5 0 0 0-.49.41l-.36 2.53a7.44 7.44 0 0 0-1.63.95l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.14 7.14 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96a7.44 7.44 0 0 0 1.63.95l.36 2.53a.5.5 0 0 0 .49.41h3.84a.5.5 0 0 0 .49-.41l.36-2.53a7.44 7.44 0 0 0 1.63-.95l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64ZM12 15.2a3.2 3.2 0 1 1 3.2-3.2 3.2 3.2 0 0 1-3.2 3.2z" />
-						</svg>
+							<SettingsIcon />
 					</button>
 					<button
 						className="kanban-icon-btn"
@@ -1175,9 +1248,7 @@ function KanbanPage() {
 						title="Metrics"
 						aria-label="Metrics"
 					>
-						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-							<path d="M10 20h4V4h-4v16zM4 20h4V10H4v10zm12 0h4V14h-4v6z" />
-						</svg>
+							<MetricsIcon />
 					</button>
 					<button
 						className="kanban-icon-btn"
@@ -1185,9 +1256,7 @@ function KanbanPage() {
 						title="Organize Columns"
 						aria-label="Organize Columns"
 					>
-						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-							<path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
-						</svg>
+							<ReorderIcon />
 					</button>
 				</div>
 			</div>
@@ -1219,7 +1288,14 @@ function KanbanPage() {
 					canDragTask={canDragTask}
 					onTaskClick={(task) => {
 						if (pendingTaskActions[String(task?.id)] || task?.isPending) return;
-						navigate(`/main-page/projects/${projectId}/kanban/tasks/${task.id}`);
+						navigate(`/main-page/projects/${projectId}/kanban/tasks/${task.id}`, {
+							state: {
+								isAdminOrOwner,
+								canMembersAssignTaskToOthers: taskPermissions.allow_assign_task_to_member,
+								canMembersReviewTasks,
+								canMembersDeleteTask: canDeleteTask,
+							}
+						});
 					}}
 					showAddTaskButton={canCreateTask}
 					onTaskDrop={handleTaskDrop}
@@ -1280,14 +1356,7 @@ function KanbanPage() {
 											);
 										})()}
 										<span className="tf-drag-handle" aria-hidden="true" title="Drag to move">
-											<svg viewBox="0 0 13 9" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-												<circle cx="2.5" cy="2" r="1.1" />
-												<circle cx="6.5" cy="2" r="1.1" />
-												<circle cx="10.5" cy="2" r="1.1" />
-												<circle cx="2.5" cy="7" r="1.1" />
-												<circle cx="6.5" cy="7" r="1.1" />
-												<circle cx="10.5" cy="7" r="1.1" />
-											</svg>
+											<DragHandleIcon />
 										</span>
 									</div>
 
@@ -1529,7 +1598,7 @@ function KanbanPage() {
 					</div>
 				)}
 
-				{/* Task details are now a dedicated page: /main-page/kanban/task/:taskId */}
+				{/* Task details are now a dedicated page: /main-page/projects/:projectId/kanban/tasks/:taskId */}
 					</>
 				)}
 			</div>

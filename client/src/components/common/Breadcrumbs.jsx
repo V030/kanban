@@ -57,6 +57,7 @@ function shouldShowBackButton(pathname) {
     "/main-page/projects",
     "/main-page/friends",
     "/main-page/notifications",
+    "/main-page/feedback",
     "/main-page/my-tasks",
     "/main-page/profile",
   ].includes(pathname);
@@ -239,6 +240,13 @@ export default function Breadcrumbs() {
       return [
         { label: "Main Page", to: "/main-page/dashboard" },
         { label: "Notifications" },
+      ];
+    }
+
+    if (pathname === "/main-page/feedback") {
+      return [
+        { label: "Main Page", to: "/main-page/dashboard" },
+        { label: "Feedback" },
       ];
     }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import CreateProjectModal from "../components/common/CreateProjectModal";
@@ -20,7 +20,7 @@ function Projects() {
     const [loading, setLoading] = useState(true);
     const [memberLoading, setMemberLoading] = useState(true);
 
-    const loadProjects = async () => {
+    const loadProjects = useCallback(async () => {
         setLoading(true);
 
         try {
@@ -31,9 +31,9 @@ function Projects() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [toast]);
 
-    const loadOtherProjects = async () => {
+    const loadOtherProjects = useCallback(async () => {
         setMemberLoading(true);
 
         try {
@@ -44,12 +44,12 @@ function Projects() {
         } finally {
             setMemberLoading(false);
         }
-    }
+    }, [toast]);
 
     useEffect(() => {
       loadProjects();
       loadOtherProjects();
-    }, []);
+    }, [loadOtherProjects, loadProjects]);
 
     const handleOptimisticCreate = (optimisticProject) => {
       setProjects((prev) => [optimisticProject, ...(prev || [])]);
@@ -133,10 +133,6 @@ function Projects() {
                 }}
                 disabled={isPending}
               >
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M8 1a4 4 0 1 1 0 8A4 4 0 0 1 8 1zm0 9c4.418 0 7 1.79 7 3v1H1v-1c0-1.21 2.582-3 7-3z" fill="currentColor"/>
-                  <path d="M13 6h2M14 5v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                </svg>
                 Add Member
               </button>
             )} */}

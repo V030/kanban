@@ -121,3 +121,11 @@ export const taskWriteLimiter = createLimiter({
   message: "Too many task updates. Please try again later.",
   prefix: "rl:task-write:",
 });
+
+export const feedbackLimiter = createLimiter({
+  windowMs: rateLimitConfig.feedback.windowMs,
+  max: rateLimitConfig.feedback.max,
+  keyGenerator: keyByUserOrIp,
+  message: "Too many feedback submissions. Please try again later.",
+  prefix: "rl:feedback:",
+});

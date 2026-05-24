@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
+import { ChartEmptyIcon, InsightTrendIcon } from "../components/common/AppIcons";
 import "../components/styles/Metrics.css";
 import "../components/styles/SkeletonLoading.css";
 import { getProjectMetrics, getProjects } from "../services/projectService";
@@ -233,10 +234,7 @@ function SimpleDonutChart({ data = [], size = 200, strokeWidth = 24 }) {
 function EmptyChartState({ message = "No data available" }) {
   return (
     <div className="empty-state chart-empty">
-      <svg width="40" height="28" viewBox="0 0 40 28" fill="none">
-        <rect x="1" y="6" width="38" height="18" rx="3" fill="#f1f5f9" />
-        <path d="M6 15h5v2H6zM14 11h5v2h-5zM23 9h5v2h-5z" fill="#cbd5e1" />
-      </svg>
+      <ChartEmptyIcon />
       <span>{message}</span>
     </div>
   );
@@ -441,9 +439,7 @@ export default function Metrics() {
 
         <div className="insight-banner">
           <div className="insight-icon" aria-hidden>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M3 17l6-6 4 4 8-8" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <InsightTrendIcon />
           </div>
           <div>
             Performance Insight: Team efficiency improved by 12% this month. Great job keeping the WIP limits in check.

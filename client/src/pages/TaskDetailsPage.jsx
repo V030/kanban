@@ -34,7 +34,7 @@ export default function TaskDetailsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { taskId, projectId } = useParams();
-  const toast = useToast();
+  const { showError, showNotFound } = useToast();
 
   const initialTask = location.state?.task || null;
   const initialProject = location.state?.project || null;
@@ -42,9 +42,11 @@ export default function TaskDetailsPage() {
   const hasInitialIsAdmin = Object.prototype.hasOwnProperty.call(location.state || {}, "isAdminOrOwner");
   const hasInitialCanAssign = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersAssignTaskToOthers");
   const hasInitialCanReview = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersReviewTasks");
+  const hasInitialCanDelete = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersDeleteTask");
   const initialIsAdmin = location.state?.isAdminOrOwner || false;
   const initialCanAssign = location.state?.canMembersAssignTaskToOthers || false;
   const initialCanReview = location.state?.canMembersReviewTasks || false;
+  const initialCanDelete = location.state?.canMembersDeleteTask || false;
 
   const [task, setTask] = useState(initialTask);
   const [project, setProject] = useState(initialProject);
@@ -54,6 +56,7 @@ export default function TaskDetailsPage() {
   const [isAdminOrOwner, setIsAdminOrOwner] = useState(initialIsAdmin);
   const [canMembersAssignTaskToOthers, setCanMembersAssignTaskToOthers] = useState(initialCanAssign);
   const [canMembersReviewTasks, setCanMembersReviewTasks] = useState(initialCanReview);
+  const [canMembersDeleteTask, setCanMembersDeleteTask] = useState(initialCanDelete);
 
   const currentUser = getCurrentUser();
 
@@ -81,11 +84,15 @@ export default function TaskDetailsPage() {
       const settings = await getProjectSettings(resolvedProjectId);
       const nextCanAssign = !!settings?.allow_assign_task_to_member;
       const nextCanReview = !!settings?.allow_member_review;
+      const nextCanDelete = !!settings?.allow_member_delete_task;
       if (!hasInitialCanAssign) {
         setCanMembersAssignTaskToOthers(nextCanAssign);
       }
       if (!hasInitialCanReview) {
         setCanMembersReviewTasks(nextCanReview);
+      }
+      if (!hasInitialCanDelete) {
+        setCanMembersDeleteTask(nextCanDelete);
       }
     } catch (err) {
       if (!hasInitialCanAssign) {
@@ -94,8 +101,11 @@ export default function TaskDetailsPage() {
       if (!hasInitialCanReview) {
         setCanMembersReviewTasks(false);
       }
+      if (!hasInitialCanDelete) {
+        setCanMembersDeleteTask(false);
+      }
     }
-  }, [hasInitialCanAssign, hasInitialCanReview, project?.id, projectId]);
+  }, [hasInitialCanAssign, hasInitialCanReview, hasInitialCanDelete, project?.id, projectId]);
 
   useEffect(() => {
     const projectIdToUse = projectId || project?.id;
@@ -134,12 +144,12 @@ export default function TaskDetailsPage() {
       const found = data?.task || null;
 
       if (!found) {
-        toast.showNotFound("Task not found.");
+        showNotFound("Task not found.");
       } else {
         // Validate that the task's project matches the route's projectId if provided
         const taskProjectId = found.project?.id || found.projectId;
         if (projectId && String(taskProjectId) !== String(projectId)) {
-          toast.showError("This task does not belong to the selected project.");
+          showError("This task does not belong to the selected project.");
           return;
         }
 
@@ -154,13 +164,32 @@ export default function TaskDetailsPage() {
         }
       }
     } catch (err) {
-      toast.showError(err?.message || "Unable to load task.");
+      const errorMessage = String(err?.message || "Unable to load task.");
+      const isMissingTask =
+        err?.status === 404 ||
+        err?.statusCode === 404 ||
+        errorMessage.includes("TASK_NOT_FOUND") ||
+        errorMessage.toLowerCase().includes("not found");
+
+      if (isMissingTask) {
+        showNotFound("This task was deleted or is no longer available.");
+
+        const fallbackProjectId = projectId || project?.id;
+        if (fallbackProjectId) {
+          navigate(`/main-page/projects/${fallbackProjectId}/kanban`, { replace: true });
+        } else {
+          navigate("/main-page/projects", { replace: true });
+        }
+        return;
+      }
+
+      showError(errorMessage);
     } finally {
       if (!silent) {
         setTaskLoading(false);
       }
     }
-  }, [hasInitialCanAssign, hasInitialIsAdmin, projectId, toast]);
+  }, [hasInitialCanAssign, hasInitialIsAdmin, navigate, project?.id, projectId, showError, showNotFound]);
 
   useEffect(() => {
     if (!taskId) return;
@@ -321,6 +350,7 @@ export default function TaskDetailsPage() {
         isAdminOrOwner={isAdminOrOwner}
         canMembersAssignTaskToOthers={canMembersAssignTaskToOthers}
         canMembersReviewTasks={canMembersReviewTasks}
+        canMembersDeleteTask={canMembersDeleteTask}
         assignMemberToTask={handleAssignMemberToTask}
         unassignMemberFromTask={handleUnassignMemberFromTask}
         createSubtasks={async ({ subtaskData }) => createSubtask(subtaskData)}

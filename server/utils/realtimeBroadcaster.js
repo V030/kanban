@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { publishNotification } from "./notificationStream.js";
 
 function normalizeUserIds(userIds) {
@@ -16,10 +17,19 @@ function normalizeTimestamp(value) {
   return new Date().toISOString();
 }
 
+/**
+ * Generate a stable event ID for deduplication across reconnects.
+ * Each event should have a unique, stable ID so clients can detect and ignore duplicates.
+ */
+function generateEventId() {
+  return randomUUID();
+}
+
 export function buildRealtimeEvent(payload = {}) {
   const eventType = String(payload.eventType || payload.type || "").trim();
   return {
     ...payload,
+    eventId: payload.eventId || generateEventId(),
     eventType,
     timestamp: normalizeTimestamp(payload.timestamp),
   };

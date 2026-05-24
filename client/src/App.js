@@ -21,6 +21,7 @@ import KanbanPage from "./pages/KanbanPage";
 import TaskDetailsPage from "./pages/TaskDetailsPage";
 import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
+import FeedbackPage from "./pages/FeedbackPage";
 import Metrics from "./pages/Metrics";
 import ErrorPage from "./pages/ErrorPage";
 import ConnectionErrorPage from "./pages/ConnectionErrorPage";
@@ -28,6 +29,7 @@ import { ProtectedRoute } from './components/protected/ProtectedRoutes';
 import { PublicRoute } from './components/public/PublicRoutes';
 
 const NETWORK_ERROR_EVENT = "kanban:network-error";
+const SESSION_EXPIRED_EVENT = "kanban:session-expired";
 
 function NetworkErrorRedirector() {
   const navigate = useNavigate();
@@ -37,10 +39,16 @@ function NetworkErrorRedirector() {
       navigate("/connection-error", { replace: true });
     };
 
+    const handleSessionExpired = () => {
+      navigate("/login", { replace: true });
+    };
+
     window.addEventListener(NETWORK_ERROR_EVENT, handleNetworkError);
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
 
     return () => {
       window.removeEventListener(NETWORK_ERROR_EVENT, handleNetworkError);
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
   }, [navigate]);
 
@@ -95,6 +103,7 @@ function App() {
               <Route path="projects/:projectId/metrics" element={<Metrics />} />
               <Route path="friends" element={<Friends />} />
               <Route path="notifications" element={<Notifications />} />
+              <Route path="feedback" element={<FeedbackPage />} />
               <Route path="my-tasks" element={<MyTasks />} />
               <Route path="profile" element={<Profile />} />
             </Route>

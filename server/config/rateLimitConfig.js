@@ -21,6 +21,7 @@ const defaultLimits = relaxedRateLimits
       invite: { windowMs: 15 * 60 * 1000, max: 120 },
       projectAction: { windowMs: 15 * 60 * 1000, max: 120 },
       taskWrite: { windowMs: 60 * 1000, max: 240 },
+      feedback: { windowMs: 15 * 60 * 1000, max: 5 },
     }
   : {
       general: { windowMs: 15 * 60 * 1000, max: 600 },
@@ -30,6 +31,7 @@ const defaultLimits = relaxedRateLimits
       invite: { windowMs: 15 * 60 * 1000, max: 30 },
       projectAction: { windowMs: 15 * 60 * 1000, max: 10 },
       taskWrite: { windowMs: 60 * 1000, max: 60 },
+      feedback: { windowMs: 15 * 60 * 1000, max: 3 },
     };
 
 const parseTrustProxy = (value) => {
@@ -118,5 +120,9 @@ export const rateLimitConfig = {
   taskWrite: {
     windowMs: parsePositiveInt(process.env.RATE_LIMIT_TASK_WRITE_WINDOW_MS, defaultLimits.taskWrite.windowMs),
     max: parsePositiveInt(process.env.RATE_LIMIT_TASK_WRITE_MAX, defaultLimits.taskWrite.max),
+  },
+  feedback: {
+    windowMs: parsePositiveInt(process.env.RATE_LIMIT_FEEDBACK_WINDOW_MS, defaultLimits.feedback.windowMs),
+    max: parsePositiveInt(process.env.RATE_LIMIT_FEEDBACK_MAX, defaultLimits.feedback.max),
   },
 };

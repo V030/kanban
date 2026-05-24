@@ -75,7 +75,7 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-text-primary);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-display);
 }
 
 /* Column Count Badge */

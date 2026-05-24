@@ -33,6 +33,7 @@ Current limiter categories:
 - inviteLimiter for invitations and friend requests.
 - projectActionLimiter for project mutations.
 - taskWriteLimiter for task mutations.
+- feedbackLimiter for authenticated email-only feedback submissions.
 
 Operational note:
 - Redis can back the limiter store when RATE_LIMIT_STORE=redis.
@@ -76,6 +77,7 @@ Operational note:
 - Set DATABASE_URL, JWT_SECRET, and JWT_EXPIRES_IN explicitly.
 - Configure TRUST_PROXY correctly in deployed environments.
 - Use RATE_LIMIT_STORE=redis when running multiple API instances.
+- Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and FEEDBACK_RECEIVER_EMAIL for feedback delivery.
 - Ensure HTTPS is enforced in production.
 - Verify all routes under /auth are intentionally protected where needed.
 - Confirm that all new endpoints have server-side permission checks.

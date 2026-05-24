@@ -5,6 +5,7 @@ import { transformErrorMessage, extractErrorMessage } from "../utils/errorTransf
 const API_URL = "http://localhost:5000";
 
 const NETWORK_ERROR_EVENT = "kanban:network-error";
+const SESSION_EXPIRED_EVENT = "kanban:session-expired";
 
 function redirectToConnectionErrorPage() {
   if (typeof window === "undefined") {
@@ -12,6 +13,25 @@ function redirectToConnectionErrorPage() {
   }
 
   window.dispatchEvent(new CustomEvent(NETWORK_ERROR_EVENT));
+}
+
+function redirectToLoginPage() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+}
+
+/**
+ * Centralized handler for auth failures (401/403).
+ * Ensures consistent logout behavior across the client regardless of server status code.
+ * @param {number} status - HTTP status code (401 or 403)
+ */
+function handleAuthFailure(status) {
+  console.log(`Auth failure detected (${status}). Logging out...`);
+  logout();
+  redirectToLoginPage();
 }
 
 function handleNetworkFailure(error) {
@@ -62,11 +82,10 @@ export async function fetchWithAuth(url, options = {}) {
     handleNetworkFailure(error);
   }
   
-  // handle token expiration/authentication failure
-  if (response.status === 401) {
-    console.log("Token invalid or expired. Logging out...");
-    logout();
-    window.location.href = "/login";
+  // Handle auth failures: both 401 (no token) and 403 (invalid/expired token)
+  // These are treated equivalently as session-expired states requiring re-login
+  if (response.status === 401 || response.status === 403) {
+    handleAuthFailure(response.status);
     throw new Error("Session expired. Please log in again.");
   }
   
@@ -343,6 +362,15 @@ export function hasRole(role) {
 
 // in-memory cached user; populated on login/register or via explicit hydration
 let cachedUser = null;
+
+/**
+ * Invalidate the cached user state.
+ * This forces a re-fetch on the next access to getCurrentUser.
+ */
+export function invalidateUserCache() {
+  console.log("Invalidating user cache (e.g., due to role change)");
+  cachedUser = null;
+}
 
 // attempt to hydrate cached user from server using token
 export async function hydrateUserFromToken() {

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../services/notificationService";
+import { NotificationIcon } from "../components/common/NotificationIcons";
 import "../components/styles/WorkspacePages.css";
 import "../components/styles/NotificationsPage.css";
 
@@ -47,6 +48,13 @@ function formatTimeAgo(value) {
 function normalizeNotification(notification) {
     const typeKey = String(notification?.type || "").toLowerCase();
     const meta = notificationTypeMeta[typeKey] || { category: "Updates", title: "Notification", tone: "neutral" };
+    const payload = notification?.payload && typeof notification.payload === "object" ? notification.payload : {};
+    const rawUrl = String(notification?.url || "").trim();
+    const taskId = payload?.taskId ?? payload?.task_id;
+    const projectId = payload?.projectId ?? payload?.project_id;
+    const normalizedUrl = rawUrl.startsWith("/main-page/kanban/task/") && projectId && taskId
+        ? `/main-page/projects/${projectId}/kanban/tasks/${taskId}`
+        : rawUrl;
 
     return {
         id: notification?.id,
@@ -57,8 +65,26 @@ function normalizeNotification(notification) {
         time: formatTimeAgo(notification?.created_at || notification?.createdAt),
         unread: String(notification?.status || "unread").toLowerCase() !== "read",
         tone: meta.tone,
-        url: notification?.url || "",
+        url: normalizedUrl,
+        payload,
     };
+}
+
+function getNotificationTargetUrl(notification) {
+    if (!notification) return "";
+
+    if (notification.url) {
+        return notification.url;
+    }
+
+    const taskId = notification?.payload?.taskId ?? notification?.payload?.task_id;
+    const projectId = notification?.payload?.projectId ?? notification?.payload?.project_id;
+
+    if (taskId && projectId) {
+        return `/main-page/projects/${projectId}/kanban/tasks/${taskId}`;
+    }
+
+    return "";
 }
 
 function Notifications() {
@@ -67,6 +93,7 @@ function Notifications() {
     const [activeFilter, setActiveFilter] = useState("all");
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(false);
+    const notificationsRef = useRef([]);
 
     const loadNotifications = useCallback(async (options = {}) => {
         const silent = options.silent === true;
@@ -91,6 +118,10 @@ function Notifications() {
     useEffect(() => {
         loadNotifications();
     }, [loadNotifications]);
+
+    useEffect(() => {
+        notificationsRef.current = notifications;
+    }, [notifications]);
 
     useEffect(() => {
         const handlePush = (event) => {
@@ -157,19 +188,20 @@ function Notifications() {
     };
 
     useEffect(() => {
-        (async () => {
-            try {
-                await markAllNotificationsRead();
-                setNotifications((current) => current.map((notification) => ({
-                    ...notification,
-                    unread: false,
-                })));
-                window.dispatchEvent(new Event("notifications:updated"));
-            } catch (error) {
-                toast.showError(error?.message || "Unable to mark notifications as read.");
-            }
-        })();
-    }, [toast]);
+        return () => {
+            const hasUnreadNotifications = notificationsRef.current.some((notification) => notification.unread);
+            if (!hasUnreadNotifications) return;
+
+            (async () => {
+                try {
+                    await markAllNotificationsRead();
+                    window.dispatchEvent(new Event("notifications:updated"));
+                } catch (error) {
+                    /* leave unread state intact if bulk mark fails */
+                }
+            })();
+        };
+    }, []);
 
     const markRead = useCallback(async (id) => {
         if (!id) return;
@@ -187,11 +219,12 @@ function Notifications() {
     }, [toast]);
 
     const handleOpenNotification = useCallback(async (notification) => {
-        if (!notification?.url) return;
+        const targetUrl = getNotificationTargetUrl(notification);
+        if (!targetUrl) return;
         if (notification.unread) {
             await markRead(notification.id);
         }
-        navigate(notification.url);
+        navigate(targetUrl);
     }, [markRead, navigate]);
 
     return (
@@ -274,8 +307,8 @@ function Notifications() {
                                 }}
                                 tabIndex={0}
                             >
-                                <div className={`notification-icon notification-icon-${notification.tone}`} aria-hidden="true">
-                                    <span />
+                                <div className={`notification-icon notification-icon-${notification.tone || 'neutral'}`} aria-hidden="true">
+                                    <NotificationIcon type={notification.type} className="notification-icon-svg" size={20} />
                                 </div>
 
                                 <div className="notification-body">

@@ -1,56 +1,89 @@
+---
+name: analyst
+user-invocable: true
+description: 'Deeply analyze frontend architecture, identify risks, edge cases, and generate comprehensive test coverage for production-grade resilience.'
+---
+
 # analyst Skill
 
+## Purpose
+Help reviewers analyze frontend problems: layout, styling, component structure, and performance. This skill turns an empirical code scan into a short, prioritized findings report with concrete file references and minimal-change recommendations.
+
 ## Activation
-Use when analyzing frontend issues, debugging layout problems, reviewing architecture, or identifying performance and structural issues.
+Use when analyzing frontend issues, debugging visual/layout problems, reviewing component architecture, or identifying performance or structural problems in the UI.
+
+## Scope
+Workspace-scoped: intended for team-wide use and shared review checklists.
 
 ## Core Agent Behavior
-Before making changes, fully scan relevant files, identify existing patterns, detect inconsistencies, and prefer minimal modification over rewrite. Base every conclusion on observed code only.
+- Always scan the relevant files before proposing fixes.
+- Base conclusions only on evidence present in the workspace.
+- Prefer minimal, targeted changes over rewrites.
+- When in doubt, surface the uncertain evidence and ask for clarification.
 
 ## Mandatory Analysis Pipeline
-1. Structure Discovery
-- Identify folder structure
-- Identify component hierarchy
-- Identify CSS organization approach
-- Identify data flow patterns
+1. Structure discovery
+	- Identify folder layout and owning files (components, pages, styles).
+	- Map component hierarchy and where styles are applied.
+	- Determine CSS organization (global CSS, modules, styled-components, design tokens).
+	- Trace data flow for the feature being inspected (props, context, hooks, API calls).
 
-2. Pattern Detection
-- Detect repeated UI patterns
-- Detect inconsistent styling rules
-- Detect layout inconsistencies
-- Detect duplicated logic
+2. Pattern detection
+	- Find repeated UI patterns and duplicated code.
+	- Detect inconsistent styling (colors, spacing, typography, breakpoints).
+	- Surface layout issues (overflow, stacking, improper flex/grid usage).
+	- Identify accessibility and responsiveness gaps when evident.
 
-3. Problem Classification
-- UI/UX inconsistency
-- CSS inconsistency
-- structural/component issues
-- responsiveness issues
-- logic separation issues
+3. Problem classification
+	- Categorize each finding as: UI/UX inconsistency, CSS issue, structural/component issue, responsiveness problem, or logic/separation concern.
 
-4. Dependency Awareness
-- Confirm actual tools used in the repo
-- Detect whether plain CSS, modules, or frameworks are used
+4. Dependency awareness
+	- Confirm frameworks and tooling actually used (React version, CSS approach, build tool).
+	- Check for runtime helpers (utility classes, design-system tokens, theme files).
 
-5. Change Strategy
-- Prefer minimal safe changes
-- Avoid full rewrites unless explicitly requested
+5. Change strategy
+	- Propose minimal safety-first fixes (CSS specificity tweaks, small markup adjustments, component prop fixes).
+	- Avoid large refactors unless the user explicitly requests them; mark such suggestions as optional.
 
-## Behavior Focus
-- Perform evidence-based analysis only
-- Reference actual code patterns found in the repo
-- Identify root causes, not surface symptoms
-- Prioritize issues by severity
+## Behavior Focus and Constraints
+- Evidence-only: do not assume architecture or intent beyond what's in the repo.
+- Read-only by default: do not modify code or run changes without explicit permission.
+- Prioritize findings by user-visible impact and ease of fix.
 
-## Constraints
-- Must not modify code
-- Must not suggest assumptions without evidence from the codebase
+## Output Format (required)
+Each report should include:
+- Issues: Short, numbered list of problems (prioritized).
+- Evidence: For each issue, cite one or more file locations and code excerpts (use workspace-relative file links where possible).
+- Root cause: A concise explanation linking evidence to the problem.
+- Recommended fix: Minimal actionable steps, with an explicit risk level (low/medium/high) and an example code snippet when helpful.
 
-## Output Format
-- Issues list
-- Evidence with file and pattern references
-- Root cause analysis
-- Recommended fix with minimal intervention
+## Usage Notes for the Agent
+- Start by opening the owning component and its stylesheet(s).
+- Capture a minimal reproduction path: which page, which component, what props or state produce the issue.
+- When recommending a change, provide the exact file and line ranges to edit and a short patch or code example.
+
+## Clarifying Questions (ask when scope is ambiguous)
+- Which routes or pages show the issue (URL or component name)?
+- Is a visual regression or functionality regression expected, or is this a new feature?
+- Are you willing to accept small UI changes (spacing/typography) as part of the fix?
+
+## Example Prompts
+- "Run the analyst skill on the TaskCard component — it overflows on small screens." 
+- "Analyze layout inconsistencies on the project board and suggest minimal CSS fixes."
+
+## Iteration and Deliverables
+1. Draft: produce an issues list with evidence and proposed fixes.
+2. Review: identify ambiguous items and ask clarifying questions.
+3. Finalize: incorporate feedback and produce final recommendations and optional patches.
+
+## Completion Criteria
+- The report lists prioritized issues with direct file references.
+- Each issue includes a root-cause explanation and a low-risk recommended fix.
+- Any high-risk refactor is labeled and left as an optional next step.
 
 ## Repository Notes
-- Start with the nearest owning files and surrounding patterns
-- Use observed structure to classify the problem before proposing a fix
-- Keep findings tied to concrete code locations
+- Start at the nearest owning files and expand outward only as needed.
+- Keep recommendations minimal and tied to concrete locations in the codebase.
+
+---
+Generated by agent-customization guidelines: focused, evidence-driven frontend analysis.

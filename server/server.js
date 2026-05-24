@@ -6,6 +6,7 @@ import { rateLimitTrustProxy } from "./config/rateLimitConfig.js";
 import { generalApiLimiter } from "./middleware/rateLimiter.js";
 import authRoutes from "./routes/authRoutes.js"; 
 import protectedRoutes from "./routes/protectedRoutes.js"; 
+import feedbackRoutes from "./routes/feedbackRoutes.js";
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 
 app.use("/auth", generalApiLimiter, authRoutes);
 app.use("/api/protected", generalApiLimiter, protectedRoutes);
+app.use("/api/feedback", generalApiLimiter, feedbackRoutes);
 
 app.get("/", (req, res) => {
 //   res.send("API running");

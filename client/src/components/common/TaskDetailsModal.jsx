@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "../../services/authService";
 import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask } from "../../services/projectService";
 import { SkeletonCommentInline } from "./SkeletonComponents";
+import { SendIcon, ClearDateIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon } from "./AppIcons";
 import "../styles/TaskDetailsModal.css";
 import "../styles/SkeletonLoading.css";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
@@ -126,7 +127,7 @@ function normalizeTaskPriority(value) {
   return "unset";
 }
 
-export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersReviewTasks = false, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
+export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersReviewTasks = false, canMembersDeleteTask = false, assignMemberToTask, unassignMemberFromTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
   const taskData = task || {};
   const currentUser = useMemo(() => getCurrentUser(), []);
   const currentUserIdValue = currentUserId || currentUser?.id || "";
@@ -979,20 +980,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     .slice()
     .sort((a, b) => new Date(a?.created_at || a?.createdAt) - new Date(b?.created_at || b?.createdAt));
 
-  const sendIcon = (
-    <svg 
-      className="tdm-send-icon" 
-      viewBox="0 0 24 24" 
-      aria-hidden="true" 
-      focusable="false"
-      style={{ transform: "rotate(-45deg)" }}
-    >
-      <path 
-        d="M2 21l21-9L2 3v7l15 2-15 2v7z" 
-        fill="currentColor" 
-      />
-    </svg>
-  );
+  const sendIcon = <SendIcon className="tdm-send-icon" />;
 
   const commentsPanel = (
     <article className="tdm-section-card tdm-comments-panel">
@@ -1216,10 +1204,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                           disabled={targetDateSubmitting || !targetDate}
                           aria-label="Clear date"
                         >
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-                            <path d="M21 12a9 9 0 1 0-3.56 6.56" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M21 3v6h-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
+                          <ClearDateIcon size={18} />
                         </button>
                       </div>
                     </div>
@@ -1316,7 +1301,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                       </button>
                     </div>
 
-                    {isAdminOrOwner && onDeleteTask && (
+                    {(isAdminOrOwner || canMembersDeleteTask) && onDeleteTask && (
                       <div className="dropdown-section">
                         <p className="dropdown-label">Remove Task</p>
                         <button
@@ -1360,9 +1345,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     title="Save task name"
                     aria-label="Save task name"
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <path d="M9 16.2l-3.5-3.5 1.4-1.4L9 13.4l8.1-8.1 1.4 1.4z" />
-                    </svg>
+                    <SaveIcon />
                   </button>
                   <button
                     type="button"
@@ -1371,9 +1354,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     title="Cancel editing task name"
                     aria-label="Cancel editing task name"
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" />
-                    </svg>
+                    <CancelIcon />
                   </button>
                 </div>
               )}
@@ -1403,9 +1384,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     title="Save task description"
                     aria-label="Save task description"
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <path d="M9 16.2l-3.5-3.5 1.4-1.4L9 13.4l8.1-8.1 1.4 1.4z" />
-                    </svg>
+                    <SaveIcon />
                   </button>
                   <button
                     type="button"
@@ -1414,9 +1393,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     title="Cancel editing task description"
                     aria-label="Cancel editing task description"
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" />
-                    </svg>
+                    <CancelIcon />
                   </button>
                 </div>
               )}
@@ -1629,16 +1606,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                               aria-label="Delete subtask"
                               title="Delete"
                             >
-<svg 
-  viewBox="0 0 24 24" 
-  aria-hidden="true" 
-  focusable="false"
->
-  <path 
-    d="M6 7h12v14H6V7zm3-3h6v2H9V4zM4 7h16v2H4V7z" 
-    fill="currentColor" 
-  />
-</svg>
+<TrashIcon />
 
 
 
@@ -1856,9 +1824,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
           <div className="tdm-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-task-title" onClick={(event) => event.stopPropagation()}>
             <div className="tdm-confirm-title-row">
               <span className="tdm-confirm-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M12 2 1 21h22L12 2zm0 6.2c.6 0 1 .4 1 1V13c0 .6-.4 1-1 1s-1-.4-1-1V9.2c0-.6.4-1 1-1zm0 8.8a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6z" />
-                </svg>
+                <TrashIcon />
               </span>
               <h3 id="delete-task-title">Delete this task?</h3>
             </div>
@@ -1977,7 +1943,9 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                   return (
                     <li key={r.id} className="tdm-review-modal-item">
                       <div className="tdm-review-modal-header">
-                        <div className="tdm-review-modal-icon">{isApproved ? "✔" : "✕"}</div>
+                        <div className="tdm-review-modal-icon">
+                          {isApproved ? <ReviewApprovedIcon size={18} /> : <ReviewRejectedIcon size={18} />}
+                        </div>
                         <div className="tdm-review-modal-info">
                           <div className="tdm-review-modal-name">
                             <strong>{r.reviewerName}</strong>

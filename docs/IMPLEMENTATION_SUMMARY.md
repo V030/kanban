@@ -4,6 +4,13 @@
 
 All possible system outcomes have been analyzed and documented in [TOAST_NOTIFICATION_ANALYSIS.md](./TOAST_NOTIFICATION_ANALYSIS.md).
 
+## Recent refactors (2026-05-21)
+
+- Centralized SVG/icon library: multiple inline SVGs were consolidated into `client/src/components/common/AppIcons.jsx` and exposed via `NotificationIcons` to make icon styling and solid-style variants consistent across the UI.
+- Notifications: notification URLs are now project-scoped (`/main-page/projects/:projectId/kanban/tasks/:taskId`). The client includes fallback logic to resolve legacy URLs from payload fields when necessary. The backend also added a self-notification guard to prevent owners/admins from being notified when they assign/unassign tasks to themselves.
+- Deleted-task handling: client-side flows now avoid repeated fetch loops when a referenced task is deleted; missing tasks navigate away or show a friendly error rather than repeatedly re-trying.
+- Typography: metrics and several pages were standardized to use the project's approved two-font stack (display + body) via `DesignSystem.css`.
+
 ### System Outcomes Identified & Categorized
 
 **11 Toast Types with Complete Specifications:**

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useState } from 'react';
+import React, { createContext, useCallback, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 // Create the Toast Context
@@ -174,7 +174,7 @@ export const ToastProvider = ({ children }) => {
     return addToast(message, type);
   }, [addToast]);
 
-  const value = {
+  const value = useMemo(() => ({
     toasts,
     addToast,
     removeToast,
@@ -190,7 +190,23 @@ export const ToastProvider = ({ children }) => {
     showRateLimit,
     showFromError,
     showFromStatus
-  };
+  }), [
+    toasts,
+    addToast,
+    removeToast,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
+    showValidationError,
+    showConflict,
+    showForbidden,
+    showUnauthorized,
+    showNotFound,
+    showRateLimit,
+    showFromError,
+    showFromStatus,
+  ]);
 
   return (
     <ToastContext.Provider value={value}>

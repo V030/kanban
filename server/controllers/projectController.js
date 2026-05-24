@@ -56,6 +56,17 @@ function truncateNotificationText(value, maxLength = 140) {
   return `${text.slice(0, maxLength - 3).trim()}...`;
 }
 
+function buildTaskNotificationUrl(taskContext) {
+  const projectId = String(taskContext?.projectId || "").trim();
+  const taskId = taskContext?.taskId;
+
+  if (!projectId || taskId == null) {
+    return "/main-page/projects";
+  }
+
+  return `/main-page/projects/${projectId}/kanban/tasks/${taskId}`;
+}
+
 function buildNotificationRecipients({ creatorId, assigneeIds = [], actorId }) {
   const ids = new Set([creatorId, ...(assigneeIds || [])].filter(Boolean));
   if (actorId) ids.delete(actorId);
@@ -702,7 +713,8 @@ export async function updateTaskStatus(req, res) {
     try {
       const actor = await getUserSummary(req.user.userId);
       const taskContext = await getTaskContext(taskId);
-      if (actor && taskContext) {
+      // Only send notification if assigning to someone other than the actor
+      if (actor && taskContext && String(memberId) !== String(req.user.userId)) {
         const recipients = buildNotificationRecipients({
           creatorId: taskContext.creatorId,
           assigneeIds: taskContext.assigneeIds,
@@ -721,7 +733,7 @@ export async function updateTaskStatus(req, res) {
               categoryName: taskContext.categoryName,
             },
             recipientUserId: recipientId,
-            url: `/main-page/kanban/task/${taskContext.taskId}`,
+            url: buildTaskNotificationUrl(taskContext),
           }))
         );
       }
@@ -835,7 +847,7 @@ export async function approveTaskReview(req, res) {
               comment,
             },
             recipientUserId: recipientId,
-            url: `/main-page/kanban/task/${taskContext.taskId}`,
+            url: buildTaskNotificationUrl(taskContext),
           }))
         );
       }
@@ -917,7 +929,7 @@ export async function rejectTaskReview(req, res) {
               comment: reviewRaw,
             },
             recipientUserId: recipientId,
-            url: `/main-page/kanban/task/${taskContext.taskId}`,
+            url: buildTaskNotificationUrl(taskContext),
           }))
         );
       }
@@ -1349,7 +1361,7 @@ export async function assignTaskToOthers(req, res) {
             assigneeId: memberId,
           },
           recipientUserId: memberId,
-          url: `/main-page/kanban/task/${taskContext.taskId}`,
+          url: buildTaskNotificationUrl(taskContext),
         });
       }
     } catch (notifyError) {
@@ -1516,7 +1528,8 @@ export async function createTaskComment(req, res) {
     try {
       const actor = await getUserSummary(req.user.userId);
       const taskContext = await getTaskContext(taskId);
-      if (actor && taskContext) {
+      // Only send notification if unassigning from someone other than the actor
+      if (actor && taskContext && String(memberId) !== String(req.user.userId)) {
         const recipients = buildNotificationRecipients({
           creatorId: taskContext.creatorId,
           assigneeIds: taskContext.assigneeIds,
@@ -1534,7 +1547,7 @@ export async function createTaskComment(req, res) {
               comment,
             },
             recipientUserId: recipientId,
-            url: `/main-page/kanban/task/${taskContext.taskId}`,
+            url: buildTaskNotificationUrl(taskContext),
           }))
         );
       }
@@ -1639,7 +1652,7 @@ export async function createTaskCommentReply(req, res) {
               reply: commentReply,
             },
             recipientUserId: recipientId,
-            url: `/main-page/kanban/task/${taskContext.taskId}`,
+            url: buildTaskNotificationUrl(taskContext),
           }))
         );
       }
@@ -1868,7 +1881,7 @@ export async function unassignTaskFromMember(req, res) {
             assigneeId: memberId,
           },
           recipientUserId: memberId,
-          url: `/main-page/kanban/task/${taskContext.taskId}`,
+          url: buildTaskNotificationUrl(taskContext),
         });
       }
     } catch (notifyError) {

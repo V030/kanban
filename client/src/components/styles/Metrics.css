@@ -1,12 +1,11 @@
 /* ── Metrics & Analytics Dashboard ─────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 @import url('../../DesignSystem.css');
 
 /* ═══════════════════════════════════════════════════════════════
    PAGE SHELL
 ═══════════════════════════════════════════════════════════════ */
 .metrics-page {
-  font-family: var(--font-base);
+  font-family: var(--font-family);
   color: var(--ink-700);
   width: min(1280px, 100%);
   
@@ -40,26 +39,27 @@
 
 .metrics-title {
   margin: 0;
-  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 3.4vw, 3rem);
   font-weight: 800;
-  color: var(--ink-300);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  line-height: 1.2;
+  color: var(--ink-900);
+  letter-spacing: -0.04em;
+  text-transform: none;
+  line-height: 1;
 }
 
 .metrics-subtitle {
   margin: 3px 0 0;
-  font-size: 0.82rem;
-  color: var(--ink-300);
+  font-size: 0.92rem;
+  color: var(--ink-500);
 }
 
 .metrics-project-name {
-  margin: 5px 0 0;
-  font-size: 1.65rem;
-  font-weight: 800;
-  color: var(--ink-900);
-  letter-spacing: -0.025em;
+  margin: 8px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-500);
+  letter-spacing: 0;
 }
 
 .metrics-actions {
@@ -74,7 +74,7 @@
   background: #ffffff;
   color: var(--ink-700);
   padding: 7px 14px;
-  font-family: var(--font-base);
+  font-family: var(--font-family);
   font-size: 0.84rem;
   font-weight: 700;
   cursor: pointer;
@@ -93,7 +93,7 @@
 .metrics-filter-label { font-size: 0.82rem; color: var(--ink-300); }
 
 .metrics-filter {
-  font-family: var(--font-base);
+  font-family: var(--font-family);
   font-size: 0.84rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -118,7 +118,7 @@
   padding: 0px;
   border-radius: 10px;
   color: var(--brand);
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   font-weight: 500;
   margin-bottom: 5px;
   margin-top: -10px;
@@ -181,7 +181,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: var(--ink-300);
+  color: var(--ink-500);
 }
 
 .kpi-trend {
@@ -208,7 +208,7 @@
 
 .kpi-meta {
   font-size: 0.78rem;
-  color: var(--ink-300);
+  color: var(--ink-500);
   margin-top: 4px;
 }
 
