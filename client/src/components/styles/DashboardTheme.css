@@ -405,27 +405,47 @@
   overflow: hidden;
 }
 
+.dashboard-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .dashboard-activity-list,
 .dashboard-task-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
 
 .dashboard-activity-card,
 .dashboard-task-card {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(176, 196, 216, 0.48);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 250, 253, 0.96) 100%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  gap: 0;
+  padding: 12px 0;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .dashboard-activity-card {
-  min-height: 92px;
+  align-items: center;
+  position: relative;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(176, 196, 216, 0.48);
+  transition: background-color var(--transition-fast);
+}
+
+.dashboard-activity-card:last-child {
+  border-bottom: none;
+}
+
+.dashboard-activity-card:hover {
+  background: rgba(15, 127, 143, 0.035);
 }
 
 .dashboard-activity-copy,
@@ -438,19 +458,28 @@
 .dashboard-task-title {
   margin: 0;
   color: var(--color-text-primary);
-  font-weight: 700;
-  line-height: 1.45;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .dashboard-activity-title strong {
   color: var(--color-text-primary);
+  font-weight: 500;
 }
 
 .dashboard-activity-meta {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   line-height: 1.35;
+}
+
+.dashboard-activity-card .dashboard-avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  margin-top: 0;
 }
 
 .dashboard-progress-wrap {
@@ -478,16 +507,21 @@
 
 .dashboard-task-card {
   align-items: center;
+  position: relative;
+  border-bottom: 1px solid rgba(176, 196, 216, 0.48);
+  transition: background-color var(--transition-fast);
+}
+
+.dashboard-task-card:last-child {
+  border-bottom: none;
+}
+
+.dashboard-task-card:hover {
+  background: rgba(15, 127, 143, 0.035);
 }
 
 .dashboard-task-checkbox {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  border: 1.5px solid rgba(100, 116, 139, 0.5);
-  background: transparent;
-  flex: 0 0 18px;
-  margin-top: 2px;
+  display: none;
 }
 
 .dashboard-task-meta-row {
@@ -496,6 +530,10 @@
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 8px;
+}
+
+.dashboard-task-copy {
+  padding-right: 0;
 }
 
 .dashboard-task-project-tag {
@@ -516,6 +554,10 @@
   font-size: 0.76rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.dashboard-task-card .dashboard-avatar {
+  display: none;
 }
 
 .dashboard-task-due--urgent {

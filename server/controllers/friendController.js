@@ -10,6 +10,17 @@ import { addFriend as addFriendModel,
         } from "../models/friendModel.js";
 import { createNotification, getUserSummary } from "../models/notificationModel.js";
 
+function buildActorPayload(actor) {
+  if (!actor) return null;
+
+  return {
+    id: actor.id,
+    name: actor.displayName || actor.name || actor.email || "Someone",
+    profileImageBase64: actor.profileImageBase64 || null,
+    profilePictureUrl: actor.profilePictureUrl || null,
+  };
+}
+
 export async function addFriend(req, res) {
   const requesterId = req.user?.userId;
   const requesterEmail = (req.user?.email || "").trim().toLowerCase();
@@ -38,6 +49,7 @@ export async function addFriend(req, res) {
           type: "friend_request",
           message: `${requester.displayName} sent you a friend request.`,
           payload: {
+            actor: buildActorPayload(requester),
             requesterId,
             requestId: friendRequest?.id || null,
           },
@@ -140,6 +152,7 @@ export async function acceptFriendRequest(req, res) {
           type: "friend_request_accepted",
           message: `${recipient.displayName} accepted your friend request.`,
           payload: {
+            actor: buildActorPayload(recipient),
             requestId,
             recipientId: userId,
           },

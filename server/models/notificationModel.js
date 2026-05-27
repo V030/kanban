@@ -15,7 +15,7 @@ export async function getUserSummary(userId) {
 
   const result = await pool.query(
     `
-    SELECT id, first_name, last_name, email
+    SELECT id, first_name, last_name, email, profile_image_base64, profile_picture_url
     FROM users
     WHERE id = $1::uuid
     LIMIT 1
@@ -32,6 +32,8 @@ export async function getUserSummary(userId) {
     lastName: row.last_name,
     email: row.email,
     displayName: formatDisplayName(row),
+    profileImageBase64: row.profile_image_base64,
+    profilePictureUrl: row.profile_picture_url,
   };
 }
 

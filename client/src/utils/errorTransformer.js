@@ -35,7 +35,8 @@ const ERROR_MESSAGE_MAP = {
   // Project errors
   'project created successfully': 'Project created successfully!',
   'project not found': 'This project no longer exists or has been deleted.',
-  'forbidden: you are not a member of this project': 'You do not have access to this project.',
+  // Hide specific authorization details from end users; show a non-descriptive friendly message
+  'forbidden: you are not a member of this project': 'Something went wrong. Please try again.',
   'forbidden: you don\'t have permission to modify the board': 'You do not have permission to modify this project.',
   'cannot remove owner': 'The project owner cannot be removed.',
   'unable to create project': 'Unable to create project. Please try again.',

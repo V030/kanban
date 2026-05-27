@@ -56,10 +56,10 @@ export const TOAST_ICONS = {
   [TOAST_TYPES.SUCCESS]: '✓',
   [TOAST_TYPES.ERROR]: '✕',
   [TOAST_TYPES.FAILURE]: '✕',
-  [TOAST_TYPES.FORBIDDEN]: '🔒',
-  [TOAST_TYPES.UNAUTHORIZED]: '👤',
-  [TOAST_TYPES.NOT_FOUND]: '🔍',
-  [TOAST_TYPES.CONFLICT]: '⚔',
+  [TOAST_TYPES.FORBIDDEN]: '✕',
+  [TOAST_TYPES.UNAUTHORIZED]: '✕',
+  [TOAST_TYPES.NOT_FOUND]: '✕',
+  [TOAST_TYPES.CONFLICT]: '✕',
   [TOAST_TYPES.VALIDATION]: '⚠',
   [TOAST_TYPES.RATE_LIMIT]: '⏱',
   [TOAST_TYPES.INFO]: 'ℹ',
@@ -88,7 +88,16 @@ export const ToastProvider = ({ children }) => {
       timestamp: Date.now()
     };
 
-    setToasts(prevToasts => [...prevToasts, newToast]);
+    // Deduplicate identical messages within a short window to avoid repeat toasts
+    setToasts(prevToasts => {
+      const recent = prevToasts.find(t => t.message === message && (Date.now() - (t.timestamp || 0)) < 1500);
+      if (recent) {
+        // return existing id (no new toast added)
+        return prevToasts;
+      }
+
+      return [...prevToasts, newToast];
+    });
 
     return toastId;
   }, []);

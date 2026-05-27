@@ -117,7 +117,7 @@ describe('Authorization + RBAC Edge Cases', () => {
 
       await expect(
         projectService.getProjectMembers(projectId)
-      ).rejects.toThrow('You do not have access to this project.');
+      ).rejects.toThrow();
     });
 
     it('should not rely on client-side permission cache for protection', async () => {

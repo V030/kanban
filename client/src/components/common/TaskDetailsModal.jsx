@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getCurrentUser } from "../../services/authService";
-import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask } from "../../services/projectService";
-import { SkeletonCommentInline } from "./SkeletonComponents";
+import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask } from "../../services/projectService";
+import { SkeletonCommentInline, SkeletonRow } from "./SkeletonComponents";
 import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon } from "./AppIcons";
 import "../styles/TaskDetailsModal.css";
 import "../styles/SkeletonLoading.css";
@@ -212,6 +213,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     return [
       { key: "todo", label: "Todo", names: ["todo", "to_do"] },
       { key: "in_progress", label: "In Progress", names: ["in_progress", "in progress"] },
+      { key: "to_review", label: "To Review", names: ["to_review", "to review", "review"] },
       { key: "done", label: "Done", names: ["done"] },
       { key: "cancelled", label: "Cancelled", names: ["cancelled", "canceled"] },
     ].map((entry) => {
@@ -228,9 +230,9 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const taskDescRef = useRef(null);
   const taskTargetDateRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState(null);
   const dropdownRef = useRef(null);
   const menuButtonRef = useRef(null);
+  const newSubtaskInputRef = useRef(null);
 
   useEffect(() => {
     if (!canManageAdminTaskActions && menuOpen) {
@@ -238,21 +240,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     }
   }, [canManageAdminTaskActions, menuOpen]);
 
-  const updateMenuPosition = useCallback(() => {
-    const button = menuButtonRef.current;
-    const dropdown = dropdownRef.current;
-    if (!button) return;
-
-    const rect = button.getBoundingClientRect();
-    const dropdownWidth = dropdown?.offsetWidth || 320;
-    const gap = 8;
-    const viewportPadding = 8;
-    const maxLeft = Math.max(viewportPadding, window.innerWidth - dropdownWidth - viewportPadding);
-    const left = Math.min(Math.max(rect.right - dropdownWidth, viewportPadding), maxLeft);
-    const top = Math.min(rect.bottom + gap, Math.max(viewportPadding, window.innerHeight - viewportPadding - 16));
-
-    setMenuPosition({ top, left });
-  }, []);
+  // dropdown is anchored via CSS to the .task-actions-wrap container
 
   useEffect(() => {
     function handleOutsideClick(e) {
@@ -277,18 +265,9 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   useEffect(() => {
     if (!menuOpen) return;
-
-    const syncMenuPosition = () => updateMenuPosition();
-    syncMenuPosition();
-
-    document.addEventListener("scroll", syncMenuPosition, true);
-    window.addEventListener("resize", syncMenuPosition);
-
-    return () => {
-      document.removeEventListener("scroll", syncMenuPosition, true);
-      window.removeEventListener("resize", syncMenuPosition);
-    };
-  }, [menuOpen, updateMenuPosition]);
+    // keep dropdown open/close responsive to scroll/resize via CSS positioning
+    return undefined;
+  }, [menuOpen]);
 
   useEffect(() => {
     const ids = (Array.isArray(task?.assignees) ? task.assignees : [])
@@ -300,6 +279,71 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   useEffect(() => {
     setLocalSubtasks(Array.isArray(task?.subtasks) ? [...task.subtasks] : []); 
   }, [task?.id, task?.subtasks])
+
+  useEffect(() => {
+    if (showAddSubtask) {
+      // small delay to ensure input is mounted
+      const t = setTimeout(() => {
+        try { newSubtaskInputRef.current?.focus(); } catch (e) {}
+      }, 30);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [showAddSubtask]);
+
+  async function handleCreateSubtask() {
+    if (!newSubtaskTitle || !newSubtaskTitle.trim()) return;
+
+    const tempId = `temp-subtask-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    const optimisticSubtask = {
+      id: tempId,
+      title: newSubtaskTitle.trim(),
+      status: "unfinished",
+      createdAt,
+      createdBy: currentUser
+        ? {
+            id: currentUser?.id || currentUserId,
+            firstName: currentUser.firstName || currentUser.first_name,
+            lastName: currentUser.lastName || currentUser.last_name,
+            email: currentUser.email,
+          }
+        : { id: currentUserId },
+      isPending: true,
+    };
+
+    setSubtaskError("");
+    setSubtaskPendingIds((prev) => ({ ...prev, [tempId]: true }));
+    setLocalSubtasks((prev) => [...prev, optimisticSubtask]);
+
+    try {
+      const payload = await createSubtasks({
+        subtaskData: {
+          taskId: task?.id,
+          title: newSubtaskTitle.trim(),
+          createdBy: currentUser?.id || currentUserId,
+          status: "unfinished",
+        },
+      });
+      const created = payload?.subtask || payload?.data || payload;
+      if (created && created.id) {
+        setLocalSubtasks((prev) => prev.map((item) => (item.id === tempId ? { ...item, ...created, isPending: false } : item)));
+      } else {
+        setLocalSubtasks((prev) => prev.map((item) => (item.id === tempId ? { ...item, isPending: false } : item)));
+      }
+      setShowAddSubtask(false);
+      setNewSubtaskTitle("");
+    } catch (error) {
+      setSubtaskError(error.message || "Failed to add subtask");
+      setLocalSubtasks((prev) => prev.filter((item) => item.id !== tempId));
+    } finally {
+      setSubtaskPendingIds((prev) => {
+        const next = { ...prev };
+        delete next[tempId];
+        return next;
+      });
+    }
+  }
 
   useEffect(() => {
     if (!isEditingTaskTitle) return;
@@ -413,7 +457,12 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     if (!reason) return alert("Please provide an approval note.");
     setApproveSubmitting(true);
     try {
-      await approveTaskReview(task.id, reason);
+      const data = await approveTaskReview(task.id, reason);
+      // update local category id if server returned updated task
+      const updatedTask = data?.task || data || null;
+      const savedCategoryId = updatedTask?.categoryId ?? updatedTask?.category_id;
+      if (savedCategoryId) setTaskCategoryId(String(savedCategoryId));
+
       const revs = await getTaskReviews(task.id);
       setReviews(revs?.reviews || revs || []);
       setShowApproveModal(false);
@@ -441,7 +490,12 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     if (!reason) return alert("Please provide a rejection reason.");
     setRejectSubmitting(true);
     try {
-      await rejectTaskReview(task.id, reason);
+      const data = await rejectTaskReview(task.id, reason);
+      // update local category id if server returned updated task
+      const updatedTask = data?.task || data || null;
+      const savedCategoryId = updatedTask?.categoryId ?? updatedTask?.category_id;
+      if (savedCategoryId) setTaskCategoryId(String(savedCategoryId));
+
       const revs = await getTaskReviews(task.id);
       setReviews(revs?.reviews || revs || []);
       setShowRejectModal(false);
@@ -479,7 +533,23 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
       try {
         const data = await getProjectTags(projectId);
         const suggestions = data?.tags || data || [];
-        setProjectTagSuggestions(suggestions);
+
+        // Deduplicate suggestions primarily by normalized name (case-insensitive),
+        // falling back to id when name is not available.
+        const seen = new Set();
+        const unique = [];
+        for (const s of suggestions) {
+          const rawName = s?.tagName || s?.tag_name || s?.name || s || "";
+          const nameNorm = String(rawName).replace(/\s+/g, " ").trim().toLowerCase();
+          const idKey = s && (s.id || s?.tagId || s?.tag_id) ? String(s.id || s.tagId || s.tag_id) : null;
+          const key = nameNorm || idKey;
+          if (!key) continue;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          unique.push(s);
+        }
+
+        setProjectTagSuggestions(unique);
       } catch (err) {
         console.error("Unable to load project tags", err);
         setProjectTagSuggestions([]);
@@ -490,6 +560,17 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
     loadProjectSuggestions();
   }, [projectId, getProjectTags]);
+
+  // Helper to render modal overlays into document.body when this content is used as a full page
+  const maybePortal = (element) => {
+    if (!element) return null;
+    if (!asPage) return element;
+    try {
+      return createPortal(element, document.body);
+    } catch (e) {
+      return element;
+    }
+  };
 
   const memberPool = useMemo(() => {
     const combined = [...(Array.isArray(projectMembers) ? projectMembers : []), ...assignees];
@@ -591,6 +672,17 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     }
     if ((tags || []).length >= 5) {
       setTagError("A task may have up to 5 tags");
+      return;
+    }
+    // Prevent adding duplicate tags (case-insensitive match on tag name)
+    const normalizedNew = name.toLowerCase();
+    const already = (tags || []).some((t) => {
+      const existing = String(t?.tagName || t?.tag_name || t?.name || t || "").trim().toLowerCase();
+      return existing === normalizedNew;
+    });
+    if (already) {
+      setTagError("This tag is already added to the task.");
+      setTagInput("");
       return;
     }
     const tempId = `temp-tag-${Date.now()}`;
@@ -894,6 +986,20 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
     setTaskCategoryError("");
 
+    // If selecting TODO or DONE from the dropdown, prompt for approval/rejection first
+    if (movingToDone || movingToToDo) {
+      // close the menu and show the appropriate modal to collect a review note
+      setMenuOpen(false);
+      if (movingToDone) {
+        setApproveReason("");
+        setShowApproveModal(true);
+      } else {
+        setRejectReason("");
+        setShowRejectModal(true);
+      }
+      return;
+    }
+
     if (!updateTaskStatus) return;
 
     setTaskCategorySubmitting(true);
@@ -958,13 +1064,59 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     }
   };
 
+  const handleToggleSubtask = async (subtask, event) => {
+    if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+    console.log("handleToggleSubtask invoked", { taskId: task?.id, subtaskId: subtask?.id, eventType: event?.type });
+    if (!task?.id || !subtask?.id) return;
+    const subtaskId = subtask.id;
+    const previousSubtasks = localSubtasks;
+
+    setSubtaskError("");
+    setSubtaskPendingIds((prev) => ({ ...prev, [subtaskId]: true }));
+
+    const wasCompleted = subtask?.status === "finished" || subtask?.status === "completed" || !!subtask.completed;
+    const nextStatus = wasCompleted ? "unfinished" : "finished";
+
+    setLocalSubtasks((prev) => prev.map((s) => (String(s?.id) === String(subtaskId) ? { ...s, status: nextStatus, isPending: true } : s)));
+
+    if (String(subtaskId).startsWith("temp-subtask-")) {
+      // Temp items don't need server update
+      setSubtaskPendingIds((prev) => {
+        const next = { ...prev };
+        delete next[subtaskId];
+        return next;
+      });
+      setLocalSubtasks((prev) => prev.map((s) => (String(s?.id) === String(subtaskId) ? { ...s, isPending: false } : s)));
+      return;
+    }
+
+    try {
+      console.log("calling updateSubtask API", { taskId: task?.id, subtaskId, nextStatus });
+      const resp = await updateSubtask(task.id, subtaskId, { status: nextStatus });
+      console.log("updateSubtask response", resp);
+      const updated = resp?.subtask || resp?.data || resp || {};
+      setLocalSubtasks((prev) => prev.map((s) => (String(s?.id) === String(subtaskId) ? { ...s, ...updated, isPending: false } : s)));
+    } catch (err) {
+      console.error("updateSubtask failed", err);
+      setSubtaskError(err?.message || "Failed to update subtask");
+      setLocalSubtasks(previousSubtasks);
+    } finally {
+      setSubtaskPendingIds((prev) => {
+        const next = { ...prev };
+        delete next[subtaskId];
+        return next;
+      });
+    }
+  };
+
   const renderMemberRow = (member, index) => {
     const resolvedMemberId = getMemberId(member);
     const memberId = resolvedMemberId || `${index}-${getMemberLabel(member)}`;
     const isAssigned = resolvedMemberId ? localAssignedIds.includes(resolvedMemberId) : false;
     const isPending = resolvedMemberId ? assignmentPendingIds[resolvedMemberId] : false;
     const isCurrentUserRow = resolvedMemberId && String(resolvedMemberId) === String(currentUserIdValue);
-    const canToggleSelf = isCurrentUserRow && (isAdminOrOwner || canMembersTakeTask);
+    const isToReview = String(taskData?.categoryName || taskData?.category_name || "").toLowerCase().includes("review");
+    const canToggleSelf = isCurrentUserRow && (isAdminOrOwner || canMembersTakeTask) && !isToReview;
     const canToggleOthers = !isCurrentUserRow && (isAdminOrOwner || (canMembersTakeTask && canMembersAssignTaskToOthers));
     const roleLabel = member?.role || member?.projectRole || member?.project_role;
     const emailLabel = member?.email;
@@ -1048,12 +1200,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const sendIcon = <SendIcon className="tdm-send-icon" />;
 
+  const [sidebarTab, setSidebarTab] = useState("comments");
+
   const commentsPanel = (
     <article className="tdm-section-card tdm-comments-panel">
-      <div className="tdm-comments-header">
-        <h3>Comments</h3>
-      </div>
-
       <div className="tdm-comments-body">
         {commentsError && <p className="tdm-comment-error">{commentsError}</p>}
 
@@ -1205,6 +1355,103 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     </article>
   );
 
+  const activitiesPanel = (
+    <article className="tdm-section-card tdm-activities-panel">
+      <div className="tdm-activities-body">
+        {reviewsError && <p className="tdm-comment-error">{reviewsError}</p>}
+
+        {reviewsLoading ? (
+          <div className="skeleton-list">
+            <SkeletonRow showAvatar={false} lineCount={3} />
+            <SkeletonRow showAvatar={false} lineCount={2} />
+          </div>
+        ) : (
+          <div className="tdm-activities-list-wrap">
+            {Array.isArray(reviews) && reviews.length > 0 ? (
+              <ul className="tdm-review-list" aria-label="Activity">
+                {reviews.map((rev, idx) => {
+                  const actor = rev?.user || rev?.actor || {};
+                  const roleLabel = rev?.reviewerRole || actor?.role || actor?.projectRole || actor?.project_role;
+                  const displayName = rev?.reviewerName || getMemberLabel(actor);
+                  const actionNorm = getReviewEntryAction(rev) || rev?.action || "";
+                  const isApproved = String(actionNorm).toLowerCase() === "approved";
+                  const isRejected = String(actionNorm).toLowerCase() === "rejected";
+                  const comment = getReviewEntryComment(rev);
+                  const timeLabel = formatTimeAgo(rev?.createdAt || rev?.created_at);
+
+                  return (
+                    <li key={rev.id || idx} className="tdm-review-row">
+                      <div className="tdm-review-icon">
+                        {(() => {
+                          const memberFromProject = (projectMembers || []).find((m) =>
+                            String(m?.id || m?.userId || m?.user_id || "") === String(rev?.reviewerId || rev?.reviewer_id || "")
+                          );
+                          const memberImg =
+                            memberFromProject?.profileImageBase64 ||
+                            memberFromProject?.profile_image_base64 ||
+                            memberFromProject?.avatar ||
+                            memberFromProject?.avatarUrl ||
+                            memberFromProject?.imageUrl ||
+                            memberFromProject?.profileImage ||
+                            memberFromProject?.profile_image;
+
+                          const avatarSrc = normalizeProfileImage(
+                            rev?.reviewerProfileImageBase64 ||
+                              rev?.reviewer_profile_image_base64 ||
+                              memberImg ||
+                              actor?.profileImageBase64 ||
+                              actor?.profile_image_base64 ||
+                              actor?.avatar ||
+                              actor?.avatarUrl ||
+                              actor?.imageUrl ||
+                              actor?.profileImage ||
+                              actor?.profile_image
+                          );
+                          return avatarSrc ? (
+                            <span className="tdm-review-avatar"><img src={avatarSrc} alt={displayName} /></span>
+                          ) : (
+                            <i className="ti ti-activity" aria-hidden="true" />
+                          );
+                        })()}
+                      </div>
+                      <div className="tdm-review-meta">
+                        <div className="tdm-review-modal-name">
+                          <strong>{displayName}</strong>
+                          {roleLabel ? <span className="tdm-review-modal-role">{capitalizeFirst(roleLabel)}</span> : null}
+                        </div>
+                        <div className="tdm-review-modal-time">{timeLabel}</div>
+                        {comment ? <div className="tdm-review-comment">{comment}</div> : null}
+                      </div>
+                      {(isApproved || isRejected) ? (
+                        <div className="tdm-review-action-col">
+                          {isApproved ? (
+                            <span className="tdm-review-action-badge tdm-review-action-badge--approved">Approved</span>
+                          ) : (
+                            <span className="tdm-review-action-badge tdm-review-action-badge--rejected">Rejected</span>
+                          )}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="tdm-empty-state">No activity yet.</div>
+            )}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+
+  const attachmentsPanel = (
+    <article className="tdm-section-card tdm-attachments-panel">
+      <div className="tdm-attachments-body">
+        <div className="tdm-empty-state">No attachments yet.</div>
+      </div>
+    </article>
+  );
+
   return (
     <div className="tdm-modal">
       {!asPage && (
@@ -1248,7 +1495,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     ref={dropdownRef}
                     role="dialog"
                     aria-label="Task actions"
-                    style={menuPosition ? { top: `${menuPosition.top}px`, left: `${menuPosition.left}px` } : undefined}
                   >
                     <div className="dropdown-row dropdown-row--select">
                       <div className="dropdown-label-row">
@@ -1467,7 +1713,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
               {canManageTags && (
                 <button type="button" className="tdm-manage-tags-btn" onClick={() => setShowTagsModal(true)}>
-                  Manage Tags
+                  Add Tags
                 </button>
               )}
               {canReview && (Array.isArray(taskCategories) ? taskCategories.find(c => String(c.id) === String(taskCategoryId) && String((c.name||c.name).toLowerCase()).includes('review')) : false) ? (
@@ -1478,20 +1724,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
               ) : null}
             </div>
 
-            {/* Latest review feedback below tags (matches Review History) */}
-            {Array.isArray(reviews) && reviews.length > 0 ? (() => {
-              const last = reviews[0];
-              const action = getReviewEntryAction(last);
-              const note = getReviewEntryComment(last);
-              if (!note) return null;
-              if (action === "rejected") {
-                return <div className="tdm-rejected-label">Rejected: {note}</div>;
-              }
-              if (action === "approved") {
-                return <div className="tdm-approved-label">Approved: {note}</div>;
-              }
-              return null;
-            })() : null}
+            {/* Latest review feedback removed from main card (moved to Activity/Review History) */}
 
             {/* <div className="tdm-priority-area">
               <label htmlFor={`task-priority-${taskData.id || "unknown"}`} className="tdm-priority-label">
@@ -1512,88 +1745,42 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                     <div className="tdm-subtask-left" />
                     <div className="tdm-subtask-main">
                       <div className="tdm-subtask-title-row">
-                        
                         <input
+                          ref={newSubtaskInputRef}
                           type="text"
                           value={newSubtaskTitle}
                           onChange={(e) => setNewSubtaskTitle(e.target.value)}
                           placeholder="New subtask title"
                           className="tdm-subtask-input"
+                          onKeyDown={async (e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              await handleCreateSubtask();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setNewSubtaskTitle("");
+                              setShowAddSubtask(false);
+                            }
+                          }}
                         />
                         <div className="tdm-subtask-action-buttons">
                           <button
                             type="button"
-                            className="tdm-subtask-action-btn"
-                            onClick={async () => {
-                              if (!newSubtaskTitle.trim()) return;
-
-                              const tempId = `temp-subtask-${Date.now()}`;
-                              const createdAt = new Date().toISOString();
-                              const optimisticSubtask = {
-                                id: tempId,
-                                title: newSubtaskTitle.trim(),
-                                status: "unfinished",
-                                createdAt,
-                                createdBy: currentUser
-                                  ? {
-                                      id: currentUser?.id || currentUserId,
-                                      firstName: currentUser.firstName || currentUser.first_name,
-                                      lastName: currentUser.lastName || currentUser.last_name,
-                                      email: currentUser.email,
-                                    }
-                                  : { id: currentUserId },
-                                isPending: true,
-                              };
-
-                              setSubtaskError("");
-                              setSubtaskPendingIds((prev) => ({ ...prev, [tempId]: true }));
-                              setLocalSubtasks((prev) => [...prev, optimisticSubtask]);
-
-                              try {
-                                const payload = await createSubtasks({
-                                  subtaskData: {
-                                    taskId: task?.id,
-                                    title: newSubtaskTitle.trim(),
-                                    createdBy: currentUser?.id || currentUserId,
-                                    status: "unfinished",
-                                  },
-                                });
-                                const created = payload?.subtask || payload?.data || payload;
-                                if (created && created.id) {
-                                  setLocalSubtasks((prev) =>
-                                    prev.map((item) => (item.id === tempId ? { ...item, ...created, isPending: false } : item))
-                                  );
-                                } else {
-                                  setLocalSubtasks((prev) =>
-                                    prev.map((item) => (item.id === tempId ? { ...item, isPending: false } : item))
-                                  );
-                                }
-                                setShowAddSubtask(false);
-                                setNewSubtaskTitle("");
-                              } catch (error) {
-                                setSubtaskError(error.message || "Failed to add subtask");
-                                setLocalSubtasks((prev) => prev.filter((item) => item.id !== tempId));
-                              } finally {
-                                setSubtaskPendingIds((prev) => {
-                                  const next = { ...prev };
-                                  delete next[tempId];
-                                  return next;
-                                });
-                              }
-                            }}
+                            className="tdm-inline-edit-action-btn tdm-inline-edit-save"
+                            onClick={async () => { await handleCreateSubtask(); }}
                             aria-label="Save subtask"
                             title="Save"
                           >
-                            ✓
+                            <SaveIcon />
                           </button>
                           <button
                             type="button"
-                            className="tdm-subtask-action-btn"
-                            onClick={() => setShowAddSubtask(false)}
+                            className="tdm-inline-edit-action-btn tdm-inline-edit-cancel"
+                            onClick={() => { setNewSubtaskTitle(""); setShowAddSubtask(false); }}
                             aria-label="Cancel"
                             title="Cancel"
                           >
-                            ×
+                            <CancelIcon />
                           </button>
                         </div>
                       </div>
@@ -1601,14 +1788,16 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  className="tdm-subtask-add-row"
-                  onClick={() => setShowAddSubtask(true)}
-                >
-                  <span className="tdm-subtask-index"></span>
-                  <span>+ New Subtask</span>
-                </button>
+                (canManageAdminTaskActions || createSubtasks) && (
+                  <button
+                    type="button"
+                    className="tdm-subtask-add-row"
+                    onClick={() => setShowAddSubtask(true)}
+                  >
+                    <span className="tdm-subtask-index"></span>
+                    <span>+ New Subtask</span>
+                  </button>
+                )
               )}
               {subtaskError && <p className="tdm-subtask-error">{subtaskError}</p>}
               {localSubtasks.length === 0 ? (
@@ -1618,15 +1807,24 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                   {localSubtasks.map((st, idx) => {
                     const createdByLabelName = st?.createdBy?.firstName + ' ' + st?.createdBy?.lastName || "Unknown";
                     const createdAtLabel = st?.createdAt ? new Date(st.createdAt).toLocaleString() : "";
-                    const isCompleted = st?.status === "completed" || !!st.completed;
+                    const isCompleted = st?.status === "finished" || st?.status === "completed" || !!st.completed;
                     const isPending = subtaskPendingIds[String(st?.id)] || st?.isPending;
 
                     return (
                       <li
                         key={st.id || `${idx}-${st.title || st}` }
                         className={`tdm-subtask-row${isCompleted ? " is-complete" : ""}`}
+                        onClick={() => handleToggleSubtask(st)}
                       >
-                        <div className="tdm-subtask-left" />
+                        <div className="tdm-subtask-left">
+                          <input
+                            type="checkbox"
+                            className="tdm-subtask-checkbox"
+                            checked={isCompleted}
+                            onChange={(e) => { e.stopPropagation(); handleToggleSubtask(st, e); }}
+                            aria-label={`Mark ${st.title || 'subtask'} completed`}
+                          />
+                        </div>
 
                         <div className="tdm-subtask-main">
                           <div className="tdm-subtask-title-row">
@@ -1635,7 +1833,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                             <button
                               type="button"
                               className="tdm-subtask-delete-btn"
-                              onClick={() => handleDeleteSubtask(st)}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteSubtask(st); }}
                               aria-label="Delete subtask"
                               title="Delete"
                             >
@@ -1681,354 +1879,406 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
         </section>
 
         <aside className="tdm-side-column">
-          {commentsPanel}
+          <div className="tdm-sidebar-tabs" role="tablist" aria-label="Task side tabs">
+            <button
+              type="button"
+              className={`friends-tab ${sidebarTab === "comments" ? "active" : ""}`}
+              onClick={() => setSidebarTab("comments")}
+            >
+              Comments
+            </button>
+
+            <button
+              type="button"
+              className={`friends-tab ${sidebarTab === "activity" ? "active" : ""}`}
+              onClick={() => setSidebarTab("activity")}
+            >
+              Activity
+            </button>
+
+            <button
+              type="button"
+              className={`friends-tab ${sidebarTab === "attachments" ? "active" : ""}`}
+              onClick={() => setSidebarTab("attachments")}
+            >
+              Attachments
+            </button>
+          </div>
+
+          <div className="tdm-sidebar-panel">
+            {sidebarTab === "comments" && commentsPanel}
+            {sidebarTab === "activity" && activitiesPanel}
+            {sidebarTab === "attachments" && attachmentsPanel}
+          </div>
         </aside>
       </div>
-      {showAssigneesModal && (
-        <div
-          className="tdm-assignees-modal"
-          role="dialog"
-          aria-modal="true"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setShowAssigneesModal(false);
-          }}
-        >
-          <div className="tdm-assignees-content">
-            <div className="tdm-assignees-header">
-              <div>
-                <h3>Task Assignees</h3>
-                <p>Assign or review people working on this task.</p>
-              </div>
-              <button
-                type="button"
-                className="tdm-close-btn tdm-assignees-close"
-                onClick={() => setShowAssigneesModal(false)}
-                aria-label="Close assignees"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="tdm-assignees-section">
-              <label htmlFor="assigneeSearch" className="tdm-assignees-title">Search</label>
-              <input
-                id="assigneeSearch"
-                type="text"
-                className="tdm-input"
-                placeholder="Search by name or email"
-                value={assigneeSearch}
-                onChange={(event) => setAssigneeSearch(event.target.value)}
-              />
-            </div>
-
-            {assignmentError && <p className="tdm-assign-error">{assignmentError}</p>}
-
-            {memberPool.length === 0 ? (
-              <p className="tdm-assignees-empty">No project members available.</p>
-            ) : (
-              <div className="tdm-assignees-body">
-                <div className="tdm-assignees-section">
-                  <div className="tdm-assignees-title">Project Owner</div>
-                  {ownerMembers.length === 0 ? (
-                    <p className="tdm-assignees-empty">No matching owners.</p>
-                  ) : (
-                    <ul className="tdm-project-members-list">
-                      {ownerMembers.map(renderMemberRow)}
-                    </ul>
-                  )}
+      {maybePortal(
+        showAssigneesModal && (
+          <div
+            className="tdm-assignees-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setShowAssigneesModal(false);
+            }}
+          >
+            <div className="tdm-assignees-content">
+              <div className="tdm-assignees-header">
+                <div>
+                  <h3>Task Assignees</h3>
+                  <p>Assign or review people working on this task.</p>
                 </div>
-
-                <div className="tdm-assignees-divider" />
-
-                <div className="tdm-assignees-section">
-                  <div className="tdm-assignees-title">Project Members</div>
-                  {nonOwnerMembers.length === 0 ? (
-                    <p className="tdm-assignees-empty">No matching members.</p>
-                  ) : (
-                    <ul className="tdm-project-members-list">
-                      {nonOwnerMembers.map(renderMemberRow)}
-                    </ul>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  className="tdm-close-btn tdm-assignees-close"
+                  onClick={() => setShowAssigneesModal(false)}
+                  aria-label="Close assignees"
+                >
+                  &times;
+                </button>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-      {showTagsModal && (
-        <div
-          className="tdm-manage-tags-modal"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowTagsModal(false);
-          }}
-        >
-          <div className="tdm-manage-content">
-            {/* <button
-              type="button"
-              className="tdm-close-btn tdm-manage-close"
-              onClick={() => setShowTagsModal(false)}
-              aria-label="Close manage tags"
-            >
-              ×
-            </button> */}
-            <h3>Manage Tags</h3>
-            <p className="tdm-manage-desc">
-              Tags help categorize and filter tasks across the project. Add new tags or choose
-              from project suggestions. A task may have up to 5 tags.
-            </p>
-            {tagError && <p className="tdm-tag-error">{tagError}</p>}
 
-            <div className="tdm-tag-composer">
-              {canManageTags && (
+              <div className="tdm-assignees-section">
+                <label htmlFor="assigneeSearch" className="tdm-assignees-title">Search</label>
                 <input
+                  id="assigneeSearch"
                   type="text"
-                  placeholder="Type tag and press Enter"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={async (e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      await handleAddTag(tagInput);
-                    }
-                  }}
-                  className="tdm-input tdm-tag-input"
+                  className="tdm-input"
+                  placeholder="Search by name or email"
+                  value={assigneeSearch}
+                  onChange={(event) => setAssigneeSearch(event.target.value)}
                 />
+              </div>
+
+              {assignmentError && <p className="tdm-assign-error">{assignmentError}</p>}
+
+              {memberPool.length === 0 ? (
+                <p className="tdm-assignees-empty">No project members available.</p>
+              ) : (
+                <div className="tdm-assignees-body">
+                  <div className="tdm-assignees-section">
+                    <div className="tdm-assignees-title">Project Owner</div>
+                    {ownerMembers.length === 0 ? (
+                      <p className="tdm-assignees-empty">No matching owners.</p>
+                    ) : (
+                      <ul className="tdm-project-members-list">
+                        {ownerMembers.map(renderMemberRow)}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="tdm-assignees-divider" />
+
+                  <div className="tdm-assignees-section">
+                    <div className="tdm-assignees-title">Project Members</div>
+                    {nonOwnerMembers.length === 0 ? (
+                      <p className="tdm-assignees-empty">No matching members.</p>
+                    ) : (
+                      <ul className="tdm-project-members-list">
+                        {nonOwnerMembers.map(renderMemberRow)}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      )}
+      {maybePortal(
+        showTagsModal && (
+          <div
+            className="tdm-manage-tags-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowTagsModal(false);
+            }}
+          >
+            <div className="tdm-manage-content">
+              <h3>Manage Tags</h3>
+              <p className="tdm-manage-desc">
+                Tags help categorize and filter tasks across the project. Add new tags or choose
+                from project suggestions. A task may have up to 5 tags.
+              </p>
+              {tagError && <p className="tdm-tag-error">{tagError}</p>}
+
+              <div className="tdm-tag-composer">
+                {canManageTags && (
+                  <input
+                    type="text"
+                    placeholder="Type tag and press Enter"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        await handleAddTag(tagInput);
+                      }
+                    }}
+                    className="tdm-input tdm-tag-input"
+                  />
+                )}
+
+                <div className="tdm-current-tags">
+                  {(tags || []).length === 0 ? (
+                    <p className="tdm-no-current-tags">This task has no tags yet.</p>
+                  ) : (
+                    (tags || []).map((t) => {
+                      const name = t?.tagName || t?.tag_name || t?.name || String(t);
+                      const id = t?.id || name;
+                      return (
+                        <span key={id} className="tdm-tag tdm-current-tag">
+                          <span className="tdm-tag-name">{name}</span>
+                          {t?.isPending && <span className="tdm-tag-pending">Saving...</span>}
+                          {canManageTags && (
+                            <button
+                              type="button"
+                              className="tdm-tag-remove"
+                              onClick={() => handleDeleteTag(t)}
+                              disabled={deletingTagId === t.id || t?.isPending}
+                              aria-label={`Remove tag ${name}`}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="tdm-suggestions-array" aria-live="polite">
+                <div className="tdm-suggestions-label">Project suggestions</div>
+                <div className="tdm-suggestions-content tdm-suggestions-pills">
+                  {(projectTagSuggestions || []).map((s) => {
+                    const name = s?.tagName || s?.tag_name || s?.name || String(s);
+                    const normName = String(name).replace(/\s+/g, " ").trim();
+                    const key = s?.id || normName;
+                    if (!canManageTags) return null;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className="tdm-suggestion-pill"
+                        onClick={() => handleAddTag(name)}
+                        title={`Add tag ${name}`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="tdm-tags-controls">
+                <button type="button" onClick={() => setShowTagsModal(false)} className="tdm-close-btn tdm-manage-close-bottom">
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      )}
+
+      {maybePortal(
+        showDeleteConfirm && (
+          <div className="tdm-confirm-overlay" role="presentation" onClick={closeDeleteConfirm}>
+            <div className="tdm-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-task-title" onClick={(event) => event.stopPropagation()}>
+              <div className="tdm-confirm-title-row">
+                <span className="tdm-confirm-icon" aria-hidden="true">
+                  <TrashIcon />
+                </span>
+                <h3 id="delete-task-title">Delete this task?</h3>
+              </div>
+              <p>This will permanently remove the task and all of its activity. This cannot be undone.</p>
+
+              <div className="tdm-confirm-actions">
+                <button type="button" className="tdm-confirm-cancel" onClick={closeDeleteConfirm} disabled={deleteTaskSubmitting}>
+                  Cancel
+                </button>
+                <button type="button" className="tdm-confirm-delete" onClick={confirmDeleteTask} disabled={deleteTaskSubmitting}>
+                  {deleteTaskSubmitting ? "Deleting..." : "Delete Task"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      )}
+
+      {maybePortal(
+        showApproveModal && (
+          <div className="tdm-confirm-overlay" role="presentation" onClick={closeApproveModal}>
+            <div
+              className="tdm-confirm-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="approve-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="tdm-confirm-title-row">
+                <h3 id="approve-title">Approve Task</h3>
+              </div>
+              <p>Please provide an approval note. This will be recorded in the review history.</p>
+              <textarea
+                id="tdm-approve-textarea"
+                className="tdm-reject-textarea"
+                value={approveReason}
+                onChange={(e) => setApproveReason(e.target.value)}
+                placeholder="Enter approval note"
+                rows={4}
+                autoComplete="off"
+              />
+
+              <div className="tdm-confirm-actions">
+                <button type="button" className="tdm-confirm-cancel" onClick={closeApproveModal} disabled={approveSubmitting}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tdm-confirm-approve"
+                  onClick={handleSubmitApprove}
+                  disabled={approveSubmitting}
+                >
+                  {approveSubmitting ? "Approving..." : "Approve Task"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      )}
+
+      {maybePortal(
+        showRejectModal && (
+          <div className="tdm-confirm-overlay" role="presentation" onClick={closeRejectModal}>
+            <div
+              className="tdm-confirm-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reject-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="tdm-confirm-title-row">
+                <h3 id="reject-title">Reject Task</h3>
+              </div>
+              <p>Please provide a reason for rejecting this task. This will be recorded in the review history.</p>
+              <textarea
+                id="tdm-reject-textarea"
+                className="tdm-reject-textarea"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter rejection reason"
+                rows={4}
+                autoComplete="off"
+              />
+
+              <div className="tdm-confirm-actions">
+                <button type="button" className="tdm-confirm-cancel" onClick={closeRejectModal} disabled={rejectSubmitting}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tdm-confirm-delete"
+                  onClick={handleSubmitReject}
+                  disabled={rejectSubmitting}
+                >
+                  {rejectSubmitting ? "Rejecting..." : "Reject Task"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      )}
+
+      {maybePortal(
+        showReviewModal && (
+          <div className="tdm-confirm-overlay" role="presentation" onClick={() => setShowReviewModal(false)}>
+            <div className="tdm-confirm-modal tdm-review-modal" role="dialog" aria-modal="true" aria-labelledby="review-history-title" onClick={(e) => e.stopPropagation()}>
+              <div className="tdm-confirm-title-row">
+                <h3 id="review-history-title">Review History</h3>
+              </div>
+              {reviewsLoading ? (
+                <div className="tdm-dropdown-note">Loading reviews...</div>
+              ) : reviewsError ? (
+                <div className="tdm-dropdown-note">{reviewsError}</div>
+              ) : reviews.length === 0 ? (
+                <div className="tdm-dropdown-note">No reviews yet.</div>
+              ) : (
+                <ul className="tdm-review-modal-list">
+                  {reviews.map((r) => {
+                    const actionNorm = getReviewEntryAction(r);
+                    const commentText = getReviewEntryComment(r);
+                    const isApproved = actionNorm === "approved";
+                    return (
+                      <li key={r.id} className="tdm-review-modal-item">
+                        <div className="tdm-review-modal-header">
+                          <div className="tdm-review-modal-icon">
+                            {isApproved ? <ReviewApprovedIcon size={18} /> : <ReviewRejectedIcon size={18} />}
+                          </div>
+                          <div className="tdm-review-modal-info">
+                            <div className="tdm-review-modal-name">
+                              <strong>{r.reviewerName}</strong>
+                              {r.reviewerRole && <span className="tdm-review-modal-role">{capitalizeFirst(r.reviewerRole)}</span>}
+                            </div>
+                          </div>
+                          <div className="tdm-review-modal-time">{formatTimeAgo(r.createdAt)}</div>
+                        </div>
+                        {commentText ? (
+                          <div
+                            className={`tdm-review-modal-comment${isApproved ? " tdm-review-modal-comment--approved" : " tdm-review-modal-comment--rejected"}`}
+                          >
+                            {commentText}
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
 
-              <div className="tdm-current-tags">
-                {(tags || []).length === 0 ? (
-                  <p className="tdm-no-current-tags">This task has no tags yet.</p>
-                ) : (
-                  (tags || []).map((t) => {
-                    const name = t?.tagName || t?.tag_name || t?.name || String(t);
-                    const id = t?.id || name;
-                    return (
-                      <span key={id} className="tdm-tag tdm-current-tag">
-                        <span className="tdm-tag-name">{name}</span>
-                        {t?.isPending && <span className="tdm-tag-pending">Saving...</span>}
-                        {canManageTags && (
-                          <button
-                            type="button"
-                            className="tdm-tag-remove"
-                            onClick={() => handleDeleteTag(t)}
-                            disabled={deletingTagId === t.id || t?.isPending}
-                            aria-label={`Remove tag ${name}`}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })
-                )}
+              <div className="tdm-confirm-actions">
+                <button type="button" className="tdm-confirm-cancel" onClick={() => setShowReviewModal(false)}>Close</button>
               </div>
             </div>
-
-            <div className="tdm-suggestions-array" aria-live="polite">
-              <div className="tdm-suggestions-label">Project suggestions</div>
-              <div className="tdm-suggestions-content tdm-suggestions-pills">
-                {(projectTagSuggestions || []).map((s, i) => {
-                  const name = s?.tagName || s?.tag_name || s?.name || String(s);
-                  const key = s?.id || name + "-" + i;
-                  if (!canManageTags) return null;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className="tdm-suggestion-pill"
-                      onClick={() => handleAddTag(name)}
-                      title={`Add tag ${name}`}
-                    >
-                      {name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="tdm-tags-controls">
-              <button type="button" onClick={() => setShowTagsModal(false)} className="tdm-close-btn tdm-manage-close-bottom">
-                Done
-              </button>
-            </div>
           </div>
-        </div>
-      )}
-
-      {showDeleteConfirm && (
-        <div className="tdm-confirm-overlay" role="presentation" onClick={closeDeleteConfirm}>
-          <div className="tdm-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-task-title" onClick={(event) => event.stopPropagation()}>
-            <div className="tdm-confirm-title-row">
-              <span className="tdm-confirm-icon" aria-hidden="true">
-                <TrashIcon />
-              </span>
-              <h3 id="delete-task-title">Delete this task?</h3>
-            </div>
-            <p>This will permanently remove the task and all of its activity. This cannot be undone.</p>
-
-            <div className="tdm-confirm-actions">
-              <button type="button" className="tdm-confirm-cancel" onClick={closeDeleteConfirm} disabled={deleteTaskSubmitting}>
-                Cancel
-              </button>
-              <button type="button" className="tdm-confirm-delete" onClick={confirmDeleteTask} disabled={deleteTaskSubmitting}>
-                {deleteTaskSubmitting ? "Deleting..." : "Delete Task"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showApproveModal && (
-        <div className="tdm-confirm-overlay" role="presentation" onClick={closeApproveModal}>
-          <div
-            className="tdm-confirm-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="approve-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="tdm-confirm-title-row">
-              <h3 id="approve-title">Approve Task</h3>
-            </div>
-            <p>Please provide an approval note. This will be recorded in the review history.</p>
-            <textarea
-              id="tdm-approve-textarea"
-              className="tdm-reject-textarea"
-              value={approveReason}
-              onChange={(e) => setApproveReason(e.target.value)}
-              placeholder="Enter approval note"
-              rows={4}
-              autoComplete="off"
-            />
-
-            <div className="tdm-confirm-actions">
-              <button type="button" className="tdm-confirm-cancel" onClick={closeApproveModal} disabled={approveSubmitting}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="tdm-confirm-approve"
-                onClick={handleSubmitApprove}
-                disabled={approveSubmitting}
-              >
-                {approveSubmitting ? "Approving..." : "Approve Task"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showRejectModal && (
-        <div className="tdm-confirm-overlay" role="presentation" onClick={closeRejectModal}>
-          <div
-            className="tdm-confirm-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reject-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="tdm-confirm-title-row">
-              <h3 id="reject-title">Reject Task</h3>
-            </div>
-            <p>Please provide a reason for rejecting this task. This will be recorded in the review history.</p>
-            <textarea
-              id="tdm-reject-textarea"
-              className="tdm-reject-textarea"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Enter rejection reason"
-              rows={4}
-              autoComplete="off"
-            />
-
-            <div className="tdm-confirm-actions">
-              <button type="button" className="tdm-confirm-cancel" onClick={closeRejectModal} disabled={rejectSubmitting}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="tdm-confirm-delete"
-                onClick={handleSubmitReject}
-                disabled={rejectSubmitting}
-              >
-                {rejectSubmitting ? "Rejecting..." : "Reject Task"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showReviewModal && (
-        <div className="tdm-confirm-overlay" role="presentation" onClick={() => setShowReviewModal(false)}>
-          <div className="tdm-confirm-modal tdm-review-modal" role="dialog" aria-modal="true" aria-labelledby="review-history-title" onClick={(e) => e.stopPropagation()}>
-            <div className="tdm-confirm-title-row">
-              <h3 id="review-history-title">Review History</h3>
-            </div>
-            {reviewsLoading ? (
-              <div className="tdm-dropdown-note">Loading reviews...</div>
-            ) : reviewsError ? (
-              <div className="tdm-dropdown-note">{reviewsError}</div>
-            ) : reviews.length === 0 ? (
-              <div className="tdm-dropdown-note">No reviews yet.</div>
-            ) : (
-              <ul className="tdm-review-modal-list">
-                {reviews.map((r) => {
-                  const actionNorm = getReviewEntryAction(r);
-                  const commentText = getReviewEntryComment(r);
-                  const isApproved = actionNorm === "approved";
-                  return (
-                    <li key={r.id} className="tdm-review-modal-item">
-                      <div className="tdm-review-modal-header">
-                        <div className="tdm-review-modal-icon">
-                          {isApproved ? <ReviewApprovedIcon size={18} /> : <ReviewRejectedIcon size={18} />}
-                        </div>
-                        <div className="tdm-review-modal-info">
-                          <div className="tdm-review-modal-name">
-                            <strong>{r.reviewerName}</strong>
-                            {r.reviewerRole && <span className="tdm-review-modal-role">{capitalizeFirst(r.reviewerRole)}</span>}
-                          </div>
-                        </div>
-                        <div className="tdm-review-modal-time">{formatTimeAgo(r.createdAt)}</div>
-                      </div>
-                      {commentText ? (
-                        <div
-                          className={`tdm-review-modal-comment${isApproved ? " tdm-review-modal-comment--approved" : " tdm-review-modal-comment--rejected"}`}
-                        >
-                          {commentText}
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            <div className="tdm-confirm-actions">
-              <button type="button" className="tdm-confirm-cancel" onClick={() => setShowReviewModal(false)}>Close</button>
-            </div>
-          </div>
-        </div>
+        )
       )}
     </div>
   );
 }
 
+
+
 export default function TaskDetailsModal({ onClose, ...props }) {
+  const [isClosing, setIsClosing] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
+
+  const closeWithAnimation = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    timerRef.current = setTimeout(() => {
+      onClose?.();
+    }, 220);
+  };
+
   return (
     <div
-      className="tdm-overlay"
+      className={`tdm-overlay${isClosing ? " is-closing" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label="Task details"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
-          onClose?.();
+          closeWithAnimation();
         }
       }}
     >
-      <TaskDetailsContent {...props} onClose={onClose} asPage={false} />
+      <TaskDetailsContent {...props} onClose={closeWithAnimation} asPage={false} />
     </div>
   );
 }

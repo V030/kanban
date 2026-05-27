@@ -18,6 +18,7 @@ import {
     SkeletonCard,
     SkeletonRow,
 } from "../components/common/SkeletonComponents";
+import normalizeProfileImage from "../utils/normalizeProfileImage";
 
 import "../components/styles/WorkspacePages.css";
 import "../components/styles/DashboardTheme.css";
@@ -42,6 +43,29 @@ function getInitials(name = "") {
         .map((part) => part[0])
         .join("")
         .toUpperCase() || "?";
+}
+
+function getProfileImageSrc(...sources) {
+    for (const source of sources) {
+        const normalized = normalizeProfileImage(
+            source?.profileImageBase64 ||
+            source?.profile_image_base64 ||
+            source?.avatar ||
+            source?.avatarUrl ||
+            source?.imageUrl ||
+            source?.profileImage ||
+            source?.profilePictureUrl ||
+            source?.picture ||
+            source?.photoUrl ||
+            source?.photo
+        );
+
+        if (normalized) {
+            return normalized;
+        }
+    }
+
+    return null;
 }
 
 function formatRelativeTime(value) {
@@ -139,6 +163,7 @@ function getTaskSortRank(task) {
 function normalizeActivityItem(notification) {
     const message = String(notification?.message || "").trim();
     const type = String(notification?.type || "").toLowerCase();
+    const payload = notification?.payload && typeof notification.payload === "object" ? notification.payload : {};
     const timestamp = notification?.created_at || notification?.createdAt || notification?.updated_at || notification?.updatedAt || Date.now();
 
     const actionTextMap = {
@@ -156,6 +181,15 @@ function normalizeActivityItem(notification) {
     const projectMatch = message.match(/\bin\s+(.+?)(?:[:.])\s*$/i) || message.match(/\bin\s+(.+?)\s*$/i);
     const userName = actorMatch?.[1]?.trim() || message.split(" ").slice(0, 2).join(" ") || "Someone";
     const projectName = projectMatch?.[1]?.trim() || "Project";
+    const avatarSrc = getProfileImageSrc(
+        notification,
+        payload,
+        payload?.actor,
+        payload?.user,
+        payload?.requester,
+        payload?.inviter,
+        payload?.recipient
+    );
 
     return {
         id: notification?.id,
@@ -163,6 +197,7 @@ function normalizeActivityItem(notification) {
             name: userName,
             avatarInitials: getInitials(userName),
             color: buildAvatarColor(userName),
+            avatarSrc,
         },
         actionText,
         projectName,
@@ -196,14 +231,14 @@ function normalizePriorityTask(task, fallbackUser = null) {
     };
 }
 
-function DashboardItemAvatar({ name, initials, color, size = 30 }) {
+function DashboardItemAvatar({ name, initials, color, src = null, size = 30 }) {
     return (
         <span
             className="dashboard-avatar"
             style={{ background: color, width: size, height: size, minWidth: size, minHeight: size }}
             aria-hidden="true"
         >
-            {initials || getInitials(name)}
+            {src ? <img src={src} alt="" /> : (initials || getInitials(name))}
         </span>
     );
 }
@@ -244,6 +279,8 @@ function DashboardActivityCard({ activity }) {
                 name={activity.user.name}
                 initials={activity.user.avatarInitials}
                 color={activity.user.color}
+                src={activity.user.avatarSrc}
+                size={30}
             />
             <div className="dashboard-activity-copy">
                 <p className="dashboard-activity-title">

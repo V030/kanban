@@ -3,7 +3,7 @@ import normalizeProfileImage from "../../utils/normalizeProfileImage";
 import ProjectMembersList from "./ProjectMembersList";
 import { getFriends } from "../../services/friendService";
 import { inviteMemberToProject } from "../../services/projectService";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "../../hooks/useToast";
 
 function getProfileImageSrc(user) {
@@ -66,6 +66,29 @@ export default function ProjectMembersModal({
     loadFriends();
   }, [isOpen]);
 
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      clearTimeout(timerRef.current);
+      setShouldRender(true);
+      setIsClosing(false);
+      return;
+    }
+
+    if (shouldRender) {
+      setIsClosing(true);
+      timerRef.current = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 220);
+    }
+
+    return () => clearTimeout(timerRef.current);
+  }, [isOpen, shouldRender]);
+
   async function loadFriends() {
     setFriendsLoading(true);
     try {
@@ -116,7 +139,7 @@ export default function ProjectMembersModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   const projectName = project?.name || "Project";
 
@@ -130,8 +153,8 @@ export default function ProjectMembersModal({
     : friends;
 
   return (
-    <div className="pmv-overlay" role="dialog" aria-modal="true" aria-label="Project members">
-      <div className="pmv-modal">
+    <div className={`pmv-overlay${isClosing ? " is-closing" : ""}`} role="dialog" aria-modal="true" aria-label="Project members">
+      <div className={`pmv-modal${isClosing ? " is-closing" : ""}`}>
 
         {/* Modal header */}
         <header className="pmv-header">

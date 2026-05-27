@@ -252,6 +252,18 @@
   will-change: opacity, transform;
 }
 
+/* When dropdown is rendered inside the task actions wrapper, anchor it to the button */
+.task-actions-wrap > .task-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  transform-origin: top right;
+  /* keep a compatible width for small viewports */
+  width: min(240px, calc(100vw - 24px));
+  max-width: min(240px, calc(100vw - 24px));
+}
+
 @keyframes taskDropdownFadeIn {
   from {
     opacity: 0;
@@ -937,9 +949,8 @@
   list-style: none;
   display: grid;
   gap: 0;
-  max-height: 320px;
   overflow: auto;
-  padding-right: 2px;
+  padding-right: 2px;  
 }
 
 .tdm-subtask-row {
@@ -947,7 +958,7 @@
   grid-template-columns: 18px 1fr;
   align-items: start;
   gap: 10px;
-  padding: 12px 0;
+  padding: 12px 16px;
   min-height: 64px;
   border: none;
   border-bottom: 1px solid #e7eef6;
@@ -967,7 +978,19 @@
 }
 
 .tdm-subtask-row.is-complete {
-  background: #f2f8f5;
+  background: rgba(15, 127, 143, 0.06);
+}
+
+.tdm-subtask-row.is-complete .tdm-subtask-title {
+  text-decoration: line-through;
+  color: var(--color-text-secondary);
+}
+
+.tdm-subtask-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: rgb(15,127,143);
 }
 
 .tdm-subtask-left {
@@ -1058,9 +1081,9 @@
   width: 100%;
   display: flex;
   grid-template-columns: 18px 1fr;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0px;
-  padding: 12px 0;
+  padding: 12px 16px;
   border: none;
   border-top: 1px solid #e7eef6;
   border-bottom: 1px solid #e7eef6;
@@ -1070,7 +1093,7 @@
   font-size: 0.78rem;
   margin-top: 10px;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
@@ -1114,15 +1137,22 @@
 
 .tdm-subtask-input {
   flex: 1;
-  border: none;
-  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: #fff;
   color: var(--color-text-primary);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 600;
   line-height: 1.15;
-  min-height: 32px;
-  padding: 6px 0;
+  min-height: 36px;
+  padding: 8px 10px;
   outline: none;
+  box-sizing: border-box;
+}
+
+.tdm-subtask-input:focus {
+  box-shadow: 0 0 0 3px rgba(15,127,143,0.12);
+  border-color: rgba(15,127,143,0.8);
 }
 
 .tdm-subtask-input::placeholder {
@@ -1141,14 +1171,38 @@
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
 }
 
 .tdm-subtask-action-btn:hover {
+  background: rgba(15,23,42,0.03);
   color: var(--color-text-primary);
+}
+
+.tdm-subtask-action-btn--confirm {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+.tdm-subtask-action-btn--confirm:hover {
+  filter: brightness(0.95);
+}
+.tdm-subtask-action-btn--cancel {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+.tdm-subtask-action-btn--cancel:hover {
+  background: rgba(15,23,42,0.03);
 }
 
 .tdm-add-subtask-toggle {
@@ -1375,11 +1429,11 @@
 .tdm-manage-tags-btn {
   border: 1px solid var(--color-border-subtle);
   background: transparent;
-  padding: 6px 10px;
+  padding: 0px;
   border-radius: 10px;
   cursor: pointer;
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
 }
 
 /* Review history button: light gray background, no border, slightly taller */
@@ -1776,11 +1830,15 @@
 .tdm-comment-item {
   border-radius: 12px;
   padding: 12px 12px;
-
-  background: #ffffff;
+  background: transparent;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Page variant: align comment rows with sidebar tabs by removing left padding when shown in page layout */
+.tdm-page-container .tdm-side-column .tdm-comment-item {
+  padding-left: 0;
 }
 
 .tdm-comment-empty {
@@ -1843,9 +1901,13 @@
 }
 
 .tdm-comment-role {
+  display: inline-block;
   font-size: 0.75rem;
   color: var(--color-text-secondary);
   font-weight: 600;
+  padding: 0 4px;
+  background: #f3f4f6;
+  border-radius: 4px;
   white-space: nowrap;
 }
 
@@ -2142,6 +2204,8 @@
   background: #ffffff;
   box-shadow: none;
   padding: 16px 18px;
+  max-height: 370px;
+  overflow: auto;
 }
 
 .tdm-subtasks-header {
@@ -2227,13 +2291,6 @@
   min-height: 0;
 }
 
-.tdm-page-container .tdm-subtasks-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 2px;
-}
-
 .tdm-page-container .tdm-subtask-actions {
   margin-top: 10px;
 }
@@ -2302,11 +2359,69 @@
 }
 
 .tdm-review-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-.tdm-review-row { display: flex; gap: 10px; align-items: flex-start; border-bottom: 1px solid #f1f7fb; padding-bottom: 8px; }
+.tdm-review-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; border-bottom: 1px solid #f1f7fb; padding: 12px 0px 20px 10px; }
 .tdm-review-icon { font-size: 1.05rem; flex: 0 0 28px; }
 .tdm-review-meta { font-size: 0.85rem; color: var(--color-text-secondary); }
-.tdm-review-comment { margin-left: 36px; color: var(--color-text-primary); font-size: 0.86rem; }
+.tdm-review-comment { margin: 0; color: var(--color-text-primary); font-size: 0.86rem; }
 .tdm-reject-textarea { width: 100%; border-radius: 8px; border: 1px solid var(--color-border-subtle); padding: 8px; }
+
+/* Small action badge shown in Activity list (approved / rejected) */
+.tdm-review-action-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  margin-left: 8px;
+  border-radius: 6px;
+  text-transform: capitalize;
+}
+.tdm-review-action-badge--approved {
+  background: #eef9f2;
+  color: #166534;
+  border: 1px solid #d3f1df;
+}
+.tdm-review-action-badge--rejected {
+  background: #fff6f6;
+  color: #b42318;
+  border: 1px solid #f4c5c5;
+}
+
+/* Avatar used in activity rows */
+.tdm-review-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #e4eef8 0%, #d8e7f5 100%);
+  border: 1px solid #ccdae8;
+  flex-shrink: 0;
+}
+.tdm-review-avatar {
+  align-self: center;
+  transform: translateY(-8px);
+}
+.tdm-review-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Right column for the small action badge */
+.tdm-review-action-col {
+  display: flex;
+  align-items: start;
+  justify-content: flex-end;
+}
+
+/* Make review modal comments fill available width with no side padding */
+.tdm-review-modal-comment {
+  margin-left: 0;
+  padding: 0;
+}
 
 /* Review History Modal */
 .tdm-review-modal {
@@ -2367,7 +2482,7 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  font-size: 0.93rem;
+  font-size: 0.86rem; /* match comment name size */
 }
 
 .tdm-review-modal-name strong {
@@ -2386,7 +2501,7 @@
 }
 
 .tdm-review-modal-time {
-  font-size: 0.82rem;
+  font-size: 0.72rem; /* match comment time size */
   color: var(--color-text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
@@ -2409,4 +2524,354 @@
   color: #b42318;
   font-weight: 500;
 }
+
+/* ---------------------- Task Details Page Redesign ---------------------- */
+/* Page-specific variable aliases (map to design system tokens) */
+.tdm-page-container {
+  --color-background-primary: var(--color-bg-surface);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-border-tertiary: var(--color-border);
+  --border-radius-md: var(--radius-md);
+  --border-radius-lg: var(--radius-lg);
+}
+
+/* Two-column layout: main content + fixed sidebar */
+.tdm-page-container .tdm-grid {
+  grid-template-columns: 1fr 480px;
+  gap: 0; /* remove gap between columns so panels sit flush */
+  align-items: stretch;
+  border: 1px solid rgba(153, 206, 214, 0.48); /* match workspace hero border */
+  border-radius: 28px; /* match hero/header rounding */
+  box-shadow: var(--shadow-md); /* match hero/header shadow */
+  overflow: hidden; 
+  max-height: 700px;
+  background: var(--color-background-primary);
+}
+
+.tdm-page-container .tdm-side-column {
+  flex: 0 0 480px;
+  min-height: 0;
+  align-self: stretch;
+  position: sticky;
+  top: 18px;
+  padding: 18px 18px; /* add top/bottom padding; horizontal breathing room preserved */
+  border-left: none; /* divider rendered as a pseudo-element so we can inset it */
+  background: transparent;
+}
+
+/* Render the internal divider as a pseudo-element so it can have top/bottom insets */
+.tdm-page-container .tdm-side-column::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18px;    /* inset from top */
+  bottom: 18px; /* inset from bottom */
+  width: 0.5px;
+  background: var(--color-border-tertiary);
+  pointer-events: none;
+}
+
+/* Page shell and cards: flat, subtle hairline borders, no shadows/gradients */
+.tdm-page-container .tdm-task-shell {
+  background: var(--color-background-primary);
+  border: none; /* outer border now on grid container */
+  border-radius: 0; /* remove panel corner radius so only grid has rounded corners */
+  box-shadow: none;
+  padding: 18px;
+  max-height: none;
+  overflow: visible;
+}
+
+.tdm-page-container .tdm-section-card {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+  box-shadow: none;
+  padding: 14px;
+}
+
+/* Remove border-radius for top-level right panel inside page view so it sits flush */
+.tdm-page-container .tdm-side-column > .tdm-section-card {
+  border-radius: 0;
+  border: none; /* keep inner content as part of the outer container */
+  padding: 18px 14px;
+}
+
+/* Title and header */
+.tdm-page-container .tdm-task-title-row {
+.tdm-page-container .tdm-grid {
+  grid-template-columns: 1fr 480px;
+  gap: 0; /* remove gap between columns so panels sit flush */
+  align-items: stretch;
+  border: 1px solid rgba(153, 206, 214, 0.48); /* match workspace hero border */
+  border-radius: 28px; /* match hero/header rounding */
+  box-shadow: var(--shadow-md); /* match hero/header shadow */
+  max-height: 700px; /* limit overall grid height */
+  overflow: hidden; /* ensure children don't show rounded corners */
+  background: var(--color-background-primary);
+}
+  color: var(--color-text-primary);
+  white-space: normal;
+  overflow: visible;
+}
+
+/* Status pill (markup may add .tdm-category-pill and .in-progress) */
+.tdm-page-container .tdm-category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: 0.82rem;
+  border: 0.5px solid var(--color-border-tertiary);
+  background: transparent;
+}
+.tdm-page-container .tdm-category-pill.in-progress {
+  background: #FAC775;
+  color: #633806;
+  border-color: rgba(0,0,0,0.04);
+}
+
+/* Metadata strip: three small bordered cards */
+.tdm-page-container .tdm-meta-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.tdm-page-container .tdm-meta-item {
+  border: 0.5px solid var(--color-border-tertiary);
+  padding: 10px;
+  border-radius: var(--border-radius-md);
+  background: transparent;
+}
+.tdm-page-container .tdm-meta-label {
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+.tdm-page-container .tdm-meta-value {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+/* Tags: pill styling and add affordance */
+.tdm-page-container .tdm-tag-list { gap: 8px; }
+.tdm-page-container .tdm-tag {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  font-weight: 500;
+  font-size: 0.82rem;
+}
+.tdm-page-container .tdm-manage-tags-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-primary);
+  text-decoration: underline;
+  padding: 6px 8px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+/* Subtasks: tight bordered list, compact rows */
+.tdm-page-container .tdm-subtasks-list {
+  max-height: 360px;
+  overflow: auto;
+
+  padding: 0;
+  border: 0.5px solid var(--color-border-tertiary);
+  max-height: 265px;
+}
+.tdm-page-container .tdm-subtask-row {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  min-height: 44px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.tdm-page-container .tdm-subtask-row:last-child { border-bottom: none; }
+.tdm-page-container .tdm-subtask-left::before {
+  content: '';
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-tertiary);
+  background: transparent;
+}
+.tdm-page-container .tdm-subtask-index {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+.tdm-page-container .tdm-subtask-title {
+  font-weight: 500;
+  font-size: 0.92rem;
+  color: var(--color-text-primary);
+}
+.tdm-page-container .tdm-subtask-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  justify-self: end;
+  text-align: right;
+}
+.tdm-page-container .tdm-subtask-add-row {
+  padding: 10px 12px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.tdm-page-container .tdm-sidebar-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: transparent;
+  margin-bottom: 0px;
+}
+.tdm-page-container .tdm-sidebar-tabs .friends-tab {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 10px 14px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid transparent;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: color 160ms ease, border-color 160ms ease;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.tdm-page-container .tdm-sidebar-tabs .friends-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.tdm-page-container .tdm-sidebar-tabs .friends-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+.tdm-page-container .tdm-sidebar-tabs button {
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+.tdm-page-container .tdm-sidebar-tabs button.is-active {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+}
+.tdm-page-container .tdm-side-column .tdm-section-card {
+  margin-bottom: 8px;
+  border-radius: 0; /* ensure inner cards sit flush with outer rounded container */
+  border: none;
+  padding: 8px 14px 14px 0; /* remove left padding so content aligns with tabs */
+}
+
+/* Make the comments section card a column flex container so the composer stays pinned */
+.tdm-page-container .tdm-side-column .tdm-section-card.tdm-comments-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 8px 14px 14px 10px; /* align with other side cards (no left padding) */
+}
+
+/* Comments panel: scrollable thread with composer pinned to bottom */
+.tdm-page-container .tdm-comments-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 8px;
+}
+.tdm-page-container .tdm-comments-list-wrap {
+  overflow: auto;
+  flex: 1 1 auto;
+  padding-right: 6px;
+  padding-left: 0;
+}
+.tdm-page-container .tdm-comments-composer {
+  position: static;
+  background: var(--color-background-primary);
+  padding-top: 10px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+}
+
+.tdm-page-container .tdm-sidebar-panel {
+  min-height: 0;
+}
+
+.tdm-empty-state {
+  padding: 18px;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+/* Enforce flatter typography in page variant (labels/headings = 500, body = 400) */
+.tdm-page-container h3,
+.tdm-page-container h4,
+.tdm-page-container .tdm-meta-label,
+.tdm-page-container .tdm-tags-label,
+.tdm-page-container .tdm-priority-label,
+.tdm-page-container .tdm-subtask-created-label,
+.tdm-page-container .tdm-subtask-created-by {
+  font-weight: 500 !important;
+}
+.tdm-page-container p,
+.tdm-page-container .tdm-task-description,
+.tdm-page-container .tdm-comment-text,
+.tdm-page-container .tdm-reply-text,
+.tdm-page-container .tdm-subtask-meta {
+  font-weight: 400 !important;
+}
+
+/* Remove gradients/shadows/blur in page view for a flat look */
+.tdm-page-container .tdm-overlay,
+.tdm-page-container .tdm-modal,
+.tdm-page-container .tdm-task-shell,
+.tdm-page-container .tdm-section-card {
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Small screens: stack and allow full width */
+@media (max-width: 820px) {
+  .tdm-page-container .tdm-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .tdm-page-container .tdm-side-column {
+    position: static;
+    border-left: none;
+    padding-left: 0;
+    order: 2;
+  }
+  .tdm-page-container .tdm-side-column::before { display: none; }
+}
+
 

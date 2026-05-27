@@ -2402,14 +2402,22 @@ export async function deleteTaskTag({ tagId, requesterId }) {
   return { id: row.id, taskId: row.task_id, tagName: row.tag_name, projectId: row.project_id };
 }
 
-export async function updateTaskPriority({ taskId, requesterId, priority }) {
+export async function updateSubtask({ taskId, subtaskId, requesterId, status, title }) {
   const normalizedTaskId = Number(taskId);
-  const normalizedRequesterId = (requesterId || "").trim();
-  const normalizedPriority = String(priority || "").trim().toLowerCase();
+  const normalizedSubtaskId = Number(subtaskId);
+  const normalizedRequesterId = (requesterId || "").toString();
+  const rawStatus = status == null ? null : String(status || "").trim();
+  const normalizedTitle = title == null ? null : String(title || "").trim();
 
   if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
     const error = new Error("taskId is required");
     error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!Number.isInteger(normalizedSubtaskId) || normalizedSubtaskId <= 0) {
+    const error = new Error("subtaskId is required");
+    error.code = "INVALID_SUBTASK";
     throw error;
   }
 
@@ -2419,20 +2427,13 @@ export async function updateTaskPriority({ taskId, requesterId, priority }) {
     throw error;
   }
 
-  if (!normalizedPriority) {
-    const error = new Error("priority is required");
-    error.code = "INVALID_PRIORITY";
+  if (rawStatus == null && normalizedTitle == null) {
+    const error = new Error("No update fields provided");
+    error.code = "INVALID_PAYLOAD";
     throw error;
   }
 
-  const allowedPriorities = new Set(["unset", "low", "medium", "high", "urgent", "critical"]);
-  if (!allowedPriorities.has(normalizedPriority)) {
-    const error = new Error("priority must be one of: unset, low, medium, high, or urgent");
-    error.code = "INVALID_PRIORITY";
-    throw error;
-  }
-
-  // Database enum may still use "critical"; map "urgent" to keep API/UI language consistent.
+  // Permission check
   const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
   if (!access.isOwner) {
     if (access.isAdmin) {
@@ -2442,40 +2443,251 @@ export async function updateTaskPriority({ taskId, requesterId, priority }) {
         throw error;
       }
     } else if (!access.settings.allow_member_edit_task) {
-      const error = new Error("Forbidden: editing task priority is disabled for members in this project");
+      const error = new Error("Forbidden: editing subtasks is disabled for members in this project");
       error.code = "TASK_FORBIDDEN";
       throw error;
     }
   }
 
-  const dbPriority = normalizedPriority === "urgent" ? "critical" : normalizedPriority;
+  const client = await pool.connect();
+  try {
+    // Determine allowed values for the status column (enum or check constraint)
+    let allowedStatuses = null;
 
-  const result = await pool.query(
-    `
-    UPDATE tasks
-    SET priority = $2
-    WHERE id = $1
-    RETURNING id, priority
-    `,
-    [normalizedTaskId, dbPriority]
-  );
+    try {
+      // 1) If status column is enum, fetch enum labels
+      const typeRes = await client.query(
+        `
+        SELECT t.typtype, t.oid
+        FROM pg_attribute a
+        JOIN pg_type t ON a.atttypid = t.oid
+        WHERE a.attrelid = $1::regclass AND a.attname = $2
+        LIMIT 1
+        `,
+        ["subtasks", "status"]
+      );
 
-  const row = result.rows[0];
-  if (!row) {
-    const error = new Error("Task not found");
-    error.code = "TASK_NOT_FOUND";
-    throw error;
+      if (typeRes.rows && typeRes.rows[0]) {
+        const typtype = typeRes.rows[0].typtype;
+        const typeOid = typeRes.rows[0].oid;
+        if (typtype === "e") {
+          const enumRes = await client.query(
+            `SELECT enumlabel FROM pg_enum WHERE enumtypid = $1 ORDER BY enumsortorder`,
+            [typeOid]
+          );
+          allowedStatuses = enumRes.rows.map((r) => String(r.enumlabel));
+        }
+      }
+    } catch (innerErr) {
+      // ignore and try constraint parsing
+    }
+
+    if (!allowedStatuses) {
+      try {
+        const consRes = await client.query(
+          `SELECT pg_get_constraintdef(c.oid) AS def FROM pg_constraint c WHERE c.conrelid = $1::regclass AND c.contype = 'c'`,
+          ["subtasks"]
+        );
+
+        if (consRes.rows && consRes.rows.length) {
+          for (const r of consRes.rows) {
+            const def = String(r.def || "");
+            // look for IN (...) pattern
+            const m = def.match(/IN\s*\(([^)]+)\)/i);
+            if (m && m[1]) {
+              const parts = m[1].split(/\s*,\s*/).map((p) => {
+                let v = String(p || "");
+                // remove any ::type suffix like ::character varying
+                v = v.replace(/::.*$/g, "");
+                // strip surrounding single/double quotes
+                v = v.replace(/^['"]+|['"]+$/g, "");
+                return v.trim();
+              });
+              if (parts.length) {
+                allowedStatuses = parts;
+                break;
+              }
+            }
+
+            // look for ARRAY[...] pattern
+            const m2 = def.match(/ARRAY\s*\[([^\]]+)\]/i);
+            if (m2 && m2[1]) {
+              const parts = m2[1].split(/\s*,\s*/).map((p) => {
+                let v = String(p || "");
+                v = v.replace(/::.*$/g, "");
+                v = v.replace(/^['"]+|['"]+$/g, "");
+                return v.trim();
+              });
+              if (parts.length) {
+                allowedStatuses = parts;
+                break;
+              }
+            }
+          }
+        }
+      } catch (innerErr) {
+        // ignore
+      }
+    }
+
+    // Fallback: read distinct values present in the table (helps infer allowed values)
+    if (!allowedStatuses) {
+      try {
+        const distinctRes = await client.query(`SELECT DISTINCT status FROM subtasks WHERE status IS NOT NULL LIMIT 20`);
+        if (distinctRes.rows && distinctRes.rows.length) {
+          allowedStatuses = distinctRes.rows.map((r) => String(r.status));
+        }
+      } catch (innerErr) {
+        // ignore
+      }
+    }
+
+    // If we discovered allowed statuses, attempt to map common synonyms
+    let chosenStatus = null;
+    if (rawStatus != null) {
+      const lowerRaw = rawStatus.toLowerCase();
+
+      // Quick canonical mapping for the most common values to avoid false negatives
+      const canonicalCompleted = new Set(["completed", "done", "finished", "complete", "closed"]);
+      const canonicalUnfinished = new Set(["unfinished", "open", "todo", "incomplete", "not started", "not_started"]);
+
+      if (canonicalCompleted.has(lowerRaw)) {
+        // Prefer matching an allowedStatus that looks like 'finished'/'done'/etc., otherwise fall back to the canonical 'finished'
+        if (allowedStatuses && allowedStatuses.length) {
+          const found = allowedStatuses.find((s) => {
+            const low = String(s).toLowerCase();
+            return low === 'finished' || low.includes('fin') || low.includes('done') || low.includes('complete') || low.includes('closed');
+          });
+          if (found) chosenStatus = found;
+          else chosenStatus = 'finished';
+        } else {
+          chosenStatus = 'finished';
+        }
+      } else if (canonicalUnfinished.has(lowerRaw)) {
+        if (allowedStatuses && allowedStatuses.length) {
+          const found = allowedStatuses.find((s) => {
+            const low = String(s).toLowerCase();
+            return low === 'unfinished' || low.includes('un') || low.includes('open') || low.includes('todo') || low.includes('incom') || low.includes('not');
+          });
+          if (found) chosenStatus = found;
+          else chosenStatus = 'unfinished';
+        } else {
+          chosenStatus = 'unfinished';
+        }
+      }
+
+      if (!chosenStatus) {
+        if (allowedStatuses && allowedStatuses.length) {
+          // direct match (case-insensitive)
+          const direct = allowedStatuses.find((s) => String(s).toLowerCase() === lowerRaw);
+          if (direct) chosenStatus = direct;
+
+          if (!chosenStatus) {
+            // Synonym mapping for other variants
+            const synonyms = {
+              completed: ["completed", "done", "finished", "complete", "closed"],
+              unfinished: ["unfinished", "open", "todo", "incomplete", "not started", "not_started"],
+            };
+
+            for (const allowed of allowedStatuses) {
+              const lowAllowed = String(allowed).toLowerCase();
+              if (synonyms.completed.includes(lowAllowed) && synonyms.completed.includes(lowerRaw)) {
+                chosenStatus = allowed;
+                break;
+              }
+              if (synonyms.unfinished.includes(lowAllowed) && synonyms.unfinished.includes(lowerRaw)) {
+                chosenStatus = allowed;
+                break;
+              }
+              // match if allowed contains 'done' and raw is 'completed'
+              if (lowerRaw === 'completed' && (lowAllowed.includes('done') || lowAllowed.includes('finish') || lowAllowed.includes('complete'))) {
+                chosenStatus = allowed;
+                break;
+              }
+              if ((lowerRaw === 'unfinished' || lowerRaw === 'open') && (lowAllowed.includes('un') || lowAllowed.includes('open') || lowAllowed.includes('todo') || lowAllowed.includes('incom') || lowAllowed.includes('not'))) {
+                chosenStatus = allowed;
+                break;
+              }
+            }
+          }
+        } else {
+          // No allowedStatuses discovered; just use rawStatus
+          chosenStatus = rawStatus;
+        }
+      }
+    }
+
+    if (rawStatus != null && chosenStatus == null) {
+      const error = new Error(`Invalid status value: ${rawStatus}. Allowed: ${allowedStatuses ? allowedStatuses.join(',') : 'unknown'}`);
+      error.code = 'INVALID_STATUS';
+      throw error;
+    }
+
+    // enforce reasonable max lengths to avoid DB truncation errors (status column is varchar(20))
+    if (chosenStatus != null) {
+      chosenStatus = String(chosenStatus || "").trim();
+      if (chosenStatus.length > 20) {
+        console.warn(`updateSubtask: truncating status to 20 chars (was ${chosenStatus.length})`);
+        chosenStatus = chosenStatus.slice(0, 20);
+      }
+    }
+
+    if (normalizedTitle != null) {
+      normalizedTitle = String(normalizedTitle || "").trim();
+      // assume title column allows larger values; cap to 1024 to be safe
+      if (normalizedTitle.length > 1024) {
+        console.warn(`updateSubtask: truncating title to 1024 chars (was ${normalizedTitle.length})`);
+        normalizedTitle = normalizedTitle.slice(0, 1024);
+      }
+    }
+
+    let result;
+    try {
+      result = await client.query(
+        `
+        UPDATE subtasks
+        SET
+          status = COALESCE(NULLIF($3::text, ''), status),
+          title = COALESCE(NULLIF($4::text, ''), title)
+        WHERE id = $1::int AND task_id = $2::int
+        RETURNING id, task_id, title, created_by, status, created_at;
+        `,
+        [normalizedSubtaskId, normalizedTaskId, chosenStatus, normalizedTitle]
+      );
+    } catch (dbErr) {
+      // Check constraint violation (invalid status)
+      if (dbErr && (dbErr.code === '23514' || String(dbErr.constraint || '').toLowerCase().includes('status'))) {
+        const allowed = allowedStatuses && allowedStatuses.length ? allowedStatuses.join(',') : 'unknown';
+        const e = new Error(`Invalid status value: ${rawStatus}. Allowed: ${allowed}`);
+        e.code = 'INVALID_STATUS';
+        throw e;
+      }
+      throw dbErr;
+    }
+
+    const row = result.rows[0];
+    if (!row) {
+      const error = new Error("Subtask not found");
+      error.code = "SUBTASK_NOT_FOUND";
+      throw error;
+    }
+
+    return {
+      id: row.id,
+      taskId: row.task_id,
+      title: row.title,
+      createdBy: row.created_by,
+      status: row.status,
+      createdAt: row.created_at,
+    };
+  } finally {
+    client.release();
   }
-
-  return {
-    id: row.id,
-    priority: row.priority === "critical" ? "urgent" : row.priority,
-  };
 }
 
 export async function updateTaskName({ taskId, requesterId, name }) {
   const normalizedTaskId = Number(taskId);
-  const normalizedRequesterId = (requesterId || "").trim();
+  const normalizedRequesterId = (requesterId || "").toString();
   const trimmedName = String(name || "").trim();
 
   if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
@@ -2524,6 +2736,8 @@ export async function updateTaskName({ taskId, requesterId, name }) {
   const updated = updateResult.rows[0];
   return { id: updated.id, title: updated.title };
 }
+
+
 
 export async function updateTaskDescription({ taskId, requesterId, description }) {
   const normalizedTaskId = Number(taskId);
@@ -2575,6 +2789,71 @@ export async function updateTaskDescription({ taskId, requesterId, description }
 
   const updated = updateResult.rows[0];
   return { id: updated.id, description: updated.description };
+}
+
+export async function updateTaskPriority({ taskId, requesterId, priority }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = (requesterId || "").toString();
+  const normalizedPriority = String(priority || "").trim().toLowerCase();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedRequesterId) {
+    const error = new Error("requesterId is required");
+    error.code = "INVALID_USER";
+    throw error;
+  }
+
+  const allowedPriorities = new Set(["unset", "low", "medium", "high", "urgent", "critical"]);
+  let priorityValue = normalizedPriority || "unset";
+  if (!allowedPriorities.has(priorityValue)) {
+    const error = new Error("priority must be one of: unset, low, medium, high, urgent");
+    error.code = "INVALID_PRIORITY";
+    throw error;
+  }
+
+  const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+  if (!access.isOwner) {
+    if (access.isAdmin) {
+      if (!access.settings.allow_admin_manage_tasks) {
+        const error = new Error("Forbidden: editing tasks is disabled for admins in this project");
+        error.code = "TASK_FORBIDDEN";
+        throw error;
+      }
+    } else if (!access.settings.allow_member_edit_task) {
+      const error = new Error("Forbidden: editing tasks is disabled for members in this project");
+      error.code = "TASK_FORBIDDEN";
+      throw error;
+    }
+  }
+
+  const dbPriority = priorityValue === "urgent" ? "critical" : priorityValue;
+
+  const result = await pool.query(
+    `
+    UPDATE tasks
+    SET priority = $2
+    WHERE id = $1::int
+    RETURNING id, priority
+    `,
+    [normalizedTaskId, dbPriority]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    const error = new Error("Task not found");
+    error.code = "TASK_NOT_FOUND";
+    throw error;
+  }
+
+  return {
+    id: row.id,
+    priority: row.priority === "critical" ? "urgent" : row.priority,
+  };
 }
 
 export async function updateTaskTargetDate({ taskId, requesterId, targetDate }) {

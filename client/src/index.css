@@ -1,5 +1,6 @@
 /* Import unified design system - single source of truth for all tokens */
 @import url('./DesignSystem.css');
+@import url('./components/styles/ModalAnimations.css');
 
 /* ────────────────────────────────────────────────────────────────
    LEGACY COMPONENT STYLES 
@@ -35,13 +36,11 @@
 
 /* All primary button styling defined in DesignSystem.css for consistency */
 .btn-primary {
-  /* Base: background, color, border, font, padding, radius from .btn and DesignSystem.css */
-  /* Inherits: var(--color-primary), white text, clean design */
+  box-sizing: border-box;
 }
 
 .btn-primary:hover:not(:disabled) {
-  /* Subtle hover: slight darkening via color change + subtle Y translate + minimal shadow */
-  /* Defined in DesignSystem.css */
+  box-sizing: border-box;
 }
 
 .btn-secondary {
@@ -236,7 +235,7 @@
 .app-layout {
   height: 100vh;
   display: grid;
-  grid-template-columns: 286px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 286px) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 16px;
   padding: 16px;
@@ -314,7 +313,7 @@
 /* Responsive */
 @media (max-width: 1080px) {
   .app-layout {
-    grid-template-columns: 236px minmax(0, 1fr);
+    grid-template-columns: var(--sidebar-narrow-width, 236px) minmax(0, 1fr);
     gap: 14px;
     padding: 14px;
   }

@@ -30,6 +30,7 @@ import { createProject as createProjectModel,
          unassignTaskFromMember as unassignTaskFromMemberModel,
          unassignTaskFromSelf as unassignTaskFromSelfModel,
          createSubtask as createSubtaskModel,
+         updateSubtask as updateSubtaskModel,
          deleteSubtask as deleteSubtaskModel,
          createTaskComment as createTaskCommentModel,
          createTaskCommentReply as createTaskCommentReplyModel,
@@ -73,6 +74,17 @@ function buildNotificationRecipients({ creatorId, assigneeIds = [], actorId }) {
   const ids = new Set([creatorId, ...(assigneeIds || [])].filter(Boolean));
   if (actorId) ids.delete(actorId);
   return Array.from(ids);
+}
+
+function buildActorPayload(actor) {
+  if (!actor) return null;
+
+  return {
+    id: actor.id,
+    name: actor.displayName || actor.name || actor.email || "Someone",
+    profileImageBase64: actor.profileImageBase64 || null,
+    profilePictureUrl: actor.profilePictureUrl || null,
+  };
 }
 
 function getMemberIds(members = []) {
@@ -260,6 +272,7 @@ export async function inviteMemberToProject(req, res) {
             type: "project_invitation",
             message: `${inviter.displayName} invited you to join ${project.name}.`,
             payload: {
+              actor: buildActorPayload(inviter),
               projectId,
               requestId: inviteRequest?.id || null,
               inviterId: inviter.id,
@@ -303,6 +316,7 @@ export async function inviteMemberToProject(req, res) {
             type: "project_invitation",
             message: `${inviter.displayName} invited you to join ${project.name}.`,
             payload: {
+              actor: buildActorPayload(inviter),
               projectId,
               requestId: inviteRequest?.id || null,
               inviterId: inviter.id,
@@ -363,6 +377,7 @@ export async function acceptProjectInvitation(req, res) {
           type: "project_invitation_accepted",
           message: `${recipient.displayName} accepted your invitation to ${project.name}.`,
           payload: {
+            actor: buildActorPayload(recipient),
             projectId: project.id,
             requestId,
             recipientId: userId,
@@ -740,6 +755,7 @@ export async function updateTaskStatus(req, res) {
             type: "task_status_changed",
             message: `${actor.displayName} moved "${taskContext.taskTitle}" to ${statusLabel} in ${taskContext.projectName}.`,
             payload: {
+              actor: buildActorPayload(actor),
               taskId: taskContext.taskId,
               projectId: taskContext.projectId,
               categoryId: taskContext.categoryId,
@@ -855,6 +871,7 @@ export async function approveTaskReview(req, res) {
             type: "review_approved",
             message: `${actor.displayName} approved the review for "${taskContext.taskTitle}" in ${taskContext.projectName}${note ? `: "${note}"` : ""}.`,
             payload: {
+              actor: buildActorPayload(actor),
               taskId: taskContext.taskId,
               projectId: taskContext.projectId,
               comment,
@@ -937,6 +954,7 @@ export async function rejectTaskReview(req, res) {
             type: "review_rejected",
             message: `${actor.displayName} rejected the review for "${taskContext.taskTitle}" in ${taskContext.projectName}${note ? `: "${note}"` : ""}.`,
             payload: {
+              actor: buildActorPayload(actor),
               taskId: taskContext.taskId,
               projectId: taskContext.projectId,
               comment: reviewRaw,
@@ -1391,6 +1409,7 @@ export async function assignTaskToOthers(req, res) {
           type: "task_assigned",
           message: `${actor.displayName} assigned you to "${taskContext.taskTitle}" in ${taskContext.projectName}.`,
           payload: {
+            actor: buildActorPayload(actor),
             taskId: taskContext.taskId,
             projectId: taskContext.projectId,
             assigneeId: memberId,
@@ -1576,6 +1595,7 @@ export async function createTaskComment(req, res) {
             type: "task_comment",
             message: `${actor.displayName} commented on "${taskContext.taskTitle}" in ${taskContext.projectName}${note ? `: "${note}"` : ""}.`,
             payload: {
+              actor: buildActorPayload(actor),
               taskId: taskContext.taskId,
               projectId: taskContext.projectId,
               commentId: createdComment?.id || null,
@@ -1681,6 +1701,7 @@ export async function createTaskCommentReply(req, res) {
             type: "task_comment_reply",
             message: `${actor.displayName} replied on "${taskContext.taskTitle}" in ${taskContext.projectName}${note ? `: "${note}"` : ""}.`,
             payload: {
+              actor: buildActorPayload(actor),
               taskId: taskContext.taskId,
               projectId: taskContext.projectId,
               commentId,
@@ -1853,7 +1874,61 @@ export async function updateSubtask(req, res) {
     return res.status(400).json({ message: "Subtask ID is required" });
   }
 
-  return res.status(501).json({ message: "Subtasks not implemented yet" });
+  const { status, title } = req.body || {};
+
+  // Debug: log incoming payload to help diagnose 400 Bad Request
+  try {
+    console.log("updateSubtask request:", {
+      userId: req.user?.userId,
+      taskId,
+      subtaskId,
+      body: req.body,
+    });
+  } catch (logErr) {
+    console.warn("Failed to log updateSubtask payload", logErr);
+  }
+
+  try {
+    const updated = await updateSubtaskModel({
+      taskId: Number(taskId),
+      subtaskId: Number(subtaskId),
+      requesterId: req.user.userId,
+      status,
+      title,
+    });
+
+    try {
+      const taskContext = await getTaskContext(taskId);
+      if (taskContext?.projectId) {
+        await broadcastProjectMembersEvent({
+          projectId: taskContext.projectId,
+          requesterId: req.user.userId,
+          payload: {
+            eventType: "subtaskUpdate",
+            taskId: taskContext.taskId,
+            projectId: taskContext.projectId,
+            subtaskId: updated?.id || null,
+            subtask: updated,
+            userRole: req.user.role || null,
+          },
+        });
+      }
+    } catch (broadcastError) {
+      console.error("Subtask update realtime broadcast error:", broadcastError);
+    }
+
+    return res.status(200).json(updated);
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_SUBTASK" || error?.code === "INVALID_STATUS") {
+      console.warn("updateSubtask validation error:", { code: error.code, message: error.message });
+      return res.status(400).json({ message: error.message });
+    }
+    if (error?.code === "SUBTASK_NOT_FOUND") return res.status(404).json({ message: error.message });
+    if (error?.code === "TASK_FORBIDDEN") return res.status(403).json({ message: error.message });
+
+    console.error("Error updating subtask:", error);
+    return res.status(500).json({ message: error?.message || "Failed to update subtask" });
+  }
 }
 
 export async function deleteSubtask(req, res) {
@@ -1921,6 +1996,7 @@ export async function unassignTaskFromMember(req, res) {
           type: "task_unassigned",
           message: `${actor.displayName} unassigned you from "${taskContext.taskTitle}" in ${taskContext.projectName}.`,
           payload: {
+            actor: buildActorPayload(actor),
             taskId: taskContext.taskId,
             projectId: taskContext.projectId,
             assigneeId: memberId,

@@ -1315,7 +1315,7 @@ function KanbanPage() {
 						const columnName = String(column?.title || "").toLowerCase();
 						const isToReview = columnName === "to_review" || columnName === "to review";
 						const isDone = columnName === "done";
-							const showTakeTask = canTakeTask && !isAssignedToMe && !isDone;
+							const showTakeTask = canTakeTask && !isAssignedToMe && !isDone && !isToReview;
 						const showUnassignTask = canTakeTask && isAssignedToMe && !isDone && !isToReview;
 						const showRemoveTask = isDone && canAdminManageTasks;
 						const pendingAction = pendingTaskActions[String(task?.id)] || (task?.isPending ? "create" : "");

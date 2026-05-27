@@ -1,0 +1,93 @@
+/* Centralized modal overlay/content animations used across modal components */
+:root {
+  --modal-animation-duration: 220ms;
+  --modal-animation-ease: cubic-bezier(0.2, 0.9, 0.15, 1);
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes overlay-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes modal-pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.996); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes modal-pop-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(6px) scale(0.996); }
+}
+
+/* Target common overlay/modal classnames used in the app */
+.modal-overlay,
+.crm-overlay,
+.tdm-overlay,
+.pmv-overlay,
+.ps-overlay,
+.kanban-confirm-overlay {
+  animation: overlay-fade-in var(--modal-animation-duration) var(--modal-animation-ease) both;
+  background: rgba(10,18,24,0.45);
+}
+
+.modal-content,
+.crm-modal,
+.tdm-modal,
+.pmv-modal,
+.ps-modal,
+.kanban-confirm-modal {
+  animation: modal-pop-in var(--modal-animation-duration) var(--modal-animation-ease) both;
+  will-change: transform, opacity;
+}
+
+/* When components add an explicit closing class (is-closing), play the exit animation */
+.modal-overlay.is-closing,
+.crm-overlay.is-closing,
+.tdm-overlay.is-closing,
+.pmv-overlay.is-closing,
+.ps-overlay.is-closing,
+.kanban-confirm-overlay.is-closing {
+  animation: overlay-fade-out var(--modal-animation-duration) var(--modal-animation-ease) both;
+}
+
+.modal-content.is-closing,
+.crm-modal.is-closing,
+.tdm-modal.is-closing,
+.pmv-modal.is-closing,
+.ps-modal.is-closing,
+.kanban-confirm-modal.is-closing {
+  animation: modal-pop-out var(--modal-animation-duration) var(--modal-animation-ease) both;
+}
+
+/* If overlay controls the closing state, animate child modal too */
+.modal-overlay.is-closing .modal-content,
+.crm-overlay.is-closing .crm-modal,
+.tdm-overlay.is-closing .tdm-modal,
+.pmv-overlay.is-closing .pmv-modal,
+.ps-overlay.is-closing .ps-modal,
+.kanban-confirm-overlay.is-closing .kanban-confirm-modal {
+  animation: modal-pop-out var(--modal-animation-duration) var(--modal-animation-ease) both;
+}
+
+/* Reduce motion preference: disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay,
+  .modal-content,
+  .crm-overlay,
+  .crm-modal,
+  .tdm-overlay,
+  .tdm-modal,
+  .pmv-overlay,
+  .pmv-modal,
+  .ps-overlay,
+  .ps-modal,
+  .kanban-confirm-overlay,
+  .kanban-confirm-modal {
+    animation: none !important;
+  }
+}

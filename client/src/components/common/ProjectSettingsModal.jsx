@@ -1,5 +1,5 @@
 import "../styles/ProjectSettingsModal.css";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 function ToggleRow({ id, label, description, checked, onChange, disabled = false, pending = false }) {
   return (
@@ -51,11 +51,35 @@ export default function ProjectSettingsModal({
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTyped, setConfirmTyped] = useState("");
-  if (!isOpen) return null;
+
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      clearTimeout(timerRef.current);
+      setShouldRender(true);
+      setIsClosing(false);
+      return;
+    }
+
+    if (shouldRender) {
+      setIsClosing(true);
+      timerRef.current = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 220);
+    }
+
+    return () => clearTimeout(timerRef.current);
+  }, [isOpen, shouldRender]);
+
+  if (!shouldRender) return null;
 
   return (
-    <div className="ps-overlay" role="dialog" aria-modal="true" aria-label="Project settings">
-      <div className="ps-modal">
+    <div className={`ps-overlay${isClosing ? " is-closing" : ""}`} role="dialog" aria-modal="true" aria-label="Project settings">
+      <div className={`ps-modal${isClosing ? " is-closing" : ""}`}>
 
         <header className="ps-header">
           <div>

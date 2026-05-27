@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useToast } from "../../hooks/useToast";
 import { getFriends } from "../../services/friendService";
 import { inviteMemberToProject } from "../../services/projectService";
@@ -18,6 +18,29 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
     loadFriends();
   }, [isOpen]);
 
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      clearTimeout(timerRef.current);
+      setShouldRender(true);
+      setIsClosing(false);
+      return;
+    }
+
+    if (shouldRender) {
+      setIsClosing(true);
+      timerRef.current = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 220);
+    }
+
+    return () => clearTimeout(timerRef.current);
+  }, [isOpen, shouldRender]);
+
   async function loadFriends() {
     setFriendsLoading(true);
     try {
@@ -30,7 +53,7 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
     }
   }
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   const normalizedSearch = friendSearch.trim().toLowerCase();
   const filteredFriends = normalizedSearch
@@ -92,8 +115,8 @@ export default function AddMemberModal({ isOpen, onClose, project, onAdded }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
+    <div className={`modal-overlay${isClosing ? " is-closing" : ""}`}>
+      <div className={`modal-content${isClosing ? " is-closing" : ""}`}>
         <div className="modal-header">
           <h2>Add Someone to "{project?.name || 'Project'}"</h2>
           <button className="close-btn" onClick={onClose} aria-label="Close">&times;</button>

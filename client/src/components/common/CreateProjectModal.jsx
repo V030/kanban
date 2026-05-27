@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useToast } from "../../hooks/useToast";
 import { createProject } from "../../services/projectService";
 import "./CreateProjectModal.css";
@@ -80,12 +80,36 @@ export default function CreateProjectModal({
     }));
   };
 
-  // If modal is not open, render nothing
-  if (!isOpen) return null;
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      // open immediately
+      clearTimeout(timerRef.current);
+      setShouldRender(true);
+      setIsClosing(false);
+      return;
+    }
+
+    // start closing animation then unmount
+    if (shouldRender) {
+      setIsClosing(true);
+      timerRef.current = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 220); // match CSS --transition-base (200ms) + small buffer
+    }
+
+    return () => clearTimeout(timerRef.current);
+  }, [isOpen, shouldRender]);
+
+  if (!shouldRender) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
+    <div className={`modal-overlay${isClosing ? " is-closing" : ""}`}>
+      <div className={`modal-content${isClosing ? " is-closing" : ""}`}>
         {/* Header */}
         <div className="modal-header">
           <h2>Create New Project</h2>

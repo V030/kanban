@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import { TaskDetailsContent } from "../components/common/TaskDetailsModal";
+import ErrorPage from "./ErrorPage";
 import { SkeletonRow, SkeletonBox } from "../components/common/SkeletonComponents";
 import {
   getProjectMembers,
@@ -195,6 +196,22 @@ export default function TaskDetailsPage() {
         return;
       }
 
+      // Suppress noisy server validation messages (e.g. 'taskId is required')
+      const lower = errorMessage.toLowerCase();
+      const isServerValidationIssue = lower.includes("taskid is required") || lower.includes("task id is required") || lower.includes("invalid task id");
+
+      if (isServerValidationIssue) {
+        // Treat as not-found / invalid and render the 404 page without spamming a toast
+        showNotFound("This task was deleted or is no longer available.");
+        if (projectId || project?.id) {
+          const pId = projectId || project.id;
+          navigate(`/main-page/projects/${pId}/kanban`, { replace: true });
+          return;
+        }
+        navigate("/main-page/projects", { replace: true });
+        return;
+      }
+
       showError(errorMessage);
     } finally {
       if (!silent) {
@@ -317,12 +334,12 @@ export default function TaskDetailsPage() {
     navigate(-1);
   };
 
-  // If task not passed via state, show fallback message
+  // If task not passed via state, show 404 page (preserve loading skeleton while fetching)
   if (!task) {
-    return (
-      <div className="page-shell tdm-page-container">
-        <div className="tdm-section-card">
-          {taskLoading ? (
+    if (taskLoading) {
+      return (
+        <div className="page-shell tdm-page-container">
+          <div className="tdm-section-card">
             <>
               <SkeletonBox width="200px" height="24px" />
               <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -330,18 +347,12 @@ export default function TaskDetailsPage() {
                 <SkeletonRow showAvatar={false} lineCount={2} />
               </div>
             </>
-          ) : (
-            <>
-              <h3>Task not available</h3>
-              <p>Open this page from the board to see task details.</p>
-            </>
-          )}
-          <div style={{ marginTop: 12 }}>
-            <button onClick={() => navigate(-1)} className="tdm-close-action">Back</button>
           </div>
         </div>
-      </div>
-    );
+      );
+    }
+
+    return <ErrorPage />;
   }
 
   return (

@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import "../styles/ColumnsReorderModal.css";
 import { createNewTaskCategory } from "../../services/projectService";
 
 function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave }) {
   const [localColumns, setLocalColumns] = useState([]);
+  const [shouldRender, setShouldRender] = useState(open);
+  const [isClosing, setIsClosing] = useState(false);
+  const timerRef = useRef(null);
   const [newVisible, setNewVisible] = useState(false);
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
@@ -13,9 +16,23 @@ function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave })
     setNewVisible(false);
     setNewName("");
     setError("");
-  }, [open, columns]);
 
-  if (!open) return null;
+    if (open) {
+      clearTimeout(timerRef.current);
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      timerRef.current = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 220);
+    }
+
+    return () => clearTimeout(timerRef.current);
+  }, [open, columns, shouldRender]);
+
+  if (!shouldRender) return null;
 
   function move(i, dir) {
     const arr = [...localColumns];
@@ -73,8 +90,8 @@ function ColumnsReorderModal({ open, onClose, projectId, columns = [], onSave })
   }
 
   return (
-    <div className="crm-overlay">
-      <div className="crm-modal">
+    <div className={`crm-overlay${isClosing ? " is-closing" : ""}`}>
+      <div className={`crm-modal${isClosing ? " is-closing" : ""}`}>
         <div className="crm-header">
           <h3>Re-order Columns</h3>
           <button type="button" className="crm-close" onClick={onClose}>x</button>
