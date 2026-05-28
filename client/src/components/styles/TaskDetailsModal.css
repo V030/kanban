@@ -987,8 +987,8 @@
 }
 
 .tdm-subtask-checkbox {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   cursor: pointer;
   accent-color: rgb(15,127,143);
 }
@@ -2704,15 +2704,11 @@
   border-bottom: 0.5px solid var(--color-border-tertiary);
 }
 .tdm-page-container .tdm-subtask-row:last-child { border-bottom: none; }
+/* Removed stray dot before subtasks checkbox wrapper */
 .tdm-page-container .tdm-subtask-left::before {
-  content: '';
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1px solid var(--color-border-tertiary);
-  background: transparent;
+  content: none;
 }
+
 .tdm-page-container .tdm-subtask-index {
   font-weight: 500;
   color: var(--color-text-secondary);

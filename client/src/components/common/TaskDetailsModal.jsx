@@ -1064,50 +1064,77 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
     }
   };
 
-  const handleToggleSubtask = async (subtask, event) => {
-    if (event && typeof event.stopPropagation === "function") event.stopPropagation();
-    console.log("handleToggleSubtask invoked", { taskId: task?.id, subtaskId: subtask?.id, eventType: event?.type });
-    if (!task?.id || !subtask?.id) return;
-    const subtaskId = subtask.id;
-    const previousSubtasks = localSubtasks;
+ const handleToggleSubtask = async (subtask, event) => {
+  if (event && typeof event.stopPropagation === "function") event.stopPropagation();
 
-    setSubtaskError("");
-    setSubtaskPendingIds((prev) => ({ ...prev, [subtaskId]: true }));
+  console.group(`[toggleSubtask] subtask id=${subtask?.id}`);
+  console.log("1. subtask object received:", JSON.parse(JSON.stringify(subtask || {})));
+  console.log("2. task.id:", task?.id);
 
-    const wasCompleted = subtask?.status === "finished" || subtask?.status === "completed" || !!subtask.completed;
-    const nextStatus = wasCompleted ? "unfinished" : "finished";
+  if (!task?.id || !subtask?.id) {
+    console.warn("EARLY EXIT — missing task.id or subtask.id");
+    console.groupEnd();
+    return;
+  }
 
-    setLocalSubtasks((prev) => prev.map((s) => (String(s?.id) === String(subtaskId) ? { ...s, status: nextStatus, isPending: true } : s)));
+  const subtaskId = subtask.id;
+  const previousSubtasks = localSubtasks;
 
-    if (String(subtaskId).startsWith("temp-subtask-")) {
-      // Temp items don't need server update
-      setSubtaskPendingIds((prev) => {
-        const next = { ...prev };
-        delete next[subtaskId];
-        return next;
-      });
-      setLocalSubtasks((prev) => prev.map((s) => (String(s?.id) === String(subtaskId) ? { ...s, isPending: false } : s)));
-      return;
-    }
+  const wasCompleted = subtask?.status === "finished" || subtask?.status === "completed" || !!subtask.completed;
+  const nextStatus = wasCompleted ? "unfinished" : "finished";
 
-    try {
-      console.log("calling updateSubtask API", { taskId: task?.id, subtaskId, nextStatus });
-      const resp = await updateSubtask(task.id, subtaskId, { status: nextStatus });
-      console.log("updateSubtask response", resp);
-      const updated = resp?.subtask || resp?.data || resp || {};
-      setLocalSubtasks((prev) => prev.map((s) => (String(s?.id) === String(subtaskId) ? { ...s, ...updated, isPending: false } : s)));
-    } catch (err) {
-      console.error("updateSubtask failed", err);
-      setSubtaskError(err?.message || "Failed to update subtask");
-      setLocalSubtasks(previousSubtasks);
-    } finally {
-      setSubtaskPendingIds((prev) => {
-        const next = { ...prev };
-        delete next[subtaskId];
-        return next;
-      });
-    }
-  };
+  console.log("3. wasCompleted:", wasCompleted, "| current status:", subtask?.status, "| nextStatus:", nextStatus);
+
+  setSubtaskError("");
+  setSubtaskPendingIds((prev) => ({ ...prev, [subtaskId]: true }));
+  setLocalSubtasks((prev) => prev.map((s) => (String(s?.id) === String(subtaskId) ? { ...s, status: nextStatus, isPending: true } : s)));
+
+  if (String(subtaskId).startsWith("temp-subtask-")) {
+    console.log("4. temp subtask — skipping API call");
+    console.groupEnd();
+    setSubtaskPendingIds((prev) => { const next = { ...prev }; delete next[subtaskId]; return next; });
+    setLocalSubtasks((prev) => prev.map((s) => (String(s?.id) === String(subtaskId) ? { ...s, isPending: false } : s)));
+    return;
+  }
+
+  try {
+    console.log("4. calling updateSubtask with:", { taskId: task.id, subtaskId, payload: { status: nextStatus } });
+
+    const resp = await updateSubtask(task.id, subtaskId, { status: nextStatus });
+
+    console.log("5. raw resp from updateSubtask:", resp);
+    console.log("   resp?.subtask:", resp?.subtask);
+    console.log("   resp?.data:", resp?.data);
+    console.log("   resp?.id:", resp?.id);
+    console.log("   resp?.status:", resp?.status);
+    console.log("   typeof resp:", typeof resp);
+    console.log("   resp instanceof Response:", resp instanceof Response);
+
+    const updated = resp?.subtask || resp?.data || resp || {};
+    console.log("6. resolved `updated` object:", updated);
+    console.log("   updated.status:", updated?.status);
+    console.log("   updated.createdBy:", updated?.createdBy);
+
+    setLocalSubtasks((prev) => prev.map((s) => {
+      if (String(s?.id) !== String(subtaskId)) return s;
+      const next = { ...s, ...updated, isPending: false };
+      console.log("7. new subtask state:", next);
+      return next;
+    }));
+
+  } catch (err) {
+    console.error("5. CAUGHT ERROR in handleToggleSubtask:", err);
+    console.error("   err.message:", err?.message);
+    console.error("   err.status:", err?.status);
+    console.error("   err.code:", err?.code);
+    console.error("   full err object:", JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err))));
+    setSubtaskError(err?.message || "Failed to update subtask");
+    setLocalSubtasks(previousSubtasks);
+  } finally {
+    setSubtaskPendingIds((prev) => { const next = { ...prev }; delete next[subtaskId]; return next; });
+    console.groupEnd();
+  }
+};
 
   const renderMemberRow = (member, index) => {
     const resolvedMemberId = getMemberId(member);
@@ -1814,7 +1841,6 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                       <li
                         key={st.id || `${idx}-${st.title || st}` }
                         className={`tdm-subtask-row${isCompleted ? " is-complete" : ""}`}
-                        onClick={() => handleToggleSubtask(st)}
                       >
                         <div className="tdm-subtask-left">
                           <input
@@ -1822,6 +1848,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                             className="tdm-subtask-checkbox"
                             checked={isCompleted}
                             onChange={(e) => { e.stopPropagation(); handleToggleSubtask(st, e); }}
+                            onClick={(e) => e.stopPropagation()}
                             aria-label={`Mark ${st.title || 'subtask'} completed`}
                           />
                         </div>
@@ -1830,7 +1857,9 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                           <div className="tdm-subtask-title-row">
                             <span className="tdm-subtask-index">{idx + 1}.</span>
                             <div className="tdm-subtask-title">{st.title || String(st)}</div>
-                            <button
+                          </div>
+
+                          <button
                               type="button"
                               className="tdm-subtask-delete-btn"
                               onClick={(e) => { e.stopPropagation(); handleDeleteSubtask(st); }}
@@ -1842,8 +1871,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
 
                             </button>
-                          </div>
-                          {isPending && <div className="tdm-subtask-pending">Saving...</div>}
+                    
                           <div className="tdm-subtask-meta">
                             <span className="tdm-subtask-created-label">Created by: </span>
                             <span className="tdm-subtask-created-by">{createdByLabelName}</span>

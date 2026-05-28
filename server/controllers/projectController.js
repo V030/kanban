@@ -1861,6 +1861,20 @@ export async function deleteTask(req, res) {
 }
 
 export async function updateSubtask(req, res) {
+  console.log("[updateSubtask] RAW BODY:", JSON.stringify(req.body));
+  console.log("[updateSubtask] content-type:", req.headers["content-type"]);
+  console.log("[updateSubtask] params:", req.params);
+
+  console.log("[updateSubtask controller] HIT", {
+    userId: req.user?.userId,
+    taskId: req.params?.taskId,
+    subtaskId: req.params?.subtaskId,
+    body: req.body,
+    headers: {
+      "content-type": req.headers["content-type"],
+      "authorization": req.headers["authorization"] ? "present" : "missing",
+    },
+  });
   if (!req.user?.userId) {
     return res.status(401).json({ message: "Authentication required" });
   }
@@ -1917,7 +1931,7 @@ export async function updateSubtask(req, res) {
       console.error("Subtask update realtime broadcast error:", broadcastError);
     }
 
-    return res.status(200).json(updated);
+    return res.status(200).json({ subtask: updated });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_SUBTASK" || error?.code === "INVALID_STATUS") {
       console.warn("updateSubtask validation error:", { code: error.code, message: error.message });

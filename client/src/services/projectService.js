@@ -281,10 +281,27 @@ export async function updateSubtask(taskId, subtaskId, payload) {
   if (!taskId) throw new Error("Unable to update subtask. Please select a task.");
   if (!subtaskId) throw new Error("Please select a subtask.");
 
-  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/subtasks/${subtaskId}`, {
+  console.log("[updateSubtask service] sending PATCH", {
+    url: `${API_URL}/auth/project/tasks/${taskId}/subtasks/${subtaskId}`,
+    payload,
+    payloadJSON: JSON.stringify(payload || {}),
+  });
+
+  const result = await fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/subtasks/${subtaskId}`, {
     method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload || {}),
   });
+
+  console.log("[updateSubtask service] fetchWithAuth returned", {
+    type: typeof result,
+    isResponse: result instanceof Response,
+    status: result?.status,
+    ok: result?.ok,
+    value: result,
+  });
+
+  return result;
 }
 
 export async function deleteSubtask(taskId, subtaskId) {

@@ -338,7 +338,7 @@ export default function TaskDetailsPage() {
   if (!task) {
     if (taskLoading) {
       return (
-        <div className="page-shell tdm-page-container">
+        <div className="page-shell tdm-page-container" role="main">
           <div className="tdm-section-card">
             <>
               <SkeletonBox width="200px" height="24px" />
@@ -403,3 +403,4 @@ export default function TaskDetailsPage() {
     </div>
   );
 }
+

@@ -238,7 +238,10 @@ export function RemoveMemberIcon({ className = "", size = 24 }) {
 export function TrashIcon({ className = "", size = 24 }) {
   return (
     <IconShell className={className} size={size}>
-      <path d="M9 3.5A1.5 1.5 0 0 1 10.5 2h3A1.5 1.5 0 0 1 15 3.5V4h4v2H5V4h4v-.5ZM6.5 7h11l-.9 13a1.5 1.5 0 0 1-1.5 1.4H8.9a1.5 1.5 0 0 1-1.5-1.4L6.5 7Zm3 2v8h2V9h-2Zm5 0v8h2V9h-2Z" />
+      <path 
+        d="M9 3h6v2h5v2H4V5h5V3zm2 6h2v8h-2V9zm-4 0h2v8H7V9zm8 0h2v8h-2V9zM6 7h12v12H6V7z" 
+        fill="currentColor" 
+      />
     </IconShell>
   );
 }
