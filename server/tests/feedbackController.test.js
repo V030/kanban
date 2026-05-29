@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getUserSummaryMock, sendFeedbackEmailMock } = vi.hoisted(() => ({
-  getUserSummaryMock: vi.fn(),
+const { sendFeedbackEmailMock } = vi.hoisted(() => ({
   sendFeedbackEmailMock: vi.fn(),
-}));
-
-vi.mock("../models/notificationModel.js", () => ({
-  getUserSummary: getUserSummaryMock,
 }));
 
 vi.mock("../utils/mailer.js", () => ({
@@ -89,13 +84,6 @@ describe("feedbackController.submitFeedback", () => {
   });
 
   it("sends feedback email for a valid payload", async () => {
-    getUserSummaryMock.mockResolvedValueOnce({
-      id: "user-1",
-      firstName: "Maya",
-      lastName: "Lee",
-      email: "user@example.com",
-      displayName: "Maya Lee",
-    });
     sendFeedbackEmailMock.mockResolvedValueOnce({ messageId: "message-1" });
 
     const req = {
@@ -107,14 +95,13 @@ describe("feedbackController.submitFeedback", () => {
         os: "Windows",
         route: "/main-page/feedback",
       },
-      user: { userId: "user-1", email: "user@example.com" },
+      user: { userId: "user-1", email: "user@example.com", name: "Maya Lee" },
       headers: { "user-agent": "Mozilla/5.0" },
     };
     const res = createMockRes();
 
     await submitFeedback(req, res);
 
-    expect(getUserSummaryMock).toHaveBeenCalledWith("user-1");
     expect(sendFeedbackEmailMock).toHaveBeenCalledWith({
       to: "admin@example.com",
       feedback: expect.objectContaining({
@@ -131,13 +118,6 @@ describe("feedbackController.submitFeedback", () => {
   });
 
   it("returns 500 when the email transport fails", async () => {
-    getUserSummaryMock.mockResolvedValueOnce({
-      id: "user-1",
-      firstName: "Maya",
-      lastName: "Lee",
-      email: "user@example.com",
-      displayName: "Maya Lee",
-    });
     sendFeedbackEmailMock.mockRejectedValueOnce(new Error("SMTP offline"));
 
     const req = {

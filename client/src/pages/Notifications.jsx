@@ -22,7 +22,7 @@ const notificationTypeMeta = {
     task_unassigned: { category: "Tasks", title: "Task unassigned", tone: "warning" },
     task_status_changed: { category: "Tasks", title: "Task status updated", tone: "info" },
     review_approved: { category: "Reviews", title: "Review approved", tone: "success" },
-    review_rejected: { category: "Reviews", title: "Review rejected", tone: "warning" },
+    review_rejected: { category: "Reviews", title: "Review rejected", tone: "error" },
     task_comment: { category: "Tasks", title: "New task comment", tone: "neutral" },
     task_comment_reply: { category: "Tasks", title: "New comment reply", tone: "neutral" },
     friend_request: { category: "Network", title: "New friend request", tone: "warning" },

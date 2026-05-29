@@ -77,7 +77,7 @@ function LoginForm() {
         <input
           id="login-email"
           type="email"
-          placeholder="name@company.com"
+          placeholder="your_email@email.com"
           value={email}
           className={emailError ? 'is-invalid' : ''}
           onChange={(e) => { setEmail(e.target.value); setEmailError(''); setFormError(''); }}

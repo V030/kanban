@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getCurrentUser } from "../../services/authService";
 import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask } from "../../services/projectService";
@@ -971,13 +971,13 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
     if (!isAdminOrOwner && currentUserRole !== "manager") {
       // Rule 0: TODO and In Progress cannot move directly to Done
       if (movingToDone && (isFromTodo || isFromInProgress)) {
-        setTaskCategoryError("Members cannot move tasks directly to Done. Tasks must be reviewed first.");
+        setTaskCategoryError("Tasks must be reviewed first.");
         return;
       }
 
       // Rule 1: Cannot move FROM in_progress TO done
       if (isFromInProgress && movingToDone) {
-        setTaskCategoryError("Members cannot move tasks directly from In Progress to Done. Tasks must be reviewed first.");
+        setTaskCategoryError("Tasks must be reviewed first.");
         return;
       }
 

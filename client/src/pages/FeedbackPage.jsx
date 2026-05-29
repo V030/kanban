@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useToast } from "../hooks/useToast";
-import { getCurrentUser } from "../services/authService";
 import { submitFeedback } from "../services/feedbackService";
 import { SendIcon, RefreshIcon } from "../components/common/AppIcons";
 import "../components/styles/WorkspacePages.css";
@@ -18,10 +17,21 @@ const CATEGORY_OPTIONS = [
 const SUBJECT_MAX_LENGTH = 120;
 const MESSAGE_MIN_LENGTH = 40;
 const MESSAGE_MAX_LENGTH = 2000;
+const SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024;
+const NULL_CHARACTER_PATTERN = new RegExp(String.fromCharCode(0), "g");
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Failed to read screenshot"));
+    reader.readAsDataURL(file);
+  });
+}
 
 function sanitizeSingleLine(value) {
   return String(value || "")
-    .replace(/\u0000/g, "")
+    .replace(NULL_CHARACTER_PATTERN, "")
     .replace(/[\r\n]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -29,7 +39,7 @@ function sanitizeSingleLine(value) {
 
 function sanitizeMessage(value) {
   return String(value || "")
-    .replace(/\u0000/g, "")
+    .replace(NULL_CHARACTER_PATTERN, "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n");
 }
@@ -52,12 +62,13 @@ function buildMetadata() {
 
 function FeedbackPage() {
   const toast = useToast();
-  const user = useMemo(() => getCurrentUser(), []);
   const metadata = useMemo(() => buildMetadata(), []);
+  const screenshotInputRef = useRef(null);
 
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState("");
   const [message, setMessage] = useState("");
+  const [screenshot, setScreenshot] = useState(null);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [formError, setFormError] = useState("");
@@ -91,6 +102,44 @@ function FeedbackPage() {
     setSuccessMessage("");
     setFormError("");
     setFieldErrors((current) => ({ ...current, message: "" }));
+  };
+
+  const handleScreenshotChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.showValidationError("Please choose an image file.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > SCREENSHOT_MAX_BYTES) {
+      toast.showValidationError("Screenshot must be 5MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setScreenshot({
+        dataUrl,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      });
+      setSuccessMessage("");
+      setFormError("");
+    } catch (error) {
+      toast.showError(error?.message || "Failed to attach screenshot.");
+    }
+  };
+
+  const clearScreenshot = () => {
+    setScreenshot(null);
+    if (screenshotInputRef.current) {
+      screenshotInputRef.current.value = "";
+    }
   };
 
   const validateForm = () => {
@@ -147,12 +196,14 @@ function FeedbackPage() {
         os: metadata.os,
         route: metadata.route,
         metadata,
+        screenshot,
       });
 
       setSuccessMessage("Your feedback has been sent. Thank you for helping improve the app.");
       setSubject("");
       setCategory("");
       setMessage("");
+      clearScreenshot();
       setFieldErrors({ subject: "", category: "", message: "" });
       toast.showSuccess("Feedback sent successfully!");
     } catch (error) {
@@ -276,6 +327,7 @@ function FeedbackPage() {
                 setSubject("");
                 setCategory("");
                 setMessage("");
+                clearScreenshot();
                 setFormError("");
                 setSuccessMessage("");
                 setFieldErrors({ subject: "", category: "", message: "" });
@@ -289,37 +341,38 @@ function FeedbackPage() {
         </form>
 
         <aside className="feedback-aside">
-          <section className="feedback-card">
-            <h3>Optional metadata</h3>
-            <p>The backend attaches context automatically so the email includes the submitting user, browser, OS, and current route.</p>
-            <dl className="feedback-meta-list">
-              <div>
-                <dt>User</dt>
-                <dd>{[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "Current signed-in user"}</dd>
-              </div>
-              <div>
-                <dt>Browser</dt>
-                <dd>{metadata.browser ? "Auto-attached" : "Unavailable in this session"}</dd>
-              </div>
-              <div>
-                <dt>System</dt>
-                <dd>{metadata.os ? metadata.os : "Unavailable in this session"}</dd>
-              </div>
-              <div>
-                <dt>Current route</dt>
-                <dd>{metadata.route || "/main-page/feedback"}</dd>
-              </div>
-            </dl>
-          </section>
-
           <section className="feedback-card feedback-upload-card">
-            <h3>Screenshot placeholder</h3>
-            <p>
-              A screenshot upload flow can be added later without changing the current email-only backend contract.
-            </p>
-            <button type="button" className="btn btn-ghost" disabled>
-              Upload screenshot later
-            </button>
+            <h3>Screenshot</h3>
+            <p>Attach an image if it helps explain the issue. It will be sent with the feedback email.</p>
+            <input
+              ref={screenshotInputRef}
+              id="feedback-screenshot"
+              type="file"
+              accept="image/*"
+              className="feedback-screenshot-input"
+              onChange={handleScreenshotChange}
+              disabled={loading}
+            />
+            {screenshot ? (
+              <div className="feedback-screenshot-preview">
+                <img src={screenshot.dataUrl} alt="Selected feedback screenshot" />
+                <div className="feedback-screenshot-meta">
+                  <span>{screenshot.name}</span>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={clearScreenshot} disabled={loading}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => screenshotInputRef.current?.click()}
+                disabled={loading}
+              >
+                Upload screenshot
+              </button>
+            )}
           </section>
 
           <section className="feedback-card feedback-guidelines-card">

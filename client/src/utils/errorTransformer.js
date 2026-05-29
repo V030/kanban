@@ -105,6 +105,8 @@ const ERROR_MESSAGE_MAP = {
   'feedback message must be at least': 'Please write a more detailed feedback message.',
   'feedback message must be': 'Your feedback message is too long.',
   'too many feedback submissions. please try again later': 'You are sending feedback too quickly. Please wait a moment and try again.',
+  'feedback email service rejected the smtp credentials': 'Gmail rejected the feedback email credentials. Check SMTP_USER and SMTP_PASS.',
+  'feedback email service could not connect to gmail smtp': 'The server could not connect to Gmail SMTP. Check SMTP_HOST, SMTP_PORT, and network access.',
   'feedback email service is not configured': 'Feedback email service is not available right now.',
 
   // Tag errors

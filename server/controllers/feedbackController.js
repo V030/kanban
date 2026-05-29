@@ -1,4 +1,3 @@
-import { getUserSummary } from "../models/notificationModel.js";
 import { sendFeedbackEmail } from "../utils/mailer.js";
 
 const ALLOWED_CATEGORIES = new Set([
@@ -13,6 +12,7 @@ const ALLOWED_CATEGORIES = new Set([
 const SUBJECT_MAX_LENGTH = 120;
 const MESSAGE_MIN_LENGTH = 40;
 const MESSAGE_MAX_LENGTH = 2000;
+const SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024;
 
 function normalizeText(value) {
   return String(value ?? "")
@@ -46,6 +46,53 @@ function getRequestMetadata(req) {
   };
 }
 
+function normalizeScreenshot(value) {
+  if (!isPlainObject(value)) return null;
+
+  const dataUrl = normalizeText(value.dataUrl);
+  const name = normalizeSingleLine(value.name || "feedback-screenshot");
+  const type = normalizeSingleLine(value.type || "");
+  const size = Number(value.size || 0);
+
+  if (!dataUrl) return null;
+
+  if (!type.startsWith("image/")) {
+    const error = new Error("Screenshot must be an image");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Number.isFinite(size) || size <= 0 || size > SCREENSHOT_MAX_BYTES) {
+    const error = new Error("Screenshot must be 5MB or smaller");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(dataUrl)) {
+    const error = new Error("Invalid screenshot payload");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return { dataUrl, name, type, size };
+}
+
+function getFeedbackEmailErrorMessage(error) {
+  if (error?.message === "Email transport is not configured" || error?.message === "Feedback email destination is not configured") {
+    return "Feedback email service is not configured";
+  }
+
+  if (error?.code === "EAUTH" || error?.responseCode === 535) {
+    return "Feedback email service rejected the SMTP credentials. Check SMTP_USER and SMTP_PASS.";
+  }
+
+  if (["ECONNECTION", "ETIMEDOUT", "ECONNREFUSED", "ESOCKET"].includes(error?.code)) {
+    return "Feedback email service could not connect to Gmail SMTP. Check SMTP_HOST, SMTP_PORT, and network access.";
+  }
+
+  return "Unable to send feedback right now. Please try again later.";
+}
+
 export async function submitFeedback(req, res) {
   const userId = req.user?.userId;
   const userEmail = normalizeSingleLine(req.user?.email);
@@ -61,6 +108,13 @@ export async function submitFeedback(req, res) {
   const subject = normalizeSingleLine(req.body.subject);
   const category = normalizeSingleLine(req.body.category);
   const message = normalizeText(req.body.message);
+  let screenshot = null;
+
+  try {
+    screenshot = normalizeScreenshot(req.body.screenshot);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ message: error.message || "Invalid screenshot payload" });
+  }
 
   if (!subject) {
     return res.status(400).json({ message: "Subject is required" });
@@ -95,8 +149,6 @@ export async function submitFeedback(req, res) {
   }
 
   try {
-    const user = await getUserSummary(userId);
-
     const metadata = getRequestMetadata(req);
     const timestamp = new Date().toISOString();
 
@@ -104,8 +156,8 @@ export async function submitFeedback(req, res) {
       to: process.env.FEEDBACK_RECEIVER_EMAIL,
       feedback: {
         userId,
-        userEmail: userEmail || user?.email || "",
-        userName: user?.displayName || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || userEmail || "",
+        userEmail,
+        userName: req.user?.name || req.user?.displayName || userEmail || "",
         subject,
         category,
         message,
@@ -113,6 +165,7 @@ export async function submitFeedback(req, res) {
         os: metadata.os,
         route: metadata.route,
         timestamp,
+        screenshot,
       },
     });
 
@@ -122,10 +175,6 @@ export async function submitFeedback(req, res) {
   } catch (error) {
     console.error("Feedback submission error:", error);
 
-    if (error?.message === "Email transport is not configured" || error?.message === "Feedback email destination is not configured") {
-      return res.status(500).json({ message: "Feedback email service is not configured" });
-    }
-
-    return res.status(500).json({ message: "Unable to send feedback right now. Please try again later." });
+    return res.status(500).json({ message: getFeedbackEmailErrorMessage(error) });
   }
 }

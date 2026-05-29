@@ -137,6 +137,7 @@ export default function useInfiniteList(
     didInitRef.current = false;
     cursorRef.current = null;
     hasMoreRef.current = true;
+    statusRef.current = "idle";
     setStatus("idle");
     setItems([]);
     setError(null);
@@ -161,12 +162,38 @@ export default function useInfiniteList(
     });
   }, []);
 
+  const updateItem = useCallback((id, patch = {}) => {
+    if (!id) return;
+
+    setItems(prev => {
+      const next = prev.map(item => (
+        item?.id === id ? { ...item, ...patch } : item
+      ));
+      itemsRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const updateItems = useCallback((updates = []) => {
+    if (!updates.length) return;
+
+    setItems(prev => {
+      const updatesById = new Map(updates.filter(item => item?.id).map(item => [item.id, item]));
+      const next = prev.map(item => (
+        updatesById.has(item?.id) ? { ...item, ...updatesById.get(item.id) } : item
+      ));
+      itemsRef.current = next;
+      return next;
+    });
+  }, []);
+
   // -------------------------
   // OBSERVER (ONLY 1 LIFECYCLE)
   // -------------------------
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
+    if (typeof IntersectionObserver === "undefined") return;
 
     // disconnect any existing observer before attaching a new one
     if (observerRef.current) {
@@ -210,8 +237,11 @@ export default function useInfiniteList(
     reset,
 
     prependItems,
+    updateItem,
+    updateItems,
 
     hasMore: hasMoreRef.current,
+    loading: status === "loading",
     isLoading: status === "loading",
     isLoadingMore: status === "loadingMore",
   };

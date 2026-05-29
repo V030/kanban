@@ -230,7 +230,7 @@ export function BrowseProjectsIcon({ className = "", size = 20 }) {
 export function RemoveMemberIcon({ className = "", size = 24 }) {
   return (
     <IconShell className={className} size={size}>
-      <path d="M8 11.5A3.5 3.5 0 1 0 8 4.5a3.5 3.5 0 0 0 0 7ZM2.5 18.5A5.5 5.5 0 0 1 8 13h.1c1.58 0 3.01.61 4.08 1.6A5.5 5.5 0 0 1 17 13h.1A5 5 0 0 1 22 18v.5a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1v-.5Zm13-8.5h6v2h-6v-2Z" />
+      <path d="M9 11.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2.5 19a6.5 6.5 0 0 1 13 0 1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Zm14.3-7.7a1 1 0 0 1 1.4 0l1.3 1.29 1.3-1.29a1 1 0 1 1 1.4 1.42L20.92 14l1.29 1.3a1 1 0 0 1-1.42 1.4l-1.29-1.28-1.3 1.29a1 1 0 0 1-1.4-1.42L18.08 14l-1.29-1.3a1 1 0 0 1 0-1.4Z" />
     </IconShell>
   );
 }
@@ -257,7 +257,7 @@ export function DeleteWarningIcon({ className = "", size = 24 }) {
 export function ReviewApprovedIcon({ className = "", size = 24 }) {
   return (
     <IconShell className={className} size={size}>
-      <path d="M12 4.5c3.93 0 7.1 3.17 7.1 7.1s-3.17 7.1-7.1 7.1-7.1-3.17-7.1-7.1 3.17-7.1 7.1-7.1Zm-1.1 8.2 5.1-5.1-1.4-1.4-3.7 3.7-1.8-1.8-1.4 1.4 3.3 3.2Z" />
+      <path d="M12 4.5c3.93 0 7.1 3.17 7.1 7.1s-3.17 7.1-7.1 7.1-7.1-3.17-7.1-7.1 3.17-7.1 7.1-7.1Zm-1.2 9.7 5.4-5.4-1.4-1.4-4 4-1.8-1.8-1.4 1.4 3.2 3.2Z" />
     </IconShell>
   );
 }
@@ -265,7 +265,7 @@ export function ReviewApprovedIcon({ className = "", size = 24 }) {
 export function ReviewRejectedIcon({ className = "", size = 24 }) {
   return (
     <IconShell className={className} size={size}>
-      <path d="M12 4.5c3.93 0 7.1 3.17 7.1 7.1s-3.17 7.1-7.1 7.1-7.1-3.17-7.1-7.1 3.17-7.1 7.1-7.1Zm-2.8 4.3 1.4-1.4L12 10.2l1.4-2.8 1.4 1.4-1.8 2.8 1.8 2.8-1.4 1.4-1.4-2.8-1.4 2.8-1.4-1.4 1.8-2.8-1.8-2.8Z" />
+      <path d="M12 4.5c3.93 0 7.1 3.17 7.1 7.1s-3.17 7.1-7.1 7.1-7.1-3.17-7.1-7.1 3.17-7.1 7.1-7.1Zm-3.3 4.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4-2.7-2.7 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4Z" />
     </IconShell>
   );
 }
@@ -363,6 +363,10 @@ export function NotificationReviewIcon({ className = "", size = 20 }) {
   return <ReviewApprovedIcon className={className} size={size} />;
 }
 
+export function NotificationReviewRejectedIcon({ className = "", size = 20 }) {
+  return <ReviewRejectedIcon className={className} size={size} />;
+}
+
 export function NotificationNetworkIcon({ className = "", size = 20 }) {
   return <TeamIcon className={className} size={size} />;
 }
@@ -380,6 +384,10 @@ export function NotificationIcon({ type = "", className = "", size = 20 }) {
 
   if (normalizedType.startsWith("project_")) {
     return <NotificationProjectIcon className={className} size={size} />;
+  }
+
+  if (normalizedType === "review_rejected") {
+    return <NotificationReviewRejectedIcon className={className} size={size} />;
   }
 
   if (normalizedType.startsWith("review_")) {

@@ -125,13 +125,14 @@ export default function ProjectInvitesModal({ isOpen, onClose }) {
                   <div className="invite-main">
                     <div className="friend-initials large">{`${(inv.senderFirstName || "").charAt(0)}${(inv.senderLastName || "").charAt(0)}`.toUpperCase()}</div>
                     <div>
+                      <p className="invite-sender">Project:</p>
                       <div className="invite-project-name">{inv.projectName}</div>
-                      <div className="invite-sender">Invited by {`${inv.senderFirstName || ""} ${inv.senderLastName || ""}`.trim() || inv.senderEmail}</div>
+                      <div className="invite-sender">Invited by <b>{`${inv.senderFirstName || ""} ${inv.senderLastName || ""}`.trim() || inv.senderEmail}</b></div>
+                      <div className="invite-date">On: {new Date(inv.requestedAt).toLocaleString()}</div>
                     </div>
                   </div>
 
                   <div className="invite-actions">
-                    <div className="invite-date">{new Date(inv.requestedAt).toLocaleString()}</div>
                     <button
                       className="accept-btn"
                       type="button"

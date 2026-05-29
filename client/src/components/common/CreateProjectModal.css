@@ -334,9 +334,9 @@
 }
 
 .accept-btn {
-  border: 1px solid #1a6a4b;
-  border-radius: var(--radius-md);
-  background: #1f7a56;
+  border: 0px solid #1a6a4b;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
   color: #ffffff;
   font-size: var(--text-sm);
   font-weight: 700;
@@ -350,13 +350,13 @@
 }
 
 .accept-btn:hover {
-  background: #186d4a;
+  background: var(--color-primary-hover);
   filter: brightness(0.95);
 }
 
 .decline-btn {
   border: 1px solid #efcaca;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: #fff8f8;
   color: var(--color-danger);
   font-size: var(--text-sm);
@@ -376,7 +376,8 @@
 
 .invite-date {
   color: var(--color-text-tertiary);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
+  margin-top: 5px;
 }
 
 .friend-add-btn {

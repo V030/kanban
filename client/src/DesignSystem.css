@@ -119,6 +119,40 @@
    ──────────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 80, 107, 0.161) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+  margin-left: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+    margin-left: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(56, 80, 107, 0.36);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(56, 80, 107, 0.52);
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 html,

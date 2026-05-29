@@ -26,11 +26,36 @@ function sanitizeBodyText(value) {
     .trim();
 }
 
+function buildImageAttachment(screenshot) {
+  if (!screenshot?.dataUrl) return null;
+
+  const match = String(screenshot.dataUrl).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return null;
+
+  const contentType = sanitizeHeaderValue(screenshot.type || match[1]);
+  const extension = contentType.split("/")[1]?.replace(/[^a-zA-Z0-9]/g, "") || "png";
+  const baseName = sanitizeHeaderValue(screenshot.name || `feedback-screenshot.${extension}`)
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .slice(0, 120);
+
+  return {
+    filename: baseName || `feedback-screenshot.${extension}`,
+    content: Buffer.from(match[2], "base64"),
+    contentType,
+  };
+}
+
 function getTransporter() {
   const host = String(process.env.SMTP_HOST || "").trim();
   const port = Number.parseInt(process.env.SMTP_PORT || "", 10);
   const user = String(process.env.SMTP_USER || "").trim();
   const pass = String(process.env.SMTP_PASS || "").trim();
+
+   console.log("[mailer] Transporter config check:");
+  console.log(`[mailer]   SMTP_HOST: '${host}'`);
+  console.log(`[mailer]   SMTP_PORT: '${port}'`);
+  console.log(`[mailer]   SMTP_USER: '${user}'`);
+  console.log(`[mailer]   SMTP_PASS (present): ${!!pass}`); // Log presence, not value
 
   if (!host || !Number.isFinite(port) || !user || !pass) {
     return null;
@@ -131,6 +156,7 @@ export async function sendFeedbackEmail({ to, feedback }) {
   const safeOs = sanitizeBodyText(feedback?.os || "");
   const safeRoute = sanitizeBodyText(feedback?.route || "");
   const safeTimestamp = sanitizeBodyText(feedback?.timestamp || new Date().toISOString());
+  const screenshotAttachment = buildImageAttachment(feedback?.screenshot);
 
   const text = [
     `New feedback submission`,
@@ -144,6 +170,7 @@ export async function sendFeedbackEmail({ to, feedback }) {
     safeBrowser ? `Browser: ${safeBrowser}` : null,
     safeOs ? `OS: ${safeOs}` : null,
     safeRoute ? `Current route: ${safeRoute}` : null,
+    screenshotAttachment ? `Screenshot: attached (${screenshotAttachment.filename})` : null,
     ``,
     `Message:`,
     safeMessage || "(empty)",
@@ -162,6 +189,7 @@ export async function sendFeedbackEmail({ to, feedback }) {
         ${safeBrowser ? `<tr><td style="padding:6px 0;color:#6b7280">Browser</td><td style="padding:6px 0">${escapeHtml(safeBrowser)}</td></tr>` : ""}
         ${safeOs ? `<tr><td style="padding:6px 0;color:#6b7280">OS</td><td style="padding:6px 0">${escapeHtml(safeOs)}</td></tr>` : ""}
         ${safeRoute ? `<tr><td style="padding:6px 0;color:#6b7280">Current route</td><td style="padding:6px 0">${escapeHtml(safeRoute)}</td></tr>` : ""}
+        ${screenshotAttachment ? `<tr><td style="padding:6px 0;color:#6b7280">Screenshot</td><td style="padding:6px 0">Attached: ${escapeHtml(screenshotAttachment.filename)}</td></tr>` : ""}
       </table>
       <div style="border:1px solid #dbe3ea;border-radius:12px;padding:16px;background:#f8fbfd">
         <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin-bottom:8px">Message</div>
@@ -178,6 +206,7 @@ export async function sendFeedbackEmail({ to, feedback }) {
       subject: `Feedback: ${safeCategory} - ${safeSubject}`,
       text,
       html,
+      attachments: screenshotAttachment ? [screenshotAttachment] : [],
     });
 
     console.info("[feedback] Email sent", { to: recipient, messageId: info && info.messageId });

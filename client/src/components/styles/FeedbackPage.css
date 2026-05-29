@@ -211,6 +211,40 @@
   gap: 12px;
 }
 
+.feedback-screenshot-input {
+  display: none;
+}
+
+.feedback-screenshot-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.feedback-screenshot-preview img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: rgba(247, 250, 252, 0.72);
+}
+
+.feedback-screenshot-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+}
+
+.feedback-screenshot-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .feedback-guidelines-card ul {
   margin: 12px 0 0;
   padding-left: 18px;

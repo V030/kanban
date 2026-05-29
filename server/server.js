@@ -1,6 +1,8 @@
 import expressPkg from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { pool } from "./config/db.js";
 import { rateLimitTrustProxy } from "./config/rateLimitConfig.js";
 import { generalApiLimiter } from "./middleware/rateLimiter.js";
@@ -8,7 +10,10 @@ import authRoutes from "./routes/authRoutes.js";
 import protectedRoutes from "./routes/protectedRoutes.js"; 
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 const express = expressPkg;
 const app = express();

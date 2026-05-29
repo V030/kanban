@@ -155,23 +155,6 @@ function Profile() {
         setEditFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleProfileImageChange = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (!file.type.startsWith("image/")) {
-            toast.showValidationError("Please select a valid image file");
-            return;
-        }
-
-        try {
-            const base64 = await toBase64(file);
-            setEditFormData((prev) => ({ ...prev, profileImageBase64: base64 }));
-        } catch (error) {
-            toast.showError(error?.message || "Failed to process selected image");
-        }
-    };
-
     const handlePasswordInputChange = (e) => {
         const { name, value } = e.target;
         setPasswordFormData((prev) => ({ ...prev, [name]: value }));
@@ -227,16 +210,11 @@ function Profile() {
                         </div>
 
                         <div>
-                            <p className="profile-hero-eyebrow">Account Center</p>
                             <h1 className="page-title">Account Settings</h1>
                             <p className="page-subtitle">Manage your profile details, password, and communication preferences.</p>
                         </div>
                     </div>
 
-                    <div className="profile-hero-meta" aria-hidden="true">
-                        <div className="profile-hero-chip">Secure workspace</div>
-                        <div className="profile-hero-chip">Member profile</div>
-                    </div>
                 </div>
 
                 <nav className="profile-tabs">
@@ -249,12 +227,14 @@ function Profile() {
                     <button
                         className={`profile-tab ${activeTab === "notifications" ? "active" : ""}`}
                         onClick={() => setActiveTab("notifications")}
+                        disabled
                     >
                         Notifications
                     </button>
                     <button
                         className={`profile-tab ${activeTab === "privacy" ? "active" : ""}`}
                         onClick={() => setActiveTab("privacy")}
+                        disabled
                     >
                         Privacy
                     </button>
@@ -262,23 +242,57 @@ function Profile() {
             </header>
 
             {activeTab === "account" && (
-                <div className="profile-content">
-                    <div className="profile-photo-section">
-                        <div className="section-title">PROFILE PHOTO</div>
-                        <div className="photo-preview">
-                            {accountImageSource && !imageError ? (
-                                <img
-                                    src={accountImageSource}
-                                    alt={fullName}
-                                    className="preview-img"
-                                    onError={() => setImageError(true)}
-                                />
-                            ) : (
-                                <div className="preview-placeholder">{initials}</div>
-                            )}
-                        </div>
-                        <div className="photo-size-hint">JPG, PNG or GIF. 1MB max.</div>
-                        <div className="photo-actions">
+                <div className="profile-content profile-account-layout">
+                    <section className="profile-settings-card">
+                        <div className="section-title">PERSONAL DETAILS</div>
+                        <form onSubmit={handleProfileUpdate} className="profile-form profile-settings-form">
+                            <div className="profile-inline-photo">
+                                {accountImageSource && !imageError ? (
+                                    <img
+                                        src={accountImageSource}
+                                        alt={fullName}
+                                        className="profile-inline-avatar"
+                                        onError={() => setImageError(true)}
+                                    />
+                                ) : (
+                                    <div className="profile-inline-avatar">{initials}</div>
+                                )}
+
+                                <div className="profile-photo-copy">
+                                    <div className="profile-photo-name">{fullName}</div>
+                                    <div className="profile-photo-actions">
+                                        <button
+                                            type="button"
+                                            className="profile-photo-link"
+                                            onClick={() => avatarInputRef.current?.click()}
+                                            disabled={loading}
+                                        >
+                                            Change
+                                        </button>
+                                        <span aria-hidden="true">|</span>
+                                        <button
+                                            type="button"
+                                            className="profile-photo-link profile-photo-link-danger"
+                                            onClick={async () => {
+                                                setLoading(true);
+                                                try {
+                                                    await updateProfile(undefined, undefined, undefined, "");
+                                                    setEditFormData((prev) => ({ ...prev, profileImageBase64: "" }));
+                                                    toast.showSuccess("Profile picture removed");
+                                                } catch (error) {
+                                                    toast.showError("Failed to remove profile picture");
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                            disabled={loading || !accountImageSource}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
                             <input
                                 ref={avatarInputRef}
                                 type="file"
@@ -286,39 +300,7 @@ function Profile() {
                                 className="profile-avatar-upload-input"
                                 onChange={handleAvatarUpload}
                             />
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => avatarInputRef.current?.click()}
-                                disabled={loading}
-                            >
-                                Change Photo
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-text-danger"
-                                onClick={async () => {
-                                    setLoading(true);
-                                    try {
-                                        await updateProfile(undefined, undefined, undefined, "");
-                                        setEditFormData((prev) => ({ ...prev, profileImageBase64: "" }));
-                                        toast.showSuccess("Profile picture removed");
-                                    } catch (error) {
-                                        toast.showError("Failed to remove profile picture");
-                                    } finally {
-                                        setLoading(false);
-                                    }
-                                }}
-                                disabled={loading || !accountImageSource}
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    </div>
 
-                    <div className="profile-details-section">
-                        <div className="section-title">PERSONAL DETAILS</div>
-                        <form onSubmit={handleProfileUpdate} className="profile-form">
                             <div className="form-row">
                                 <div className="form-group">
                                     <label htmlFor="firstName">First Name</label>
@@ -327,7 +309,7 @@ function Profile() {
                                         id="firstName"
                                         name="firstName"
                                         value={editFormData.firstName}
-                                        onChange={(e) => setEditFormData((prev) => ({ ...prev, firstName: e.target.value }))}
+                                        onChange={handleEditInputChange}
                                         disabled={loading}
                                         required
                                     />
@@ -339,7 +321,7 @@ function Profile() {
                                         id="lastName"
                                         name="lastName"
                                         value={editFormData.lastName}
-                                        onChange={(e) => setEditFormData((prev) => ({ ...prev, lastName: e.target.value }))}
+                                        onChange={handleEditInputChange}
                                         disabled={loading}
                                         required
                                     />
@@ -353,7 +335,7 @@ function Profile() {
                                     id="email"
                                     name="email"
                                     value={editFormData.email}
-                                    onChange={(e) => setEditFormData((prev) => ({ ...prev, email: e.target.value }))}
+                                    onChange={handleEditInputChange}
                                     disabled={loading}
                                     required
                                 />
@@ -365,7 +347,7 @@ function Profile() {
                                     id="bio"
                                     name="bio"
                                     value={editFormData.bio}
-                                    onChange={(e) => setEditFormData((prev) => ({ ...prev, bio: e.target.value }))}
+                                    onChange={handleEditInputChange}
                                     disabled={loading}
                                     rows={4}
                                     placeholder="Tell us about yourself"
@@ -373,17 +355,30 @@ function Profile() {
                             </div>
 
                             <div className="form-actions">
-                                <button type="button" className="btn btn-secondary" disabled={loading}>Cancel</button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    disabled={loading}
+                                    onClick={() => setEditFormData({
+                                        firstName: user?.firstName || "",
+                                        lastName: user?.lastName || "",
+                                        email: user?.email || "",
+                                        profileImageBase64: user?.profileImageBase64 || "",
+                                        bio: user?.bio || "",
+                                    })}
+                                >
+                                    Cancel
+                                </button>
                                 <button type="submit" className="btn btn-primary" disabled={loading}>
                                     {loading ? "Saving..." : "Save Changes"}
                                 </button>
                             </div>
                         </form>
-                    </div>
+                    </section>
 
-                    <div className="profile-details-section full-width">
+                    <section className="profile-settings-card">
                         <div className="section-title">CHANGE PASSWORD</div>
-                        <form onSubmit={handlePasswordChange} className="profile-form">
+                        <form onSubmit={handlePasswordChange} className="profile-form profile-settings-form profile-password-form">
                             <div className="form-group">
                                 <label htmlFor="currentPassword">Current Password</label>
                                 <input
@@ -391,7 +386,7 @@ function Profile() {
                                     id="currentPassword"
                                     name="currentPassword"
                                     value={passwordFormData.currentPassword}
-                                    onChange={(e) => setPasswordFormData((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                                    onChange={handlePasswordInputChange}
                                     placeholder="Enter your current password"
                                     disabled={loading}
                                     required
@@ -405,7 +400,7 @@ function Profile() {
                                     id="newPassword"
                                     name="newPassword"
                                     value={passwordFormData.newPassword}
-                                    onChange={(e) => setPasswordFormData((prev) => ({ ...prev, newPassword: e.target.value }))}
+                                    onChange={handlePasswordInputChange}
                                     placeholder="Enter new password (min. 6 characters)"
                                     disabled={loading}
                                     required
@@ -419,7 +414,7 @@ function Profile() {
                                     id="confirmPassword"
                                     name="confirmPassword"
                                     value={passwordFormData.confirmPassword}
-                                    onChange={(e) => setPasswordFormData((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                                    onChange={handlePasswordInputChange}
                                     placeholder="Re-enter new password"
                                     disabled={loading}
                                     required
@@ -427,19 +422,26 @@ function Profile() {
                             </div>
 
                             <div className="form-actions">
-                                <button type="button" className="btn btn-secondary" disabled={loading}>Cancel</button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    disabled={loading}
+                                    onClick={() => setPasswordFormData({ currentPassword: "", newPassword: "", confirmPassword: "" })}
+                                >
+                                    Cancel
+                                </button>
                                 <button type="submit" className="btn btn-primary" disabled={loading}>
                                     {loading ? "Updating..." : "Update Password"}
                                 </button>
                             </div>
                         </form>
-                    </div>
+                    </section>
                 </div>
             )}
 
             {activeTab === "notifications" && (
-                <div className="profile-content">
-                    <div className="profile-details-section full-width">
+                <div className="profile-content profile-secondary-layout">
+                    <div className="profile-details-section full-width profile-secondary-card">
                         <div className="section-title">NOTIFICATIONS</div>
                         <p>Notification settings coming soon...</p>
                     </div>
@@ -447,8 +449,8 @@ function Profile() {
             )}
 
             {activeTab === "privacy" && (
-                <div className="profile-content">
-                    <div className="profile-details-section full-width">
+                <div className="profile-content profile-secondary-layout">
+                    <div className="profile-details-section full-width profile-secondary-card">
                         <div className="section-title">PRIVACY</div>
                         <p>Privacy settings coming soon...</p>
                     </div>

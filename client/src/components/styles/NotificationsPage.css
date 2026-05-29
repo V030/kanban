@@ -141,6 +141,7 @@
 
 .notification-icon-svg {
   display: block;
+  flex-shrink: 0;
 }
 
 .notification-icon-success {
@@ -156,6 +157,11 @@
 .notification-icon-warning {
   background: rgba(245, 158, 11, 0.14);
   color: #d97706;
+}
+
+.notification-icon-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
 }
 
 .notification-icon-neutral {

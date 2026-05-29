@@ -119,7 +119,7 @@ function ForgotPasswordPage() {
                 <input
                   id="forgot-email"
                   type="email"
-                  placeholder="name@company.com"
+                  placeholder="your_email@email.com"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
