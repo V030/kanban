@@ -232,7 +232,7 @@ export default function Breadcrumbs() {
     if (pathname === "/main-page/dashboard") {
       return [
         { label: "Main Page", to: "/main-page/dashboard" },
-        { label: "Dashboard" },
+        { label: "Home" },
       ];
     }
 

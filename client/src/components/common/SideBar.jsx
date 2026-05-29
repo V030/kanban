@@ -7,13 +7,15 @@ import { DashboardIcon, FolderIcon, TeamIcon, TasksIcon, NotificationsIcon, Send
 import "../styles/SideBar.css";
 
 const navItems = [
-    { to: "/main-page/dashboard", label: "Dashboard", icon: <DashboardIcon /> },
+    { to: "/main-page/dashboard", label: "Home", icon: <DashboardIcon /> },
     { to: "/main-page/projects", label: "Projects", icon: <FolderIcon /> },
     { to: "/main-page/friends", label: "Network", icon: <TeamIcon /> },
-    { to: "/main-page/notifications", label: "Notifications", icon: <NotificationsIcon /> },
-    { to: "/main-page/my-tasks", label: "My Tasks", icon: <TasksIcon /> },
+    { to: "/main-page/notifications", label: "Notifs", icon: <NotificationsIcon /> },
+    { to: "/main-page/my-tasks", label: "Tasks", icon: <TasksIcon /> },
     { to: "/main-page/feedback", label: "Feedback", icon: <SendIcon /> },
 ];
+
+const mobileNavItems = navItems.filter((item) => item.to !== "/main-page/feedback");
 
 function getUserFullName(user) {
     if (!user) return "";
@@ -88,7 +90,34 @@ export default function SideBar () {
                 logout();
                 navigate("/login");
         }
+    const emitMobileNavEvent = (item) => {
+        window.dispatchEvent(new CustomEvent("miruban:mobile-nav-select", {
+            detail: {
+                to: item.to,
+                label: item.label,
+            },
+        }));
+    };
+
+    const getNavClass = (item, isActive) => {
+        if (item.to === "/main-page/projects") {
+            const isProjectActive = location.pathname.startsWith("/main-page/projects");
+            return isProjectActive ? "nav-btn active" : "nav-btn";
+        }
+        return isActive ? "nav-btn active" : "nav-btn";
+    };
+
+    const isNavItemActive = (item, isActive) => {
+        if (item.to === "/main-page/projects") {
+            return location.pathname.startsWith("/main-page/projects");
+        }
+        return isActive;
+    };
+
+    const profileImageSrc = normalizeProfileImage(currentUser?.profileImageBase64 || currentUser?.profile_image_base64);
+
     return (
+        <>
         <aside className="sidebar">
             <div className="sidebar-top">
                 <div className="logo-mark" aria-hidden="true">Miru</div>
@@ -105,14 +134,7 @@ export default function SideBar () {
                                     <NavLink
                                         key={item.to}
                                         to={item.to}
-                                        className={({ isActive }) => {
-                                            // Keep Projects highlighted when user opens a project (which navigates to /main-page/projects/:projectId/kanban)
-                                            if (item.to === "/main-page/projects") {
-                                                const isProjectActive = location.pathname.startsWith("/main-page/projects");
-                                                return isProjectActive ? "nav-btn active" : "nav-btn";
-                                            }
-                                            return isActive ? "nav-btn active" : "nav-btn";
-                                        }}
+                                        className={({ isActive }) => getNavClass(item, isActive)}
                                     >
                                         <span className="nav-icon">{item.icon}</span>
                                         <span className="nav-label">
@@ -192,6 +214,63 @@ export default function SideBar () {
 
                         </div>
         </aside>
+
+        <nav className="mobile-bottom-nav" aria-label="Primary mobile navigation">
+            <ul className="mobile-bottom-nav__list">
+                {mobileNavItems.map((item) => (
+                    <li className="mobile-bottom-nav__item" key={item.to}>
+                        <NavLink
+                            to={item.to}
+                            className={({ isActive }) => (
+                                isNavItemActive(item, isActive)
+                                    ? "mobile-bottom-nav__link is-active"
+                                    : "mobile-bottom-nav__link"
+                            )}
+                            aria-label={item.label}
+                            onClick={() => emitMobileNavEvent(item)}
+                        >
+                            <span className="mobile-bottom-nav__icon" aria-hidden="true">
+                                {item.icon}
+                            </span>
+                            <span className="mobile-bottom-nav__label">{item.label}</span>
+                        </NavLink>
+                    </li>
+                ))}
+                <li className="mobile-bottom-nav__item mobile-bottom-nav__item--profile">
+                    <NavLink
+                        to="/main-page/profile"
+                        className={({ isActive }) => (
+                            isActive
+                                ? "mobile-bottom-nav__profile-link is-active"
+                                : "mobile-bottom-nav__profile-link"
+                        )}
+                        aria-label="Profile"
+                        onClick={() => {
+                            window.dispatchEvent(new CustomEvent("miruban:mobile-nav-select", {
+                                detail: {
+                                    to: "/main-page/profile",
+                                    label: "Profile",
+                                },
+                            }));
+                        }}
+                    >
+                        {profileImageSrc && !imageError ? (
+                            <img
+                                src={profileImageSrc}
+                                alt={displayName || "Profile"}
+                                className="mobile-bottom-nav__avatar"
+                                onError={() => setImageError(true)}
+                            />
+                        ) : (
+                            <span className="mobile-bottom-nav__avatar mobile-bottom-nav__avatar--fallback" aria-hidden="true">
+                                {displayInitials || "U"}
+                            </span>
+                        )}
+                    </NavLink>
+                </li>
+            </ul>
+        </nav>
+        </>
     );
 }
 
