@@ -110,13 +110,13 @@ function LoginForm() {
         <button className="btn btn-secondary" type="button" onClick={ toRegister } disabled={loading}>Create Account</button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0' }}>
-        <hr style={{ flex: 1, borderColor: '#cccccc28' }} />
-        <span style={{ margin: '0 10px', color: '#cccccce5', fontSize: '14px' }}>or</span>
-        <hr style={{ flex: 1, borderColor: '#cccccc28' }} />
+      <div className="auth-divider" aria-hidden="true">
+        <hr />
+        <span>or</span>
+        <hr />
       </div>
 
-      <div>
+      <div className="auth-google-wrap">
         <GoogleLogin
           onSuccess={handleGoogleSuccess}
           onError={handleGoogleError}

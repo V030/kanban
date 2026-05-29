@@ -7,7 +7,7 @@
 .projects-page,
 .tasks-page,
 .profile-page {
-  width: min(1280px, 100%);
+  width: min(1440px, 100%);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -50,7 +50,7 @@
 /* Workspace-only hero matching dashboard look */
 .workspace-hero {
   position: relative;
-  padding: 24px;
+  padding: clamp(18px, 2vw, 28px);
   border-radius: 28px;
 
   border: 1px solid rgba(153, 206, 214, 0.48);
@@ -66,6 +66,7 @@
   z-index: 2;
 
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
@@ -106,6 +107,7 @@
   flex-shrink: 0;
   align-items: flex-end;
   justify-content: flex-end;
+  max-width: 100%;
 }
 
 /* Hero action button: icon + label */
@@ -114,6 +116,8 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .workspace-hero .hero-action-button {
@@ -576,12 +580,14 @@
 .project-table-wrapper {
   border: 1px solid rgba(176, 196, 216, 0.56);
   border-radius: 16px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: var(--shadow-sm);
 }
 
 .project-table {
   width: 100%;
+  min-width: 680px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -1696,9 +1702,26 @@
   margin-top: 4px;
 }
 
-.auth-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.auth-form .auth-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
 
-.auth-actions .btn { flex: 1 1 150px; }
+.auth-form .auth-actions .btn {
+  flex: none;
+  width: 100%;
+}
+
+@media (min-width: 820px) {
+  .auth-form .auth-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .auth-form .auth-actions-register {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 
 .auth-error {
   margin: 0;
@@ -1817,6 +1840,22 @@
   .dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-grid,
   .profile-grid    { grid-template-columns: 1fr; }
+
+  .workspace-hero-content {
+    align-items: flex-start;
+  }
+
+  .projects-header-actions,
+  .tasks-header-actions,
+  .profile-header-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 880px) {
+  .workspace-hero-content > div:first-child {
+    flex-basis: 100%;
+  }
 }
 
 @media (max-width: 760px) {

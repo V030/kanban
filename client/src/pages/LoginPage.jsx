@@ -1,24 +1,22 @@
 import LoginForm from "../components/common/LoginForm";
+import AuthBrand, { AuthLogo } from "../components/common/AuthBrand";
 
 function LoginPage() {
     return (
         <div className="auth-page">
             <section className="auth-panel">
-                <aside className="auth-brand">
-                    <div>
-                        <h1>Plan better workdays with Miruban.</h1>
-                        <p>
-                            Keep projects clear, boards tidy, and team momentum visible from one focused workspace.
-                        </p>
-                    </div>
-                    <div className="auth-brand-list">
-                        <span>Structured project views</span>
-                        <span>Transparent task ownership</span>
-                        <span>Fast access to teams and settings</span>
-                    </div>
-                </aside>
+                <AuthBrand
+                    title="Plan better workdays with Miruban."
+                    description="Keep projects clear, boards tidy, and team momentum visible from one focused workspace."
+                    items={[
+                        "Structured project views",
+                        "Transparent task ownership",
+                        "Fast access to teams and settings",
+                    ]}
+                />
 
                 <div className="auth-content">
+                    <AuthLogo className="auth-mobile-logo-row" />
                     <h2>Sign In</h2>
                     <p>Welcome back. Continue where your team left off.</p>
                     <LoginForm />

@@ -84,7 +84,7 @@
   user-select: none;
 }
 
-@media (max-width: 920px) {
+@media (max-width: 820px) {
   .breadcrumb-portal-host {
     margin-bottom: 8px;
   }

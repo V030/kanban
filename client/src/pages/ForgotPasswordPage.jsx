@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import { requestPasswordResetOtp, verifyPasswordResetOtp, completePasswordResetWithToken } from "../services/authService";
+import AuthBrand, { AuthLogo } from "../components/common/AuthBrand";
 import "../components/styles/WorkspacePages.css";
 
 function ForgotPasswordPage() {
@@ -94,21 +95,18 @@ function ForgotPasswordPage() {
   return (
     <div className="auth-page">
       <section className="auth-panel">
-        <aside className="auth-brand">
-          <div>
-            <h1>Reset access without losing the workspace flow.</h1>
-            <p>
-              Request a one-time code for your account email, then set a new password that is different from the current one.
-            </p>
-          </div>
-          <div className="auth-brand-list">
-            <span>Email-based OTP delivery</span>
-            <span>Single-use reset code</span>
-            <span>Protected against password reuse</span>
-          </div>
-        </aside>
+        <AuthBrand
+          title="Reset access without losing the workspace flow."
+          description="Request a one-time code for your account email, then set a new password that is different from the current one."
+          items={[
+            "Email-based OTP delivery",
+            "Single-use reset code",
+            "Protected against password reuse",
+          ]}
+        />
 
         <div className="auth-content">
+          <AuthLogo className="auth-mobile-logo-row" />
           <h2>Forgot Password</h2>
           <p>{step === "request" ? "Enter your email to receive a reset code." : "Enter the code and choose a new password."}</p>
 

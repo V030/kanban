@@ -7,7 +7,8 @@
 .metrics-page {
   font-family: var(--font-family);
   color: var(--ink-700);
-  width: min(1280px, 100%);
+  width: min(1440px, 100%);
+  margin: 0 auto;
   
   display: flex;
   flex-direction: column;
@@ -66,6 +67,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   align-self: flex-end;
+  max-width: 100%;
 }
 
 .metrics-controls-row {
@@ -891,6 +893,9 @@
   .cycle-stat-grid      { grid-template-columns: 1fr 1fr; }
   .review-activity-shell { grid-template-columns: 1fr; }
   .review-activity-stats { grid-template-columns: 1fr 1fr; }
+
+  .metrics-hero-content { align-items: flex-start; }
+  .metrics-actions      { align-self: flex-start; }
 }
 
 @media (max-width: 768px) {

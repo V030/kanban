@@ -1,7 +1,7 @@
 @import url('../../DesignSystem.css');
 
 .feedback-page {
-  width: min(1280px, 100%);
+  width: min(1440px, 100%);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -27,6 +27,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: flex-start;
+  max-width: min(360px, 100%);
 }
 
 .feedback-chip {
@@ -43,7 +44,7 @@
 
 .feedback-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.72fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.72fr);
   gap: 16px;
   align-items: start;
 }
@@ -252,9 +253,18 @@
   gap: 8px;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 940px) {
   .feedback-layout {
     grid-template-columns: 1fr;
+  }
+
+  .feedback-hero-content {
+    align-items: flex-start;
+  }
+
+  .feedback-hero-actions {
+    justify-content: flex-start;
+    max-width: 100%;
   }
 }
 

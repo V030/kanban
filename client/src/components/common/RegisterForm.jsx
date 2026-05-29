@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { register, checkEmail } from "../../services/authService";
-import { useToast } from "../../hooks/useToast";
 import { useNavigate } from "react-router-dom";
 import "../styles/WorkspacePages.css";
 
@@ -19,14 +18,7 @@ function RegisterForm() {
     const [confirmPasswordError, setConfirmPasswordError] = useState("");
     const [formError, setFormError] = useState("");
     const [checkingEmail, setCheckingEmail] = useState(false);
-    const toast = useToast();
     const navigate = useNavigate();
-
-    const goto = (s) => setStep((prev) => {
-      const next = Number(s);
-      if (Number.isNaN(next)) return prev;
-      return Math.max(1, Math.min(3, next));
-    });
 
     const next = async () => {
       if (step === 1) {
@@ -187,7 +179,7 @@ function RegisterForm() {
 
         {formError && <div className="auth-error">{formError}</div>}
 
-        <div className="auth-actions" style={{ display: 'flex', gap: 8 }}>
+        <div className="auth-actions auth-actions-register">
           <button className="btn btn-secondary" type="button" onClick={previous} disabled={step === 1 || loading || checkingEmail}>
             Previous
           </button>

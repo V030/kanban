@@ -1,7 +1,7 @@
 @import url('../../DesignSystem.css');
 
 .friends-page {
-  width: min(1280px, 100%);
+  width: min(1440px, 100%);
   margin: 0 auto;
 }
 
