@@ -150,19 +150,19 @@
 }
 
 .tdm-section-card {
-  border: 1px solid var(--color-border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   background: none;
-  box-shadow: 0 1px 2px rgba(18, 38, 58, 0.06);
-  padding: 25px;
+  box-shadow: none;
+  padding: 0;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
   position: relative; /* anchor absolute controls like the ellipsis dropdown */
 }
 
 /* Remove visible container for the focus/header card so it appears flush */
 .tdm-focus-card {
-  border: 1px solid #e3e9f1;
-  box-shadow: 0 8px 18px rgba(16, 24, 40, 0.06);
+  border: none;
+  box-shadow:none;
   background: #ffffff;
   padding: 18px 20px;
   border-radius: 20px;
@@ -219,6 +219,14 @@
   flex: 0 0 auto;
 }
 
+.tdm-task-title:not(.is-editing):hover {
+  color: var(--color-primary); /* Change text color to the primary teal */
+  text-decoration: underline;  /* Add a subtle underline */
+  text-decoration-color: var(--color-primary); /* Use a softer version of the teal for the underline */
+  text-underline-offset: 3px;  /* Lift the underline slightly from the text */
+  transition: color 0.2s ease, text-decoration-color 0.2 ease;
+}
+
 .task-more-btn {
   border: none;
   background: #ffffff00;
@@ -260,8 +268,8 @@
   left: auto;
   transform-origin: top right;
   /* keep a compatible width for small viewports */
-  width: min(240px, calc(100vw - 24px));
-  max-width: min(240px, calc(100vw - 24px));
+  width: min(300px, calc(100vw - 24px));
+  max-width: min(300px, calc(100vw - 24px));
 }
 
 @keyframes taskDropdownFadeIn {
@@ -427,13 +435,15 @@
   width: 30px;
   height: 30px;
   border-radius: 999px;
-  background: #fff2f3;
-  border: 1px solid #f8c4cc;
+  background: none;
+  border: none;
   color: #b42318;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 30px;
+  margin-top: -10px;
+  padding: 0;
 }
 
 .tdm-confirm-icon svg {
@@ -516,6 +526,24 @@
   text-overflow: ellipsis;
   min-width: 0;
   cursor: pointer;
+   text-decoration: none; /* Explicitly start with no underline line */
+  text-decoration-color: transparent; /* Make the color transparent initially */
+  text-decoration-thickness: 0; /* Start with zero thickness */
+  text-underline-offset: 3px; /* Keep consistent offset */
+  cursor: pointer;
+
+  /* MODIFIED: Add text-decoration-thickness and text-decoration-color to transition */
+  transition: color 0.2s ease,
+              text-decoration-color 0.2s ease,
+              text-decoration-thickness 0.2s ease;
+}
+
+/* Hover state: apply when not in editing mode */
+.tdm-task-title:not(.is-editing):hover {
+  color: var(--color-primary); /* Change text color */
+  text-decoration-line: underline; /* Now apply the underline line */
+  text-decoration-color: var(--color-primary); /* Change underline color */
+  text-decoration-thickness: 1px; /* MODIFIED: Animate to a visible thickness */
 }
 
 .tdm-task-title.is-editing {
@@ -702,7 +730,26 @@
   border: none;
   padding: 0;
   cursor: pointer;
+  text-decoration: none; /* Explicitly start with no underline line */
+  text-decoration-color: transparent; /* Make the color transparent initially */
+  text-decoration-thickness: 0; /* Start with zero thickness */
+  text-underline-offset: 3px; /* Consistent offset for the underline */
+  cursor: pointer;      /* Indicate it's clickable/interactive */
+
+  /* MODIFIED: Add color, text-decoration-color, and text-decoration-thickness to transition */
+  transition: color 0.2s ease,
+              text-decoration-color 0.2s ease,
+              text-decoration-thickness 0.2s ease;
 }
+
+.tdm-task-description-editable:not(.is-editing):hover {
+  color: var(--color-primary); /* Change text color to the primary teal */
+  text-decoration-line: underline; /* Now apply the underline line */
+  text-decoration-color: var(--color-primary); /* Change underline color */
+  text-decoration-thickness: 1px; /* Animate to a visible thickness */
+}
+
+
 
 .tdm-task-description-editable.is-editing {
   outline: 2px solid rgba(15, 127, 143, 0.35);
@@ -987,8 +1034,8 @@
 }
 
 .tdm-subtask-checkbox {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
   accent-color: rgb(15,127,143);
 }
@@ -2180,13 +2227,14 @@
 }
 
 .tdm-task-shell {
-  border: 1px solid rgba(176, 196, 216, 0.56);
+  border: none;
   border-radius: 28px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 249, 253, 0.94) 100%);
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
   flex: 1;
   min-height: 0;
-  padding: 18px;
+  padding: 0;
+  margin: 0;
   display: grid;
   gap: 14px;
   min-height: 0;
@@ -2583,11 +2631,11 @@
 }
 
 .tdm-page-container .tdm-section-card {
-  border: 0.5px solid var(--color-border-tertiary);
+  border: none;
   border-radius: var(--border-radius-md);
   background: var(--color-background-primary);
   box-shadow: none;
-  padding: 14px;
+  padding: 5px;
 }
 
 /* Remove border-radius for top-level right panel inside page view so it sits flush */

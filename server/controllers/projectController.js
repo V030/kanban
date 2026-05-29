@@ -1938,7 +1938,14 @@ export async function updateSubtask(req, res) {
       return res.status(400).json({ message: error.message });
     }
     if (error?.code === "SUBTASK_NOT_FOUND") return res.status(404).json({ message: error.message });
-    if (error?.code === "TASK_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "TASK_FORBIDDEN") {
+      broadcastForbiddenToast(req.user.userId, {
+        message: error.message,
+        taskId,
+        userRole: req.user.role || null,
+      });
+      return res.status(403).json({ message: error.message });
+    }
 
     console.error("Error updating subtask:", error);
     return res.status(500).json({ message: error?.message || "Failed to update subtask" });

@@ -1,0 +1,148 @@
+# Project‑Based Permissions (RBAC)
+
+The Kanban app enforces fine‑grained, per‑project access control through a
+**role‑based access control (RBAC)** system. Permissions are evaluated on the
+server for **every protected endpoint** – the client UI may hide or show
+controls, but the final decision is always made by the backend.
+
+---
+
+## 1️⃣ Roles
+
+| Role   | Description |
+|--------|-------------|
+| **owner**   | The user who created the project. Implicitly has every permission, even if the `project_members` table does not contain a row for them. |
+| **admin**   | Can manage members, boards, tags, and all tasks. |
+| **manager**| Can create/ edit/ delete tasks, assign tasks, and add boards. |
+| **member**  | Limited to actions explicitly allowed by the project’s **settings** (see below). |
+
+Roles are stored in `project_members.role` (type `varchar`).  
+When a user is the **owner**, the system treats them as `owner` regardless of the
+`project_members` entry.
+
+---
+
+## 2️⃣ Permission Context Helpers
+
+Two utility functions expose a **permission context** that downstream services
+and controllers use:
+
+| Helper | Purpose | Returned shape (relevant fields) |
+|--------|---------|----------------------------------|
+| `getProjectPermissionContext({ projectId, requesterId })` | Loads the project, its owner, the requester’s role, and the project‑wide settings. | `projectId`, `ownerId`, `requesterId`, `requesterRole`, `isOwner`, `isAdmin`, `isManager`, `isMember`, `settings` (see below). |
+| `getTaskPermissionContext({ taskId, requesterId })` | Same as above, but also loads the task’s creator, its project, and whether the requester is an assignee. | All fields from the project context **plus** `taskId`, `isCreator`, `isAssignee`. |
+
+Both helpers are defined in **`server/utils/projectPermissions.js`** and
+throw a **403** (`PROJECT_FORBIDDEN`) if the requester is not a member of the
+project.
+
+---
+
+## 3️⃣ Project Settings (Feature Flags)
+
+Each project has a row in **`project_settings`** that stores Boolean flags
+controlling what members are allowed to do. The flags are read via the
+permission helpers and are exposed to the client through the project API
+responses.
+
+| Flag | Default | What it controls |
+|------|---------|-------------------|
+| `allow_member_create_task` | `true` | Member may create new tasks. |
+| `allow_member_take_task` | `true` | Member may **self‑assign** or assign to others (if `allow_assign_task_to_member` is also true). |
+| `allow_member_edit_task` | `true` | Member may edit task details. |
+| `allow_member_delete_task` | `true` | Member may delete tasks. |
+| `allow_member_add_board` | `true` | Member may create new boards. |
+| `allow_member_add_member` | `true` | Member may invite other users to the project. |
+| `allow_member_review` | `false` | Member may mark a task as “reviewed”. |
+| `allow_assign_task_to_member` | `false` | Member may assign a task to **another** member (owner/admin can always assign). |
+| `allow_admin_add_member` | `true` | Admin can add members. |
+| `allow_admin_remove_member` | `true` | Admin can remove members. |
+| `allow_admin_add_board` | `true` | Admin can add boards. |
+| `allow_admin_manage_tasks` | `true` | Admin can edit/delete any task regardless of member flags. |
+| `allow_admin_create_tag` | `true` | Admin can create tags. |
+| `allow_member_create_tag` | `false` | Member may create tags (if enabled). |
+
+> **Tip:** When adding a new feature that depends on a permission, create a
+> corresponding column in `project_settings` and expose it through the
+> `settings` object returned by the helpers.
+
+---
+
+## 4️⃣ How Controllers Enforce Permissions
+
+Typical pattern (example from `server/controllers/taskController.js`):
+
+```js
+import { getTaskPermissionContext } from '../utils/projectPermissions.js';
+
+export async function updateTask(req, res) {
+  const { taskId } = req.params;
+  const { requesterId } = req.auth; // filled by JWT middleware
+
+  const ctx = await getTaskPermissionContext({ taskId, requesterId });
+
+  // Example: deny edit if member lacks the flag
+  if (ctx.isMember && !ctx.settings.allow_member_edit_task) {
+    const err = new Error('Permission denied: cannot edit tasks');
+    err.code = 'FORBIDDEN';
+    throw err;
+  }
+
+  // Owner/admin/manager shortcuts
+  if (ctx.isOwner || ctx.isAdmin || ctx.isManager) {
+    // allow
+  }
+
+  // ...perform the update...
+}
+```
+
+All protected routes follow this pattern, guaranteeing **defense‑in‑depth**:
+client UI may hide the “Edit” button, but the server will still reject a
+malicious request.
+
+---
+
+## 5️⃣ Testing the Permission System
+
+The test suite includes a dedicated file:
+
+- `tests/authz.rbac.test.js` – verifies that:
+  * Non‑members receive **403**.
+  * Role escalation is impossible.
+  * Flags such as `allow_member_delete_task` are respected.
+  * Stale client‑side caches do not bypass server checks.
+
+If you add a new permission flag, extend the corresponding tests here.
+
+---
+
+## 6️⃣ How the Frontend Consumes Permissions
+
+1. **API response** – Project endpoints (`GET /api/projects/:id`) include a
+   `settings` object mirroring the flags listed above.
+2. **Context hook** – `src/contexts/AuthContext.js` (or a similar hook) stores the
+   current user’s role per project.
+3. **UI gating** – Components read `settings` and `role` to decide whether to
+   render action buttons.  
+   *Even if a button is forced visible via DevTools, the backend will still
+   reject the request.*
+
+---
+
+## 7️⃣ Updating Documentation
+
+Whenever you add or rename a permission flag:
+
+1. Add the new column to **`project_settings`** (SQL migration).  
+2. Update the **`settings`** object in `projectPermissions.js`.  
+3. **Add a row** to the table above (Flag → Default → Description).  
+4. Extend **`tests/authz.rbac.test.js`** with a case that validates the new
+   behaviour.  
+
+---
+
+## 8️⃣ Quick Reference Links (add these to the main “Project Source of Truth”)
+
+```markdown
+- **Project Permissions** – `docs/auth/PROJECT_PERMISSIONS.md`

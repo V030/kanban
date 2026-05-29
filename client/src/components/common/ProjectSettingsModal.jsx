@@ -38,7 +38,6 @@ export default function ProjectSettingsModal({
   onSettingChange,
   onDeleteProject,
   projectRole,
-  canEditPermissions = false,
   pendingSettings = {},
   deleteProjectPending = false,
   activeTab,
@@ -75,6 +74,10 @@ export default function ProjectSettingsModal({
     return () => clearTimeout(timerRef.current);
   }, [isOpen, shouldRender]);
 
+  const canEditOwner   = projectRole === 'owner';                       // owners can edit everything
+  const canEditAdmin   = projectRole === 'owner';                       // only owners may edit admin‑level settings
+  const canEditMember  = projectRole === 'owner' || projectRole === 'admin'; // owners + admins can edit member‑level settings
+
   if (!shouldRender) return null;
 
   return (
@@ -91,11 +94,13 @@ export default function ProjectSettingsModal({
           </button>
         </header>
 
-        {!canEditPermissions && (
-          <div className="ps-readonly-banner">
-            Only owners and admins can change these settings.
-          </div>
-        )}
+        {!canEditOwner && (
+        <div className="ps-readonly-banner">
+          {canEditAdmin
+            ? "Only the project owner can change these settings."
+            : "Only the project owner and admins can change these settings."}
+        </div>
+      )}
 
         <div className="ps-body">
 
@@ -122,13 +127,13 @@ export default function ProjectSettingsModal({
                 </p>
 
                 <div className="ps-toggle-list">
-                  <ToggleRow
+                  {/* <ToggleRow
                     id="owner-transfer"
                     label="Transfer ownership"
                     description="Assign a new owner to this project."
                     checked={settings.allow_owner_transfer ?? false}
                     onChange={(v) => onSettingChange("allow_owner_transfer", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditOwner}
                     pending={!!pendingSettings.allow_owner_transfer}
                   />
                   <ToggleRow
@@ -137,9 +142,9 @@ export default function ProjectSettingsModal({
                     description="Hide the project without permanently deleting it."
                     checked={settings.allow_owner_archive ?? false}
                     onChange={(v) => onSettingChange("allow_owner_archive", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditOwner}
                     pending={!!pendingSettings.allow_owner_archive}
-                  />
+                  /> */}
                 </div>
 
                 {projectRole === "owner" && onDeleteProject && (
@@ -207,7 +212,7 @@ export default function ProjectSettingsModal({
                     description="Allow admins to invite people to the project."
                     checked={settings.allow_admin_add_member}
                     onChange={(v) => onSettingChange("allow_admin_add_member", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditAdmin}
                     pending={!!pendingSettings.allow_admin_add_member}
                   />
                   <ToggleRow
@@ -216,7 +221,7 @@ export default function ProjectSettingsModal({
                     description="Allow admins to remove members from the project."
                     checked={settings.allow_admin_remove_member}
                     onChange={(v) => onSettingChange("allow_admin_remove_member", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditAdmin}
                     pending={!!pendingSettings.allow_admin_remove_member}
                   />
                   <ToggleRow
@@ -225,7 +230,7 @@ export default function ProjectSettingsModal({
                     description="Allow admins to add and manage boards & columns."
                     checked={settings.allow_admin_add_board}
                     onChange={(v) => onSettingChange("allow_admin_add_board", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditAdmin}
                     pending={!!pendingSettings.allow_admin_add_board}
                   />
                   <ToggleRow
@@ -234,7 +239,7 @@ export default function ProjectSettingsModal({
                     description="Allow admins to create, edit, move, and delete tasks."
                     checked={settings.allow_admin_manage_tasks}
                     onChange={(v) => onSettingChange("allow_admin_manage_tasks", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditAdmin}
                     pending={!!pendingSettings.allow_admin_manage_tasks}
                   />
                 </div>
@@ -252,7 +257,7 @@ export default function ProjectSettingsModal({
                     description="Allow project members to create new tasks."
                     checked={settings.allow_member_create_task}
                     onChange={(v) => onSettingChange("allow_member_create_task", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_member_create_task}
                   />
                   <ToggleRow
@@ -261,7 +266,7 @@ export default function ProjectSettingsModal({
                     description="Allow members to assign themselves to unassigned tasks."
                     checked={settings.allow_member_take_task}
                     onChange={(v) => onSettingChange("allow_member_take_task", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_member_take_task}
                   />
                   <ToggleRow
@@ -270,7 +275,7 @@ export default function ProjectSettingsModal({
                     description="Allow members to edit task details."
                     checked={settings.allow_member_edit_task}
                     onChange={(v) => onSettingChange("allow_member_edit_task", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_member_edit_task}
                   />
                   <ToggleRow
@@ -279,7 +284,7 @@ export default function ProjectSettingsModal({
                     description="Allow members to delete tasks."
                     checked={settings.allow_member_delete_task}
                     onChange={(v) => onSettingChange("allow_member_delete_task", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_member_delete_task}
                   />
                   <ToggleRow
@@ -288,7 +293,7 @@ export default function ProjectSettingsModal({
                     description="Allow project members to add and manage boards & columns."
                     checked={settings.allow_member_add_board}
                     onChange={(v) => onSettingChange("allow_member_add_board", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_member_add_board}
                   />
                   <ToggleRow
@@ -297,7 +302,7 @@ export default function ProjectSettingsModal({
                     description="Allow project members to invite other people to the project."
                     checked={settings.allow_member_add_member}
                     onChange={(v) => onSettingChange("allow_member_add_member", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_member_add_member}
                   />
                   <ToggleRow
@@ -306,7 +311,7 @@ export default function ProjectSettingsModal({
                     description="Allow project members to approve or reject tasks in review."
                     checked={settings.allow_member_review}
                     onChange={(v) => onSettingChange("allow_member_review", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_member_review}
                   />
                   <ToggleRow
@@ -315,7 +320,7 @@ export default function ProjectSettingsModal({
                     description="Allow members to create tags on tasks."
                     checked={settings.allow_member_create_tag}
                     onChange={(v) => onSettingChange("allow_member_create_tag", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_member_create_tag}
                   />
                   <ToggleRow
@@ -324,13 +329,10 @@ export default function ProjectSettingsModal({
                     description="Allow project members to assign tasks to other members."
                     checked={settings.allow_assign_task_to_member}
                     onChange={(v) => onSettingChange("allow_assign_task_to_member", v)}
-                    disabled={!canEditPermissions}
+                    disabled={!canEditMember}
                     pending={!!pendingSettings.allow_assign_task_to_member}
                   />
                 </div>
-                <p className="ps-member-note">
-                  Members can create tags on tasks they created or are assigned to when this setting is enabled.
-                </p>
               </>
             )}
 
@@ -338,7 +340,7 @@ export default function ProjectSettingsModal({
         </div>
 
         <footer className="ps-footer">
-          <span className="ps-footer-role">Role: {projectRole}</span>
+          <span className="ps-footer-role"></span>
           <button type="button" className="ps-done-btn" onClick={onClose}>Done</button>
         </footer>
 

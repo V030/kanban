@@ -1478,7 +1478,7 @@ export async function inviteMemberToProject(inviteData) {
       [inviteeEmail]
     );
     if (result.rows.length === 0) {
-      const error = new Error("Invitee not found");
+      const error = new Error("User not found");
       error.code = "USER_NOT_FOUND";
       throw error;
     }
@@ -1584,7 +1584,7 @@ export async function inviteMemberToProject(inviteData) {
     );
 
     if (duplicateResult.rows.length > 0) {
-      const error = new Error("A pending invite already exists for this user in this project or user is already in the project.");
+      const error = new Error("This user has already been invited.");
       error.code = "ALREADY_PENDING";
       throw error;
     }
@@ -2435,18 +2435,13 @@ export async function updateSubtask({ taskId, subtaskId, requesterId, status, ti
 
   const access = await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
   if (!access.isOwner) {
-    if (access.isAdmin) {
-      if (!access.settings.allow_admin_manage_tasks) {
-        const error = new Error("Forbidden: editing tasks is disabled for admins in this project");
-        error.code = "TASK_FORBIDDEN";
-        throw error;
-      }
-    } else if (!access.settings.allow_member_edit_task) {
-      const error = new Error("Forbidden: editing subtasks is disabled for members in this project");
+    if (!access.isAssignee) {
+      const error = new Error("Forbidden: only assignees can mark subtasks finished/unfinished");
       error.code = "TASK_FORBIDDEN";
       throw error;
     }
   }
+
 
   let chosenStatus = null;
   if (rawStatus != null) {

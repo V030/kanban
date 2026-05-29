@@ -52,7 +52,7 @@ const ERROR_MESSAGE_MAP = {
   'task moved successfully': 'Task moved successfully!',
   'task approved and moved to done': 'Task approved and moved to Done!',
   'task rejected and moved to todo': 'Task returned to To-Do. Assignee can make revisions.',
-  'task not found': 'This task no longer exists.',
+  'task not found': 'This task does not exists.',
   'forbidden: you don\'t have permission to approve reviews': 'You do not have permission to approve this task.',
   'unable to create task': 'Unable to create task. Please try again.',
   'unable to delete task': 'Unable to delete task. Please try again.',

@@ -44,6 +44,7 @@ export default function ProjectMembersModal({
   currentUserRole = "member",
   canRemoveMembers = false,
   canUpdateRoles = false,
+  canInvite = false,
   onRemoveMember,
   onUpdateRole,
   removePending = {},
@@ -102,6 +103,11 @@ export default function ProjectMembersModal({
   }
 
   const handleSelectFriend = async (friendId, projectId) => {
+    if (!canInvite) {
+      toast.showError("You don't have permission to invite members.");  
+      return;
+    }
+    
     setInviteLoading(true);
     setPendingFriendId(String(friendId));
     try {
@@ -121,6 +127,11 @@ export default function ProjectMembersModal({
 
     if (!email || !email.trim()) {
       toast.showValidationError("Please enter an email.");
+      return;
+    }
+
+    if (!canInvite) {
+      toast.showError("You don't have permission to invite members.");  
       return;
     }
 
@@ -151,6 +162,17 @@ export default function ProjectMembersModal({
         return fullName.includes(normalizedSearch) || emailValue.includes(normalizedSearch);
       })
     : friends;
+
+  // Inside ProjectMembersModal component (just after the props block)
+
+    const isAlreadyMember = (friendId) => {
+      // `members` may contain `id`, `userId`, or `user_id`.  Normalise both sides.
+      const fid = String(friendId);
+      return members.some((m) => {
+        const mid = String(m.id ?? m.userId ?? m.user_id ?? "");
+        return mid && mid === fid;
+      });
+    };
 
   return (
     <div className={`pmv-overlay${isClosing ? " is-closing" : ""}`} role="dialog" aria-modal="true" aria-label="Project members">
@@ -220,7 +242,7 @@ export default function ProjectMembersModal({
                 <button
                   type="submit"
                   className="pmv-send-btn"
-                  disabled={inviteLoading}
+                  disabled={inviteLoading || !canInvite}
                 >
                   {inviteLoading ? "Sending…" : "Send invite"}
                 </button>
@@ -263,9 +285,9 @@ export default function ProjectMembersModal({
                       type="button"
                       className="pmv-add-btn"
                       onClick={() => handleSelectFriend(f.id, project.id)}
-                      disabled={pendingFriendId === String(f.id)}
+                      disabled={pendingFriendId === String(f.id) || !canInvite || isAlreadyMember(f.id) }
                     >
-                      {pendingFriendId === String(f.id) ? "…" : "Add"}
+                      {pendingFriendId === String(f.id) ? "…" : "Invite"}
                     </button>
                   </div>
                 ))}

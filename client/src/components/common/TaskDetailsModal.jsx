@@ -117,7 +117,7 @@ function normalizeTaskPriority(value) {
   return "unset";
 }
 
-export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersTakeTask = false, canMembersReviewTasks = false, canMembersDeleteTask = false, canMembersCreateTag = false, canAdminsManageTasks = false, assignMemberToTask, unassignMemberFromTask, takeSelfTask, unassignSelfTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
+export function TaskDetailsContent({ asPage = false, canMembersEditTask = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersTakeTask = false, canMembersReviewTasks = false, canMembersDeleteTask = false, canMembersCreateTag = false, canAdminsManageTasks = false, assignMemberToTask, unassignMemberFromTask, takeSelfTask, unassignSelfTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
   const taskData = task || {};
   const currentUser = useMemo(() => getCurrentUser(), []);
   const currentUserIdValue = currentUserId || currentUser?.id || "";
@@ -194,15 +194,17 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const canEditTaskTitle = useMemo(() => {
     if (currentUserRole === "owner") return true;
     if (currentUserRole === "admin") return canAdminsManageTasks;
+    if (currentUserRole === "member" || !currentUserRole) return canMembersEditTask;
     if (!currentUserIdValue) return false;
     const creatorId = taskData?.createdBy || taskData?.created_by;
     if (creatorId && String(creatorId) === String(currentUserIdValue)) return true;
     return assignees.some((member) => String(member?.id || member?.user_id || "") === String(currentUserIdValue));
-  }, [assignees, canAdminsManageTasks, currentUserIdValue, currentUserRole, taskData?.createdBy, taskData?.created_by]);
+  }, [assignees, canAdminsManageTasks, canMembersEditTask, currentUserIdValue, currentUserRole, taskData?.createdBy, taskData?.created_by]);
   const canManageAdminTaskActions = currentUserRole === "owner" || (currentUserRole === "admin" && canAdminsManageTasks);
+  const canOpenTaskActionsMenu = canManageAdminTaskActions || canEditTaskTitle;
   const canReview = isAdminOrOwner || currentUserRole === "manager" || (currentUserRole === "member" && canMembersReviewTasks);
   const canManageTags = isAdminOrOwner || (currentUserRole === "member" && canMembersCreateTag);
-  const canChangeTaskCategory = canManageAdminTaskActions || currentUserRole === "manager" || (currentUserRole === "member" && isCurrentUserAssigned);
+  const canChangeTaskCategory = canManageAdminTaskActions || currentUserRole === "manager" || (currentUserRole === "member" && (canMembersEditTask || isCurrentUserAssigned));
 
   const taskMenuStatusOptions = useMemo(() => {
     const normalizedCategories = (taskCategories || []).map((category) => ({
@@ -235,10 +237,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
   const newSubtaskInputRef = useRef(null);
 
   useEffect(() => {
-    if (!canManageAdminTaskActions && menuOpen) {
+    if (!canOpenTaskActionsMenu && menuOpen) {
       setMenuOpen(false);
     }
-  }, [canManageAdminTaskActions, menuOpen]);
+  }, [canOpenTaskActionsMenu, menuOpen]);
 
   // dropdown is anchored via CSS to the .task-actions-wrap container
 
@@ -923,6 +925,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const handleUpdateTaskPriority = async (nextPriority) => {
     if (!task?.id || !nextPriority) return;
+    if (!canEditTaskTitle) {
+      setPriorityError("You don't have permission to edit this task.");
+      return;
+    }
     if (currentUserRole === "admin" && !canAdminsManageTasks) {
       setPriorityError("Task management is disabled for admins in this project.");
       return;
@@ -1016,6 +1022,10 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
 
   const handleUpdateTargetDate = async (nextValue) => {
     if (!task?.id) return;
+    if (!canEditTaskTitle) {
+      setTargetDateError("You don't have permission to edit this task.");
+      return;
+    }
     if (currentUserRole === "admin" && !canAdminsManageTasks) {
       setTargetDateError("Task management is disabled for admins in this project.");
       return;
@@ -1503,7 +1513,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                 <h3 className="tdm-task-title-label">Task</h3>
                 <div className="task-actions-wrap">
 
-                {canManageAdminTaskActions && (
+                {canOpenTaskActionsMenu && (
                   <button
                     className="task-more-btn"
                     onClick={() => setMenuOpen(prev => !prev)}
@@ -1533,7 +1543,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                         className="tdm-menu-select"
                         value={taskPriority}
                         onChange={(event) => handleUpdateTaskPriority(event.target.value)}
-                        disabled={prioritySubmitting || (currentUserRole === "admin" && !canAdminsManageTasks)}
+                        disabled={prioritySubmitting || !canEditTaskTitle}
                       >
                         {TASK_PRIORITY_OPTIONS.map((priorityOption) => (
                           <option key={priorityOption} value={priorityOption}>
@@ -1584,7 +1594,7 @@ export function TaskDetailsContent({ asPage = false, currentUserId, task, isAdmi
                           const next = event.target.value || null;
                           handleUpdateTargetDate(next);
                         }}
-                        disabled={targetDateSubmitting || (currentUserRole === "admin" && !canAdminsManageTasks)}
+                        disabled={targetDateSubmitting || !canEditTaskTitle}
                       />
                     </div>
 

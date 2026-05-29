@@ -46,10 +46,12 @@ export default function TaskDetailsPage() {
   
   const hasInitialCanReview = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersReviewTasks");
   const hasInitialCanDelete = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersDeleteTask");
+  const hasInitialCanEdit = Object.prototype.hasOwnProperty.call(location.state || {}, "canMembersEditTask");
   const initialIsAdmin = location.state?.isAdminOrOwner || false;
   const initialCanAssign = location.state?.canMembersAssignTaskToOthers || false;
   const initialCanReview = location.state?.canMembersReviewTasks || false;
   const initialCanDelete = location.state?.canMembersDeleteTask || false;
+  const initialCanEdit = location.state?.canMembersEditTask || false;
   const initialCanCreateTag = location.state?.canMembersCreateTag || false;
   const initialCanManageTasks = location.state?.canAdminsManageTasks ?? false;
 
@@ -63,6 +65,7 @@ export default function TaskDetailsPage() {
   const [canMembersTakeTask, setCanMembersTakeTask] = useState(false);
   const [canMembersReviewTasks, setCanMembersReviewTasks] = useState(initialCanReview);
   const [canMembersDeleteTask, setCanMembersDeleteTask] = useState(initialCanDelete);
+  const [canMembersEditTask, setCanMembersEditTask] = useState(initialCanEdit);
   const [canMembersCreateTag, setCanMembersCreateTag] = useState(initialCanCreateTag);
   const [canAdminsManageTasks, setCanAdminsManageTasks] = useState(initialCanManageTasks);
 
@@ -94,6 +97,7 @@ export default function TaskDetailsPage() {
       const nextCanTake = !!settings?.allow_member_take_task;
       const nextCanReview = !!settings?.allow_member_review;
       const nextCanDelete = !!settings?.allow_member_delete_task;
+      const nextCanEdit = !!settings?.allow_member_edit_task;
       const nextCanCreateTag = !!settings?.allow_member_create_tag;
       const nextCanManageTasks = !!settings?.allow_admin_manage_tasks;
       setCanMembersAssignTaskToOthers(nextCanAssign);
@@ -106,6 +110,9 @@ export default function TaskDetailsPage() {
       if (!hasInitialCanDelete) {
         setCanMembersDeleteTask(nextCanDelete);
       }
+      if (!hasInitialCanEdit) {
+        setCanMembersEditTask(nextCanEdit);
+      }
     } catch (err) {
       setCanMembersAssignTaskToOthers(false);
       setCanMembersTakeTask(false);
@@ -117,8 +124,11 @@ export default function TaskDetailsPage() {
       if (!hasInitialCanDelete) {
         setCanMembersDeleteTask(false);
       }
+      if (!hasInitialCanEdit) {
+        setCanMembersEditTask(false);
+      }
     }
-  }, [hasInitialCanReview, hasInitialCanDelete, project?.id, projectId]);
+  }, [hasInitialCanReview, hasInitialCanDelete, hasInitialCanEdit, project?.id, projectId]);
 
   useEffect(() => {
     const projectIdToUse = projectId || project?.id;
@@ -377,6 +387,7 @@ export default function TaskDetailsPage() {
         canMembersTakeTask={canMembersTakeTask}
         canMembersReviewTasks={canMembersReviewTasks}
         canMembersDeleteTask={canMembersDeleteTask}
+        canMembersEditTask={canMembersEditTask}
         canMembersCreateTag={canMembersCreateTag}
         canAdminsManageTasks={canAdminsManageTasks}
         assignMemberToTask={handleAssignMemberToTask}

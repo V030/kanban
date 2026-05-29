@@ -11,6 +11,7 @@ import { TeamIcon, SettingsIcon, MetricsIcon, ReorderIcon, SaveIcon, CancelIcon,
 import "../components/styles/KanbanPage.css";
 import "../components/styles/ColumnsReorderModal.css";
 import "../components/styles/SkeletonLoading.css";
+import "../components/styles/TaskDetailsModal.css";
 import "../components/styles/WorkspacePages.css";
 import { getCurrentUser, hydrateUserFromToken } from "../services/authService";
 import { getProjects, getMemberProjects, getTaskCategories, createNewTask, getProjectMembers, getProjectSettings, updateProjectSettings, updateProjectName, updateProjectDescription, takeTask, updateTaskStatus, approveTaskReview, rejectTaskReview, unassignTask, deleteTask, deleteProject, removeMemberFromProject, updateMemberRole } from "../services/projectService";
@@ -1255,14 +1256,6 @@ function KanbanPage() {
 					>
 							<MetricsIcon />
 					</button>
-					<button
-						className="kanban-icon-btn"
-						onClick={openReorder}
-						title="Organize Columns"
-						aria-label="Organize Columns"
-					>
-							<ReorderIcon />
-					</button>
 				</div>
 			</div>
 		</header>
@@ -1300,6 +1293,7 @@ function KanbanPage() {
 								canMembersAssignTaskToOthers: taskPermissions.allow_assign_task_to_member,
 								canMembersReviewTasks,
 								canMembersDeleteTask: canDeleteTask,
+								canMembersEditTask: taskPermissions.allow_member_edit_task,
 							}
 						});
 					}}
@@ -1443,9 +1437,9 @@ function KanbanPage() {
 									</div>
 								</div>
 
-								{!showTaskAction && projectRole === "member" && (
+								{/* {!showTaskAction && projectRole === "member" && (
 									<p className="tf-task-helper">Take Task is hidden in strict mode.</p>
-								)}
+								)} */}
 							</>
 						);
 					}}
@@ -1536,6 +1530,11 @@ function KanbanPage() {
 					currentUserRole={projectRole}
 					canRemoveMembers={projectRole === "owner" || projectRole === "admin"}
 					canUpdateRoles={projectRole === "owner"}
+					canInvite={
+						isOwner ||
+						isAdmin ||
+						taskPermissions.allow_member_add_member
+					}
 					onRemoveMember={handleRemoveMember}
 					onUpdateRole={handleUpdateMemberRole}
 					removePending={memberActionPending}
@@ -1556,9 +1555,9 @@ function KanbanPage() {
 				/>
 
 				{dragReviewModal.isOpen && (
-					<div className="kanban-confirm-overlay" role="presentation" onClick={() => setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null })}>
-						<div className="kanban-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="drag-review-title" onClick={(e) => e.stopPropagation()}>
-							<div className="kanban-confirm-title-row">
+					<div className="tdm-confirm-overlay" role="presentation" onClick={() => setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null })}>
+						<div className="tdm-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="drag-review-title" onClick={(e) => e.stopPropagation()}>
+							<div className="tdm-confirm-title-row">
 								<h3 id="drag-review-title">
 									{dragReviewModal.action === "approve" ? "Approve Task" : "Reject Task"}
 								</h3>
@@ -1569,17 +1568,17 @@ function KanbanPage() {
 									: "Please provide a reason for rejecting this task. This will be recorded in the review history."}
 							</p>
 							<textarea
-								className="kanban-review-textarea"
+								className="tdm-reject-textarea"
 								value={dragReviewReason}
 								onChange={(e) => setDragReviewReason(e.target.value)}
 								placeholder={dragReviewModal.action === "approve" ? "Enter approval note" : "Enter rejection reason"}
 								rows={4}
 								autoComplete="off"
 							/>
-							<div className="kanban-confirm-actions">
+							<div className="tdm-confirm-actions">
 								<button
 									type="button"
-									className="kanban-confirm-cancel"
+									className="tdm-confirm-cancel"
 									onClick={() => setDragReviewModal({ isOpen: false, taskId: null, targetColumn: null, action: null })}
 									disabled={dragReviewSubmitting}
 								>
@@ -1587,7 +1586,7 @@ function KanbanPage() {
 								</button>
 								<button
 									type="button"
-									className={dragReviewModal.action === "approve" ? "kanban-confirm-approve" : "kanban-confirm-reject"}
+									className={dragReviewModal.action === "approve" ? "tdm-confirm-approve" : "tdm-confirm-delete"}
 									onClick={handleDragReviewConfirm}
 									disabled={dragReviewSubmitting}
 								>
