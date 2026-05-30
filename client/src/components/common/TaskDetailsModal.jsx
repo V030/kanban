@@ -117,6 +117,25 @@ function normalizeTaskPriority(value) {
   return "unset";
 }
 
+function normalizeCategoryName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isTodoCategoryName(value) {
+  const normalized = normalizeCategoryName(value);
+  return normalized === "todo" || normalized === "to_do";
+}
+
+function isInProgressCategoryName(value) {
+  const normalized = normalizeCategoryName(value);
+  return normalized === "in_progress" || normalized === "in progress";
+}
+
+function isToReviewCategoryName(value) {
+  const normalized = normalizeCategoryName(value);
+  return normalized === "to_review" || normalized === "to review" || normalized === "review";
+}
+
 export function TaskDetailsContent({ asPage = false, canMembersEditTask = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersTakeTask = false, canMembersReviewTasks = false, canMembersDeleteTask = false, canMembersCreateTag = false, canAdminsManageTasks = false, assignMemberToTask, unassignMemberFromTask, takeSelfTask, unassignSelfTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
   const taskData = task || {};
   const currentUser = useMemo(() => getCurrentUser(), []);
@@ -204,7 +223,16 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   const canOpenTaskActionsMenu = canManageAdminTaskActions || canEditTaskTitle;
   const canReview = isAdminOrOwner || currentUserRole === "manager" || (currentUserRole === "member" && canMembersReviewTasks);
   const canManageTags = isAdminOrOwner || (currentUserRole === "member" && canMembersCreateTag);
-  const canChangeTaskCategory = canManageAdminTaskActions || currentUserRole === "manager" || (currentUserRole === "member" && (canMembersEditTask || isCurrentUserAssigned));
+  const currentTaskCategoryName = useMemo(() => {
+    const currentCategory = (taskCategories || []).find((category) => String(category?.id || "") === String(taskCategoryId || ""));
+    return normalizeCategoryName(currentCategory?.name || taskData?.categoryName || taskData?.category_name);
+  }, [taskCategories, taskCategoryId, taskData?.categoryName, taskData?.category_name]);
+  const isCurrentTaskDone = currentTaskCategoryName === "done";
+  const isCurrentTaskToReview = isToReviewCategoryName(currentTaskCategoryName);
+  const canEditTaskDetails = canEditTaskTitle && !isCurrentTaskToReview;
+  const canChangeTaskCategory =
+    !isCurrentTaskDone &&
+    (canManageAdminTaskActions || currentUserRole === "manager" || (currentUserRole === "member" && (canMembersEditTask || isCurrentUserAssigned)));
 
   const taskMenuStatusOptions = useMemo(() => {
     const normalizedCategories = (taskCategories || []).map((category) => ({
@@ -241,6 +269,14 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
       setMenuOpen(false);
     }
   }, [canOpenTaskActionsMenu, menuOpen]);
+
+  useEffect(() => {
+    if (!isCurrentTaskToReview) return;
+    setIsEditingTaskTitle(false);
+    setIsEditingTaskDesc(false);
+    setShowAddSubtask(false);
+    setShowTagsModal(false);
+  }, [isCurrentTaskToReview]);
 
   // dropdown is anchored via CSS to the .task-actions-wrap container
 
@@ -295,6 +331,11 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
   async function handleCreateSubtask() {
     if (!newSubtaskTitle || !newSubtaskTitle.trim()) return;
+    if (isCurrentTaskToReview) {
+      setSubtaskError("Tasks in review can't be edited.");
+      setShowAddSubtask(false);
+      return;
+    }
 
     const tempId = `temp-subtask-${Date.now()}`;
     const createdAt = new Date().toISOString();
@@ -668,7 +709,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   const handleAddTag = async (tagName) => {
     const name = (tagName || tagInput || "").trim();
     if (!task?.id || !name) return;
-    if (!canManageTags) {
+    if (!canManageTags || isCurrentTaskToReview) {
       setTagError("Tag editing is disabled for your project role.");
       return;
     }
@@ -718,7 +759,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
   const handleDeleteTag = async (tag) => {
     if (!tag?.id || !task?.id) return;
-    if (!canManageTags) {
+    if (!canManageTags || isCurrentTaskToReview) {
       setTagError("Tag editing is disabled for your project role.");
       return;
     }
@@ -740,6 +781,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   };
 
   const beginEditTaskTitle = () => {
+    if (!canEditTaskDetails) return;
     const currentTitle = taskTitle || taskData?.title || "";
     setTaskTitleOriginal(currentTitle);
     setTaskTitleDraft(currentTitle);
@@ -761,6 +803,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   };
 
   const beginEditTaskDesc = () => {
+    if (!canEditTaskDetails) return;
     const currentDesc = taskDesc || taskData?.description || "";
     setTaskDescOriginal(currentDesc);
     setTaskDescDraft(currentDesc);
@@ -800,6 +843,12 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   };
 
   const saveTaskTitle = async () => {
+    if (!canEditTaskDetails) {
+      setTaskTitleError("Tasks in review can't be edited.");
+      setIsEditingTaskTitle(false);
+      return;
+    }
+
     const trimmed = taskTitleDraft.replace(/[\r\n]+/g, " ").trim();
     if (!trimmed) {
       setTaskTitleError("Task name cannot be empty.");
@@ -832,6 +881,12 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   };
 
   const saveTaskDesc = async () => {
+    if (!canEditTaskDetails) {
+      setTaskDescError("Tasks in review can't be edited.");
+      setIsEditingTaskDesc(false);
+      return;
+    }
+
     const trimmed = taskDescDraft.replace(/[\r\n]+/g, " ").trim();
     if (!trimmed) {
       setTaskDescError("Task description cannot be empty.");
@@ -925,7 +980,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
   const handleUpdateTaskPriority = async (nextPriority) => {
     if (!task?.id || !nextPriority) return;
-    if (!canEditTaskTitle) {
+    if (!canEditTaskDetails) {
       setPriorityError("You don't have permission to edit this task.");
       return;
     }
@@ -958,17 +1013,22 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
       return;
     }
 
-    const currentCategoryName = String(task?.categoryName || "").trim().toLowerCase();
+    const currentCategoryName = currentTaskCategoryName;
     const nextCategory = (taskCategories || []).find((cat) => String(cat?.id || "") === String(nextCategoryId || ""));
-    const nextCategoryName = String(nextCategory?.name || "").trim().toLowerCase();
+    const nextCategoryName = normalizeCategoryName(nextCategory?.name);
     const movingToDone = nextCategoryName === "done";
-    const movingToToDo = nextCategoryName === "to_do" || nextCategoryName === "todo";
-    const isFromTodo = currentCategoryName === "to_do" || currentCategoryName === "todo";
-    const isFromInProgress = currentCategoryName === "in_progress" || currentCategoryName === "in progress";
-    const isFromToReview = currentCategoryName === "to_review" || currentCategoryName === "to review";
+    const movingToToDo = isTodoCategoryName(nextCategoryName);
+    const isFromTodo = isTodoCategoryName(currentCategoryName);
+    const isFromInProgress = isInProgressCategoryName(currentCategoryName);
+    const isFromToReview = isToReviewCategoryName(currentCategoryName);
+
+    if (currentCategoryName === "done") {
+      setTaskCategoryError("Done tasks can't be moved to another status.");
+      return;
+    }
 
     // Check permission rules for members
-    if (!isAdminOrOwner && currentUserRole !== "manager") {
+    if (!canManageAdminTaskActions && currentUserRole !== "manager") {
       // Rule 0: TODO and In Progress cannot move directly to Done
       if (movingToDone && (isFromTodo || isFromInProgress)) {
         setTaskCategoryError("Tasks must be reviewed first.");
@@ -992,9 +1052,8 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
     setTaskCategoryError("");
 
-    // If selecting TODO or DONE from the dropdown, prompt for approval/rejection first
-    if (movingToDone || movingToToDo) {
-      // close the menu and show the appropriate modal to collect a review note
+    // Moving out of To Review to Todo or Done is a review action, matching board drag/drop.
+    if (isFromToReview && (movingToDone || movingToToDo)) {
       setMenuOpen(false);
       if (movingToDone) {
         setApproveReason("");
@@ -1022,7 +1081,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
   const handleUpdateTargetDate = async (nextValue) => {
     if (!task?.id) return;
-    if (!canEditTaskTitle) {
+    if (!canEditTaskDetails) {
       setTargetDateError("You don't have permission to edit this task.");
       return;
     }
@@ -1051,6 +1110,10 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
   const handleDeleteSubtask = async (subtask) => {
     if (!task?.id || !subtask?.id) return;
+    if (isCurrentTaskToReview) {
+      setSubtaskError("Tasks in review can't be edited.");
+      return;
+    }
     const subtaskId = subtask.id;
     const previousSubtasks = localSubtasks;
 
@@ -1076,6 +1139,10 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
  const handleToggleSubtask = async (subtask, event) => {
   if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+  if (isCurrentTaskToReview) {
+    setSubtaskError("Tasks in review can't be edited.");
+    return;
+  }
 
   console.group(`[toggleSubtask] subtask id=${subtask?.id}`);
   console.log("1. subtask object received:", JSON.parse(JSON.stringify(subtask || {})));
@@ -1152,9 +1219,8 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
     const isAssigned = resolvedMemberId ? localAssignedIds.includes(resolvedMemberId) : false;
     const isPending = resolvedMemberId ? assignmentPendingIds[resolvedMemberId] : false;
     const isCurrentUserRow = resolvedMemberId && String(resolvedMemberId) === String(currentUserIdValue);
-    const isToReview = String(taskData?.categoryName || taskData?.category_name || "").toLowerCase().includes("review");
-    const canToggleSelf = isCurrentUserRow && (isAdminOrOwner || canMembersTakeTask) && !isToReview;
-    const canToggleOthers = !isCurrentUserRow && (isAdminOrOwner || (canMembersTakeTask && canMembersAssignTaskToOthers));
+    const canToggleSelf = isCurrentUserRow && (isAdminOrOwner || canMembersTakeTask) && !isCurrentTaskToReview;
+    const canToggleOthers = !isCurrentUserRow && !isCurrentTaskToReview && (isAdminOrOwner || (canMembersTakeTask && canMembersAssignTaskToOthers));
     const roleLabel = member?.role || member?.projectRole || member?.project_role;
     const emailLabel = member?.email;
 
@@ -1543,7 +1609,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                         className="tdm-menu-select"
                         value={taskPriority}
                         onChange={(event) => handleUpdateTaskPriority(event.target.value)}
-                        disabled={prioritySubmitting || !canEditTaskTitle}
+                        disabled={prioritySubmitting || !canEditTaskDetails}
                       >
                         {TASK_PRIORITY_OPTIONS.map((priorityOption) => (
                           <option key={priorityOption} value={priorityOption}>
@@ -1594,7 +1660,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                           const next = event.target.value || null;
                           handleUpdateTargetDate(next);
                         }}
-                        disabled={targetDateSubmitting || !canEditTaskTitle}
+                        disabled={targetDateSubmitting || !canEditTaskDetails}
                       />
                     </div>
 
@@ -1643,11 +1709,11 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                 aria-label="Task name"
                 onInput={(event) => setTaskTitleDraft(event.currentTarget.textContent || "")}
                 onKeyDown={handleTaskTitleKeyDown}
-                onClick={() => canEditTaskTitle && !isEditingTaskTitle && beginEditTaskTitle()}
+                onClick={() => canEditTaskDetails && !isEditingTaskTitle && beginEditTaskTitle()}
               >
                 {isEditingTaskTitle ? null : (taskTitle || taskData.title || "Untitled task")}
               </h4>
-              {canEditTaskTitle && isEditingTaskTitle && (
+              {canEditTaskDetails && isEditingTaskTitle && (
                 <div className="tdm-inline-edit-actions">
                   <button
                     type="button"
@@ -1682,11 +1748,11 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                 aria-label="Task description"
                 onInput={(event) => setTaskDescDraft(event.currentTarget.textContent || "")}
                 onKeyDown={handleTaskDescKeyDown}
-                onClick={() => canEditTaskTitle && !isEditingTaskDesc && beginEditTaskDesc()}
+                onClick={() => canEditTaskDetails && !isEditingTaskDesc && beginEditTaskDesc()}
               >
                 {isEditingTaskDesc ? null : (taskDesc || taskData.description || "No description provided.")}
               </p>
-              {canEditTaskTitle && isEditingTaskDesc && (
+              {canEditTaskDetails && isEditingTaskDesc && (
                 <div className="tdm-inline-edit-actions">
                   <button
                     type="button"
@@ -1733,7 +1799,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                   <span key={t.id || t.tagName} className="tdm-tag">
                     <span className="tdm-tag-name">{t.tagName || t.tag_name}</span>
                     {t?.isPending && <span className="tdm-tag-pending">Saving...</span>}
-                    {canManageTags && (
+                    {canManageTags && !isCurrentTaskToReview && (
                       <button
                         type="button"
                         className="tdm-tag-remove"
@@ -1748,7 +1814,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                 ))}
               </div>
 
-              {canManageTags && (
+              {canManageTags && !isCurrentTaskToReview && (
                 <button type="button" className="tdm-manage-tags-btn" onClick={() => setShowTagsModal(true)}>
                   Add Tags
                 </button>
@@ -1825,7 +1891,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                   </div>
                 </div>
               ) : (
-                (canManageAdminTaskActions || createSubtasks) && (
+                !isCurrentTaskToReview && (canManageAdminTaskActions || createSubtasks) && (
                   <button
                     type="button"
                     className="tdm-subtask-add-row"
@@ -1859,6 +1925,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                             checked={isCompleted}
                             onChange={(e) => { e.stopPropagation(); handleToggleSubtask(st, e); }}
                             onClick={(e) => e.stopPropagation()}
+                            disabled={isCurrentTaskToReview}
                             aria-label={`Mark ${st.title || 'subtask'} completed`}
                           />
                         </div>
@@ -1873,6 +1940,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                               type="button"
                               className="tdm-subtask-delete-btn"
                               onClick={(e) => { e.stopPropagation(); handleDeleteSubtask(st); }}
+                              disabled={isCurrentTaskToReview}
                               aria-label="Delete subtask"
                               title="Delete"
                             >
@@ -2042,7 +2110,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
               {tagError && <p className="tdm-tag-error">{tagError}</p>}
 
               <div className="tdm-tag-composer">
-                {canManageTags && (
+                {canManageTags && !isCurrentTaskToReview && (
                   <input
                     type="text"
                     placeholder="Type tag and press Enter"
@@ -2069,7 +2137,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                         <span key={id} className="tdm-tag tdm-current-tag">
                           <span className="tdm-tag-name">{name}</span>
                           {t?.isPending && <span className="tdm-tag-pending">Saving...</span>}
-                          {canManageTags && (
+                          {canManageTags && !isCurrentTaskToReview && (
                             <button
                               type="button"
                               className="tdm-tag-remove"
@@ -2094,7 +2162,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                     const name = s?.tagName || s?.tag_name || s?.name || String(s);
                     const normName = String(name).replace(/\s+/g, " ").trim();
                     const key = s?.id || normName;
-                    if (!canManageTags) return null;
+                    if (!canManageTags || isCurrentTaskToReview) return null;
                     return (
                       <button
                         key={key}

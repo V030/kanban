@@ -17,12 +17,13 @@ function IconShell({ children, className = "", size = 24, viewBox = "0 0 24 24",
 
 export function DashboardIcon({ className = "", size = 24 }) {
   return (
-    <IconShell className={className} size={size}>
-      <rect x="3" y="3" width="7" height="7" rx="1.8" />
-      <rect x="14" y="3" width="7" height="5" rx="1.8" />
-      <rect x="14" y="12" width="7" height="9" rx="1.8" />
-      <rect x="3" y="14" width="7" height="7" rx="1.8" />
-    </IconShell>
+<IconShell className={className} size={size}>
+  <path 
+    d="M4 10.5a1.5 1.5 0 0 1 .44-1.06l7-7a1.5 1.5 0 0 1 2.12 0l7 7A1.5 1.5 0 0 1 20 10.5V19a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-4h-4v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8.5z" 
+    fill="currentColor" 
+  />
+</IconShell>
+
   );
 }
 
