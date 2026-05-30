@@ -1,4 +1,5 @@
 import "../styles/KanbanBoard.css";
+import { useEffect, useMemo, useState } from "react";
 
 export default function KanbanBoard({
   columns = [],
@@ -10,10 +11,37 @@ export default function KanbanBoard({
   canDragTask,
   showAddTaskButton = true,
 }) {
+  const [activeColumnId, setActiveColumnId] = useState(columns[0]?.id || "");
+
+  useEffect(() => {
+    if (!columns.length) {
+      setActiveColumnId("");
+      return;
+    }
+
+    const hasActiveColumn = columns.some((column) => String(column.id) === String(activeColumnId));
+    if (!hasActiveColumn) {
+      setActiveColumnId(columns[0].id);
+    }
+  }, [columns, activeColumnId]);
+
+  const activeColumn = useMemo(
+    () => columns.find((column) => String(column.id) === String(activeColumnId)) || columns[0],
+    [columns, activeColumnId]
+  );
+
   const formatCategoryLabel = (value) =>
     String(value || "")
       .replace(/_/g, " ")
-      .toUpperCase();
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  const getColumnTone = (value) => {
+    const key = String(value || "").toLowerCase().replace(/\s+/g, "_");
+    if (key.includes("progress")) return "progress";
+    if (key.includes("review")) return "review";
+    if (key.includes("done") || key.includes("complete")) return "done";
+    return "todo";
+  };
 
   const createDragImage = (sourceElement) => {
     if (!sourceElement || !document?.body) return null;
@@ -60,11 +88,58 @@ export default function KanbanBoard({
   };
 
   return (
+    <>
+    <div className="tf-mobile-board-nav" aria-label="Kanban columns">
+      <div className="tf-mobile-tabs" role="tablist" aria-label="Task columns">
+        {columns.map((column) => {
+          const isActive = String(column.id) === String(activeColumn?.id);
+          const label = formatCategoryLabel(column.title);
+
+          return (
+            <button
+              key={column.id}
+              type="button"
+              className={`tf-mobile-tab${isActive ? " is-active" : ""}`}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`tf-column-panel-${column.id}`}
+              id={`tf-column-tab-${column.id}`}
+              onClick={() => setActiveColumnId(column.id)}
+            >
+              <span>{label}</span>
+              <span className="tf-mobile-tab-count">{(column.tasks || []).length}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="tf-mobile-overview-strip" aria-label="Column task counts">
+        {columns.map((column) => {
+          const tone = getColumnTone(column.title);
+          return (
+            <button
+              key={column.id}
+              type="button"
+              className={`tf-mobile-overview-pill tf-mobile-overview-pill--${tone}`}
+              onClick={() => setActiveColumnId(column.id)}
+            >
+              <span className="tf-mobile-overview-dot" aria-hidden="true" />
+              <span>{formatCategoryLabel(column.title)}</span>
+              <strong>{(column.tasks || []).length}</strong>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+
     <div className="tf-board">
       {columns.map((column) => (
         <section 
           key={column.id} 
-          className="tf-column"
+          className={`tf-column${String(column.id) === String(activeColumn?.id) ? " tf-column--mobile-active" : ""}`}
+          id={`tf-column-panel-${column.id}`}
+          role="tabpanel"
+          aria-labelledby={`tf-column-tab-${column.id}`}
           data-column={String(column?.title || column?.name || "").toLowerCase().replace(/\s+/g, "_")}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
@@ -149,5 +224,6 @@ export default function KanbanBoard({
         </section>
       ))}
     </div>
+    </>
   );
 }

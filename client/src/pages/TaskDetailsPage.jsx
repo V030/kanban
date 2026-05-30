@@ -348,7 +348,7 @@ export default function TaskDetailsPage() {
   if (!task) {
     if (taskLoading) {
       return (
-        <div className="page-shell tdm-page-container" role="main">
+        <div className="page-shell tdm-page-container task-details-page-shell" role="main">
           <div className="tdm-section-card">
             <>
               <SkeletonBox width="200px" height="24px" />
@@ -366,7 +366,7 @@ export default function TaskDetailsPage() {
   }
 
   return (
-    <div className="page-shell tdm-page-container" role="main">
+    <div className="page-shell tdm-page-container task-details-page-shell" role="main">
       <header className="workspace-hero tdm-page-hero">
         <div className="workspace-hero-content">
           <div>
@@ -382,6 +382,7 @@ export default function TaskDetailsPage() {
         task={task}
         projectMembers={projectMembers}
         projectId={project?.id}
+        projectName={project?.name || task?.project?.name || "Project Management TOOL"}
         isAdminOrOwner={isAdminOrOwner}
         canMembersAssignTaskToOthers={canMembersAssignTaskToOthers}
         canMembersTakeTask={canMembersTakeTask}

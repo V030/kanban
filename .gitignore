@@ -20,3 +20,7 @@ yarn-error.log*
 
 /client/node_modules/
 /server/node_modules/
+
+# credentials
+/credentials/
+/*.json

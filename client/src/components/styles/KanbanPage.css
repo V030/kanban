@@ -221,6 +221,11 @@
   justify-content: flex-end;
 }
 
+.kanban-mobile-breadcrumb-bar,
+.kanban-mobile-overflow {
+  display: none;
+}
+
 .kanban-actions .btn {
   font-size: 0.75rem;
   padding: 6px 12px;
@@ -412,8 +417,8 @@
 .tf-task-card-inner {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 5px 5px 5px;
+  gap: 8px;
+  padding: 0;
 }
 
 /* ── Top line: priority + drag handle ── */
@@ -422,7 +427,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }
 
 .tf-drag-handle {
@@ -475,11 +480,12 @@
 .tf-priority-pill {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  gap: 4px;
+  padding: 3px 10px;
   border-radius: 999px;
-  font-size: 0.67rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
@@ -492,20 +498,21 @@
 
 /* ── Title ── */
 .tf-task-title {
-  margin: 0 0 5px;
-  font-size: 0.9rem;
-  font-weight: 700;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
   color: var(--color-text-primary);
   line-height: 1.3;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 /* ── Description ── */
 .tf-task-desc {
-  margin: 0 0 10px;
-  font-size: 0.78rem;
+  margin: 0;
+  font-size: 0.8rem;
   color: var(--color-text-secondary);
-  line-height: 1.5;
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -514,7 +521,7 @@
 
 /* ── Meta rows (Created by / Target) ── */
 .tf-task-meta {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 0.75rem;
   color: var(--color-text-tertiary);
   line-height: 1.4;
@@ -525,16 +532,18 @@
 }
 
 .tf-task-meta-name {
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.tdm-target-value,
+.tf-task-target-date {
   font-weight: 600;
   color: var(--color-text-secondary);
 }
 
-.tdm-target-value {
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.tdm-target-value.is-overdue {
+.tdm-target-value.is-overdue,
+.tf-task-target-date.is-overdue {
   color: #dc2626;
 }
 
@@ -555,7 +564,7 @@
 .tf-task-divider {
   height: 1px;
   background: var(--color-border-subtle);
-  margin: 11px 0 10px;
+  margin: 2px 0 4px;
   opacity: 0.7;
 }
 
@@ -564,8 +573,38 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   min-height: 28px;
+  margin-top: 4px;
+}
+
+.tf-task-footer-meta {
+  display: none !important;
+}
+
+.tf-task-creator {
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tf-overdue-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .tf-task-assignee-block {
@@ -573,6 +612,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .tf-task-assignee-label {
@@ -580,12 +620,14 @@
   font-weight: 600;
   color: var(--color-text-tertiary);
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tf-task-avatar-row {
   display: flex;
   align-items: center;
-  gap: -4px;
+  gap: 0;
+  flex: 0 0 auto;
 }
 
 .tf-task-avatar {
@@ -623,8 +665,8 @@
 /* ── Action button (Take / Unassign / Remove) ── */
 .tf-task-action {
   flex-shrink: 0;
-  padding: 4px 11px;
-  border-radius: 7px;
+  padding: 5px 12px;
+  border-radius: 8px;
   font-size: 0.71rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -636,6 +678,8 @@
   height: 26px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .tf-task-action--take {
@@ -679,4 +723,252 @@
   font-size: 0.7rem;
   color: var(--color-text-tertiary);
   padding: 0 15px 10px;
+}
+
+@media (max-width: 768px) {
+  .app-layout:has(.kanban-page) {
+    padding: 0 0 calc(92px + env(safe-area-inset-bottom));
+    gap: 0;
+  }
+
+  .kanban-page {
+    width: 100%;
+    gap: 12px;
+    color: #12263a;
+  }
+
+  .content:has(.kanban-page),
+  .content-inner:has(> .kanban-page) {
+    background: #f0f4f3;
+  }
+
+  .content-inner:has(> .kanban-page) {
+    padding-right: 0;
+    overflow-x: hidden;
+  }
+
+  .kanban-page .workspace-hero {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #f0f4f3;
+  }
+
+  .kanban-page .breadcrumb-portal-host {
+    display: none;
+  }
+
+  .kanban-mobile-breadcrumb-bar {
+    min-height: 38px;
+    padding: 3px 8px;
+    border-bottom: 0.5px solid rgba(148, 163, 184, 0.35);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 30px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .kanban-mobile-breadcrumb {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #7b8a99;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .kanban-mobile-breadcrumb-link {
+    flex: 0 0 auto;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #1D9E75;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .kanban-mobile-breadcrumb-current {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .kanban-mobile-breadcrumb-separator {
+    flex: 0 0 auto;
+    color: #94a3b8;
+  }
+
+  .kanban-mobile-back-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: #38506b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .kanban-page .workspace-hero-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+    padding: 6px 8px 0;
+  }
+
+  .kanban-title {
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .kanban-project-meta {
+    order: 2;
+    gap: 6px;
+    min-width: 0;
+    font-size: 11px;
+  }
+
+  .kanban-project-tag {
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #1D9E75;
+    background: transparent;
+  }
+
+  .kanban-project-tag::before {
+    width: 7px;
+    height: 7px;
+    background: #1D9E75;
+  }
+
+  .kanban-project-summary {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 700;
+  }
+
+  .kanban-title-row {
+    order: 1;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .kanban-editable-title {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.18;
+    letter-spacing: 0;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .kanban-desc-row {
+    display: none;
+  }
+
+  .kanban-actions {
+    flex-wrap: nowrap;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .kanban-icon-btn {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 10px !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: #64748b;
+  }
+
+  .kanban-icon-btn svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .kanban-desktop-action {
+    display: none !important;
+  }
+
+  .kanban-mobile-overflow {
+    position: relative;
+    display: block;
+  }
+
+  .kanban-mobile-overflow-trigger span {
+    display: inline-block;
+    transform: translateY(-2px);
+    font-size: 0.8rem;
+    letter-spacing: -0.08em;
+  }
+
+  .kanban-mobile-overflow-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 50;
+    display: none;
+    min-width: 138px;
+    padding: 6px;
+    border-radius: 12px;
+    border: 0.5px solid rgba(148, 163, 184, 0.4);
+    background: #ffffff;
+    box-shadow: 0 16px 32px -20px rgba(15, 23, 42, 0.38);
+  }
+
+  .kanban-mobile-overflow-menu[data-open] {
+    display: grid;
+    gap: 2px;
+  }
+
+  .kanban-mobile-overflow-menu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    padding: 8px 9px;
+    color: #38506b;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .kanban-mobile-overflow-menu button:hover {
+    background: rgba(29, 158, 117, 0.08);
+    color: #1D9E75;
+  }
+
+  .kanban-mobile-overflow-menu svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .kanban-shell {
+    min-height: 0;
+    padding: 0 8px 5px;
+    gap: 6px;
+  }
 }

@@ -1139,11 +1139,32 @@ function KanbanPage() {
 	return (
 		<section className="page-shell kanban-page">
 			<header className="workspace-hero">
+				<div className="kanban-mobile-breadcrumb-bar">
+					<nav className="kanban-mobile-breadcrumb" aria-label="Project breadcrumb">
+						<button
+							type="button"
+							className="kanban-mobile-breadcrumb-link"
+							onClick={() => navigate("/main-page/projects")}
+						>
+							Projects
+						</button>
+						<span className="kanban-mobile-breadcrumb-separator" aria-hidden="true">›</span>
+						<span className="kanban-mobile-breadcrumb-current">{project.name || "Project"}</span>
+					</nav>
+					<button
+						type="button"
+						className="kanban-mobile-back-btn"
+						onClick={() => navigate(-1)}
+						aria-label="Go back"
+					>
+						‹
+					</button>
+				</div>
 				<div className="workspace-hero-content">
 				<div className="kanban-title">
 					<div className="kanban-project-meta">
 						<span className="kanban-project-tag">Active Project</span>
-						<span className="kanban-project-summary">{columnCount} columns - {taskCount} tasks</span>
+						<span className="kanban-project-summary">{columnCount} columns · {taskCount} tasks</span>
 					</div>
 					<div className="kanban-title-row">
 						<h1
@@ -1241,7 +1262,7 @@ function KanbanPage() {
 							<TeamIcon />
 					</button>
 					<button
-						className="kanban-icon-btn"
+						className="kanban-icon-btn kanban-desktop-action"
 						onClick={() => setSettingsOpen(true)}
 						title="Project Settings"
 						aria-label="Project Settings"
@@ -1249,13 +1270,34 @@ function KanbanPage() {
 							<SettingsIcon />
 					</button>
 					<button
-						className="kanban-icon-btn"
+						className="kanban-icon-btn kanban-desktop-action"
 						onClick={() => navigate(`/main-page/projects/${projectId}/metrics`)}
 						title="Metrics"
 						aria-label="Metrics"
 					>
 							<MetricsIcon />
 					</button>
+					<div className="kanban-mobile-overflow">
+						<button
+							type="button"
+							className="kanban-icon-btn kanban-mobile-overflow-trigger"
+							aria-label="More project actions"
+							onClick={(event) => {
+								const menu = event.currentTarget.nextElementSibling;
+								menu?.toggleAttribute("data-open");
+							}}
+						>
+							<span aria-hidden="true">•••</span>
+						</button>
+						<div className="kanban-mobile-overflow-menu">
+							<button type="button" onClick={() => setSettingsOpen(true)}>
+								<SettingsIcon /> Settings
+							</button>
+							<button type="button" onClick={() => navigate(`/main-page/projects/${projectId}/metrics`)}>
+								<MetricsIcon /> Metrics
+							</button>
+						</div>
+					</div>
 				</div>
 			</div>
 		</header>
@@ -1330,10 +1372,12 @@ function KanbanPage() {
 									return "Updating...";
 							}
 						})();
-						const showTaskAction = showTakeTask || showUnassignTask || showRemoveTask || isPending;
 						const actionLabel = isPending ? pendingLabel : (showUnassignTask ? "Unassign" : "Take Task");
 						const creatorName = `${task.creator?.firstName || task.createdBy?.firstName || task.creator?.first_name || task.createdBy?.first_name || ""} ${task.creator?.lastName || task.createdBy?.lastName || task.creator?.last_name || task.createdBy?.last_name || ""}`.trim();
-							const assignedMembers = getTaskAssignedMembers(task);
+						const assignedMembers = getTaskAssignedMembers(task);
+						const taskTargetDate = task.targetDate || task.target_date;
+						const taskTargetDateLabel = formatDateShort(taskTargetDate);
+						const isOverdue = Boolean(task.isPastDue || task.is_past_due);
 
 						return (
 							<>
@@ -1349,9 +1393,9 @@ function KanbanPage() {
 														.replace(/_/g, " ")
 														.replace(/\b\w/g, (c) => c.toUpperCase());
 											return (
-											<span className="tf-priority-line">
+											<span className={`tf-priority-pill tf-priority-${pillClass}`}>
 												<span className="tf-priority-prefix">Priority •</span>{" "}
-												<span className={`tf-priority-pill tf-priority-${pillClass}`}>{label}</span>
+												<span>{label}</span>
 												</span>
 											);
 										})()}
@@ -1373,18 +1417,17 @@ function KanbanPage() {
 										
 									{creatorName && (
 										<p className="tf-task-meta">
-											Created by: <strong className="tf-task-meta-name">{creatorName}</strong>
+											<span>Created by:</span>
+											<span className="tf-task-meta-name">{creatorName}</span>
 										</p>
 									)}
-
-									{(task.targetDate || task.target_date) && (
+									{taskTargetDateLabel && (
 										<p className="tf-task-meta">
-											Target: <span className={`tf-task-meta-name tdm-target-value${(task.isPastDue || task.is_past_due) ? " is-overdue" : ""}`}>
-												{formatDateShort(task.targetDate || task.target_date)}
+											<span>Target:</span>
+											<span className={`tf-task-target-date${isOverdue ? " is-overdue" : ""}`}>
+												{taskTargetDateLabel}
 											</span>
-											{(task.isPastDue || task.is_past_due) ? (
-												<span className="tdm-overdue-badge" style={{ marginLeft: 8 }}>Overdue</span>
-											) : null}
+											{isOverdue && <span className="tf-overdue-pill">Overdue</span>}
 										</p>
 									)}
 

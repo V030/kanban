@@ -70,6 +70,7 @@ export default function ProjectMembersModal({
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
   const timerRef = useRef(null);
+  const touchStartYRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -150,6 +151,18 @@ export default function ProjectMembersModal({
     }
   };
 
+  const handleSheetTouchStart = (e) => {
+    if (window.innerWidth > 768) return;
+    touchStartYRef.current = e.touches?.[0]?.clientY ?? null;
+  };
+
+  const handleSheetTouchEnd = (e) => {
+    if (window.innerWidth > 768 || touchStartYRef.current == null) return;
+    const endY = e.changedTouches?.[0]?.clientY ?? touchStartYRef.current;
+    if (endY - touchStartYRef.current > 80) onClose();
+    touchStartYRef.current = null;
+  };
+
   if (!shouldRender) return null;
 
   const projectName = project?.name || "Project";
@@ -175,13 +188,30 @@ export default function ProjectMembersModal({
     };
 
   return (
-    <div className={`pmv-overlay${isClosing ? " is-closing" : ""}`} role="dialog" aria-modal="true" aria-label="Project members">
-      <div className={`pmv-modal${isClosing ? " is-closing" : ""}`}>
+    <div
+      className={`pmv-overlay${isClosing ? " is-closing" : ""}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Project members"
+      onMouseDown={onClose}
+      onTouchStart={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={`pmv-modal${isClosing ? " is-closing" : ""}`}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={handleSheetTouchStart}
+        onTouchEnd={handleSheetTouchEnd}
+      >
+        <div className="pmv-drag-handle" aria-hidden="true" />
 
         {/* Modal header */}
         <header className="pmv-header">
           <div>
-            <h2 className="pmv-title">Project Members</h2>
+            <h2 className="pmv-title">
+              Project members <span className="pmv-title-count">{members.length}</span>
+            </h2>
             <p className="pmv-subtitle">
               {project?.name
                 ? `People currently collaborating in ${projectName}.`
@@ -234,7 +264,7 @@ export default function ProjectMembersModal({
                   name="email"
                   type="email"
                   className="pmv-input"
-                  placeholder="person@example.com"
+                  placeholder="Invite by email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -244,7 +274,7 @@ export default function ProjectMembersModal({
                   className="pmv-send-btn"
                   disabled={inviteLoading || !canInvite}
                 >
-                  {inviteLoading ? "Sending…" : "Send invite"}
+                  {inviteLoading ? "Sending..." : "Invite"}
                 </button>
               </form>
             </div>
@@ -252,19 +282,22 @@ export default function ProjectMembersModal({
             {/* Friends list */}
             <div className="pmv-friends-section">
               <span className="pmv-col-label">Your friends</span>
-              <input
-                id="projectMemberSearch"
-                name="projectMemberSearch"
-                type="text"
-                className="pmv-input"
-                placeholder="Search by name or email…"
-                value={friendSearch}
-                onChange={(e) => setFriendSearch(e.target.value)}
-              />
+              <div className="pmv-search-wrap">
+                <span className="pmv-search-icon" aria-hidden="true">⌕</span>
+                <input
+                  id="projectMemberSearch"
+                  name="projectMemberSearch"
+                  type="text"
+                  className="pmv-input"
+                  placeholder="Search by name or email..."
+                  value={friendSearch}
+                  onChange={(e) => setFriendSearch(e.target.value)}
+                />
+              </div>
 
               <div className="pmv-friends-list">
                 {friendsLoading && (
-                  <p className="pmv-muted">Loading friends…</p>
+                  <p className="pmv-muted">Loading friends...</p>
                 )}
                 {!friendsLoading && friends.length === 0 && (
                   <p className="pmv-muted">You have no friends yet.</p>
@@ -287,7 +320,11 @@ export default function ProjectMembersModal({
                       onClick={() => handleSelectFriend(f.id, project.id)}
                       disabled={pendingFriendId === String(f.id) || !canInvite || isAlreadyMember(f.id) }
                     >
-                      {pendingFriendId === String(f.id) ? "…" : "Invite"}
+                      {isAlreadyMember(f.id)
+                        ? "Already in"
+                        : pendingFriendId === String(f.id)
+                          ? "..."
+                          : "Invite"}
                     </button>
                   </div>
                 ))}

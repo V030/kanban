@@ -356,18 +356,95 @@
     padding-left: 16px;
   }
 
+  .pm-section {
+    padding: 0;
+  }
+
+  .pm-list {
+    gap: 0;
+  }
+
   .pm-item {
-    align-items: flex-start;
-    flex-direction: column;
+    min-height: 44px;
+    align-items: center;
+    flex-direction: row;
+    padding: 8px 16px;
+    border: 0;
+    border-top: 0.5px solid var(--color-border-subtle);
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .pm-info {
-    width: 100%;
+    width: auto;
+    gap: 10px;
+  }
+
+  .pm-avatar {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    margin-right: 0;
+  }
+
+  .pm-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .pm-email {
+    max-width: 100%;
+    font-size: 12px;
   }
 
   .pm-actions-container {
-    width: 100%;
-    justify-content: flex-start;
+    width: auto;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+  }
+
+  .pm-role.owner {
+    padding: 3px 8px;
+    border: 0;
+    background: #E1F5EE;
+    color: #085041;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .pm-role.selector {
+    min-width: 78px;
+    min-height: 28px;
+    padding: 5px 9px;
+    border: 0;
+    border-radius: 20px;
+    background: var(--color-bg-subtle);
+    font-size: 12px;
+    box-shadow: none;
+  }
+
+  .pm-role-options {
+    right: 0;
+  }
+
+  .pm-remove-icon {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: #FCEBEB;
+    color: #A32D2D;
+    flex-shrink: 0;
+  }
+
+  .pm-remove-icon svg {
+    width: 15px;
+    height: 15px;
   }
 }
 

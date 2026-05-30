@@ -1,6 +1,6 @@
 # Database
 
-Last updated: 2026-05-13
+Last updated: 2026-05-30
 
 This document describes the PostgreSQL schema as inferred from the codebase, migrations, and SQL queries. It focuses on actual relationships and lifecycle behavior that the application depends on.
 
@@ -31,6 +31,7 @@ tasks
   |--< task_assignees
   |--< task_comments
   |--< task_comments_replies
+  |--< task_files
   |--< task_tags
   |--< subtasks
   |--< reviews
@@ -263,6 +264,38 @@ Lifecycle:
 - Nested under comments.
 - Deleted when the parent task is deleted.
 
+### task_files
+Purpose: files attached to a task.
+
+Create table:
+```sql
+CREATE TABLE IF NOT EXISTS task_files (
+  id SERIAL PRIMARY KEY,
+  task_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  file_size BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_files_task_id ON task_files(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_files_created_by ON task_files(created_by);
+```
+
+Important columns:
+- id
+- task_id
+- url
+- created_on
+- created_by
+- file_size
+
+Lifecycle:
+- Created when a user attaches a file to a task.
+- Deleted when the parent task is deleted.
+- Deleted through task cascade when a project is deleted.
+- Deleted if the attaching user is deleted.
+
 ### task_tags
 Purpose: freeform task labels.
 
@@ -326,6 +359,7 @@ Lifecycle:
 Observed or implied behaviors:
 - project_requests cascades through user and project deletion.
 - reviews cascades on task deletion.
+- task_files cascades on task deletion, including task deletes triggered by project deletion.
 - project deletion is treated as a cascade boundary for downstream project data.
 - task deletion is manually cleaned up before deleting the task row, which is a defensive choice even when cascades may exist.
 
@@ -343,6 +377,7 @@ Recommended indexes if they are not already present:
 - tasks(category_id, position)
 - task_tags(project_id, tag_name)
 - task_comments(task_id, created_at)
+- task_files(task_id)
 - reviews(task_id, created_at)
 - project_requests(recipient_id, status, requested_at DESC)
 

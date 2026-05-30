@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { getCurrentUser } from "../../services/authService";
 import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask } from "../../services/projectService";
 import { SkeletonCommentInline, SkeletonRow } from "./SkeletonComponents";
-import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon } from "./AppIcons";
+import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon, CalendarIcon } from "./AppIcons";
 import "../styles/TaskDetailsModal.css";
 import "../styles/SkeletonLoading.css";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
@@ -26,7 +26,11 @@ function getCreatedAtLabel(task) {
   const parsedDate = new Date(rawValue);
   if (Number.isNaN(parsedDate.getTime())) return String(rawValue);
 
-  return parsedDate.toLocaleString();
+  return parsedDate.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 function formatTargetDate(value) {
@@ -136,7 +140,22 @@ function isToReviewCategoryName(value) {
   return normalized === "to_review" || normalized === "to review" || normalized === "review";
 }
 
-export function TaskDetailsContent({ asPage = false, canMembersEditTask = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersTakeTask = false, canMembersReviewTasks = false, canMembersDeleteTask = false, canMembersCreateTag = false, canAdminsManageTasks = false, assignMemberToTask, unassignMemberFromTask, takeSelfTask, unassignSelfTask, projectMembers = [], onAssign, onClose, projectId, taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
+function getStatusBadgeKey(value) {
+  if (isInProgressCategoryName(value)) return "in-progress";
+  if (isToReviewCategoryName(value)) return "review";
+  if (normalizeCategoryName(value) === "done") return "done";
+  return "todo";
+}
+
+function getStatusBadgeLabel(value) {
+  const key = getStatusBadgeKey(value);
+  if (key === "in-progress") return "In Progress";
+  if (key === "review") return "To Review";
+  if (key === "done") return "Done";
+  return "Todo";
+}
+
+export function TaskDetailsContent({ asPage = false, canMembersEditTask = false, currentUserId, task, isAdminOrOwner, createSubtasks, fetchTaskComments, addTaskComment, addTaskCommentReply, canMembersAssignTaskToOthers, canMembersTakeTask = false, canMembersReviewTasks = false, canMembersDeleteTask = false, canMembersCreateTag = false, canAdminsManageTasks = false, assignMemberToTask, unassignMemberFromTask, takeSelfTask, unassignSelfTask, projectMembers = [], onAssign, onClose, projectId, projectName = "", taskCategories = [], getProjectTags, getTaskTags, createTaskTag, deleteTaskTag, updateTaskName, updateTaskDescription, updateTaskPriority, updateTaskStatus, updateTaskTargetDate, onDeleteTask }) {
   const taskData = task || {};
   const currentUser = useMemo(() => getCurrentUser(), []);
   const currentUserIdValue = currentUserId || currentUser?.id || "";
@@ -227,6 +246,10 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
     const currentCategory = (taskCategories || []).find((category) => String(category?.id || "") === String(taskCategoryId || ""));
     return normalizeCategoryName(currentCategory?.name || taskData?.categoryName || taskData?.category_name);
   }, [taskCategories, taskCategoryId, taskData?.categoryName, taskData?.category_name]);
+  const mobileStatusKey = getStatusBadgeKey(currentTaskCategoryName);
+  const mobileStatusLabel = getStatusBadgeLabel(currentTaskCategoryName);
+  const mobileProjectName = projectName || taskData?.project?.name || taskData?.projectName || taskData?.project_name || "Project Management TOOL";
+  const canDeleteCurrentTask = (currentUserRole === "member" ? canMembersDeleteTask : canManageAdminTaskActions) && onDeleteTask;
   const isCurrentTaskDone = currentTaskCategoryName === "done";
   const isCurrentTaskToReview = isToReviewCategoryName(currentTaskCategoryName);
   const canEditTaskDetails = canEditTaskTitle && !isCurrentTaskToReview;
@@ -1569,6 +1592,231 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
             </button>
           </div>
         </header>
+      )}
+
+      {asPage && (
+        <div className="tdm-mobile-stack">
+          <header className="tdm-mobile-header">
+            <div className="tdm-mobile-breadcrumb-bar">
+              <nav className="tdm-mobile-breadcrumb" aria-label="Task breadcrumb">
+                <span>Projects</span>
+                <span aria-hidden="true">›</span>
+                <span>{mobileProjectName}</span>
+                <span aria-hidden="true">›</span>
+                <strong>{taskTitle || taskData.title || "Untitled task"}</strong>
+              </nav>
+              <button type="button" className="tdm-mobile-back-btn" onClick={onClose} aria-label="Go back">
+                ‹
+              </button>
+            </div>
+
+            <div className="tdm-mobile-title-row">
+              <h1>{taskTitle || taskData.title || "Untitled task"}</h1>
+              {canOpenTaskActionsMenu && (
+                <div className="task-actions-wrap tdm-mobile-actions-wrap">
+                  <button
+                    type="button"
+                    className="task-more-btn tdm-mobile-more-btn"
+                    onClick={() => setMenuOpen((prev) => !prev)}
+                    aria-expanded={menuOpen}
+                    aria-haspopup="true"
+                    title="More actions"
+                    ref={menuButtonRef}
+                  >
+                    ⋯
+                  </button>
+                  {menuOpen && (
+                    <div className="task-dropdown tdm-mobile-task-dropdown" ref={dropdownRef} role="dialog" aria-label="Task actions">
+                      <button
+                        type="button"
+                        className="task-dropdown-item"
+                        onClick={() => { setMenuOpen(false); setShowReviewModal(true); }}
+                      >
+                        Review history
+                      </button>
+                      <button
+                        type="button"
+                        className="task-dropdown-item"
+                        onClick={() => { setMenuOpen(false); setShowAssigneesModal(true); }}
+                      >
+                        Assignees
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <p className="tdm-mobile-description">{taskDesc || taskData.description || "No description provided."}</p>
+            <div className="tdm-mobile-badges" aria-label="Task summary">
+              <span className={`tdm-mobile-badge tdm-mobile-badge--priority tdm-priority-${taskPriority}`}>
+                {capitalizeFirst(taskPriority)}
+              </span>
+              <span className={`tdm-mobile-badge tdm-mobile-badge--status is-${mobileStatusKey}`}>
+                {mobileStatusLabel}
+              </span>
+              <span className={`tdm-mobile-badge tdm-mobile-badge--target${targetDate ? "" : " is-empty"}`}>
+                <CalendarIcon size={13} />
+                {formatTargetDate(targetDate)}
+              </span>
+            </div>
+          </header>
+
+          <article className="tdm-mobile-card tdm-mobile-details-card">
+            <div className="tdm-mobile-card-header">
+              <h2>Details</h2>
+            </div>
+            <div className="tdm-mobile-meta-grid">
+              <label className="tdm-mobile-meta-cell">
+                <span>Priority</span>
+                <select
+                  value={taskPriority}
+                  onChange={(event) => handleUpdateTaskPriority(event.target.value)}
+                  disabled={prioritySubmitting || !canEditTaskDetails}
+                >
+                  {TASK_PRIORITY_OPTIONS.map((priorityOption) => (
+                    <option key={priorityOption} value={priorityOption}>
+                      {capitalizeFirst(priorityOption)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="tdm-mobile-meta-cell">
+                <span>Status</span>
+                <select
+                  value={taskCategoryId || ""}
+                  onChange={(event) => handleUpdateTaskCategory(event.target.value)}
+                  disabled={taskCategorySubmitting || !canChangeTaskCategory || (Array.isArray(taskCategories) && taskCategories.length === 0)}
+                >
+                  <option value="" disabled>Select status</option>
+                  {taskMenuStatusOptions
+                    .filter((statusOption) => statusOption.key !== "cancelled")
+                    .map((statusOption) => (
+                      <option key={statusOption.key} value={statusOption.categoryId} disabled={statusOption.disabled}>
+                        {statusOption.label}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <div className="tdm-mobile-meta-cell">
+                <span>Created</span>
+                <strong>{getCreatedAtLabel(taskData)}</strong>
+              </div>
+              <div className="tdm-mobile-meta-cell">
+                <span>Target date</span>
+                <strong className={targetDate ? "" : "is-muted"}>{formatTargetDate(targetDate)}</strong>
+              </div>
+            </div>
+          </article>
+
+          <article className="tdm-mobile-card">
+            <div className="tdm-mobile-card-header">
+              <h2>Assignees</h2>
+              <button type="button" className="tdm-mobile-header-action" onClick={() => setShowAssigneesModal(true)}>
+                + Add
+              </button>
+            </div>
+            {assignees.length === 0 ? (
+              <p className="tdm-mobile-empty">No assignees yet</p>
+            ) : (
+              <ul className="tdm-mobile-assignee-list">
+                {assignees.map((member, index) => (
+                  <li key={getMemberId(member) || index} className="tdm-mobile-assignee-row">
+                    {(() => {
+                      const src = normalizeProfileImage(member?.profileImageBase64 || member?.profile_image_base64);
+                      return src ? (
+                        <span className="tdm-mobile-avatar"><img src={src} alt={getMemberLabel(member)} /></span>
+                      ) : (
+                        <span className="tdm-mobile-avatar">{getInitials(member)}</span>
+                      );
+                    })()}
+                    <span>
+                      <strong>{getMemberLabel(member)}</strong>
+                      <small>{member?.email || "No email"}</small>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+
+          <article className="tdm-mobile-card">
+            <div className="tdm-mobile-card-header">
+              <h2>Subtasks</h2>
+              {!isCurrentTaskToReview && (canManageAdminTaskActions || createSubtasks) && (
+                <button type="button" className="tdm-mobile-header-action" onClick={() => setShowAddSubtask(true)}>
+                  + New
+                </button>
+              )}
+            </div>
+            {showAddSubtask && (
+              <div className="tdm-mobile-subtask-composer">
+                <input
+                  ref={newSubtaskInputRef}
+                  type="text"
+                  value={newSubtaskTitle}
+                  onChange={(event) => setNewSubtaskTitle(event.target.value)}
+                  placeholder="New subtask title"
+                  onKeyDown={async (event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      await handleCreateSubtask();
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setNewSubtaskTitle("");
+                      setShowAddSubtask(false);
+                    }
+                  }}
+                />
+                <button type="button" onClick={handleCreateSubtask}>Add</button>
+              </div>
+            )}
+            {localSubtasks.length === 0 ? (
+              <p className="tdm-mobile-empty">No subtasks yet</p>
+            ) : (
+              <ul className="tdm-mobile-subtask-list">
+                {localSubtasks.map((st, index) => {
+                  const isCompleted = st?.status === "finished" || st?.status === "completed" || !!st.completed;
+                  return (
+                    <li key={st.id || `${index}-${st.title || st}`} className="tdm-mobile-subtask-row">
+                      <input
+                        type="checkbox"
+                        checked={isCompleted}
+                        onChange={(event) => handleToggleSubtask(st, event)}
+                        disabled={isCurrentTaskToReview}
+                        aria-label={`Mark ${st.title || "subtask"} completed`}
+                      />
+                      <span>{st.title || String(st)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </article>
+
+          <article className="tdm-mobile-card tdm-mobile-tabs-card">
+            <div className="tdm-mobile-tabs" role="tablist" aria-label="Task side tabs">
+              <button type="button" className={sidebarTab === "comments" ? "is-active" : ""} onClick={() => setSidebarTab("comments")}>Comments</button>
+              <button type="button" className={sidebarTab === "activity" ? "is-active" : ""} onClick={() => setSidebarTab("activity")}>Activity</button>
+              <button type="button" className={sidebarTab === "attachments" ? "is-active" : ""} onClick={() => setSidebarTab("attachments")}>Attachments</button>
+            </div>
+            <div className="tdm-mobile-tab-panel">
+              {sidebarTab === "comments" && commentsPanel}
+              {sidebarTab === "activity" && activitiesPanel}
+              {sidebarTab === "attachments" && attachmentsPanel}
+            </div>
+          </article>
+
+          {canDeleteCurrentTask && (
+            <article className="tdm-mobile-card tdm-mobile-remove-card">
+              <button type="button" className="tdm-mobile-remove-row" onClick={openDeleteConfirm} disabled={deleteTaskSubmitting}>
+                <TrashIcon size={18} />
+                <span>Remove task</span>
+              </button>
+            </article>
+          )}
+        </div>
       )}
 
       <div className="tdm-grid">

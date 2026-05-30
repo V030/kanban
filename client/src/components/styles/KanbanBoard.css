@@ -12,6 +12,10 @@
   width: 100%;
 }
 
+.tf-mobile-board-nav {
+  display: none;
+}
+
 /* Column Container */
 .tf-column {
   display: flex;
@@ -496,27 +500,326 @@
 }
 
 @media (max-width: 768px) {
+  .tf-mobile-board-nav {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .tf-mobile-tabs {
+    display: flex;
+    gap: 18px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 2px;
+    border-bottom: 0.5px solid rgba(148, 163, 184, 0.28);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tf-mobile-tabs::-webkit-scrollbar,
+  .tf-mobile-overview-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tf-mobile-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 10px 0 8px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: #7b8a99;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .tf-mobile-tab.is-active {
+    color: #1D9E75;
+    border-bottom-color: #1D9E75;
+  }
+
+  .tf-mobile-tab:focus-visible,
+  .tf-mobile-overview-pill:focus-visible {
+    outline: 2px solid rgba(29, 158, 117, 0.32);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  .tf-mobile-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #edf2f4;
+    color: #7b8a99;
+    font-size: 0.68rem;
+    font-weight: 900;
+  }
+
+  .tf-mobile-tab.is-active .tf-mobile-tab-count {
+    background: #E1F5EE;
+    color: #085041;
+  }
+
+  .tf-mobile-overview-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 0 2px 2px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tf-mobile-overview-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex: 0 0 auto;
+    min-height: 30px;
+    padding: 6px 10px;
+    border: 0.5px solid rgba(148, 163, 184, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.82);
+    color: #64748b;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .tf-mobile-overview-pill strong {
+    color: #12263a;
+    font-weight: 900;
+  }
+
+  .tf-mobile-overview-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #94a3b8;
+  }
+
+  .tf-mobile-overview-pill--progress .tf-mobile-overview-dot { background: #2563eb; }
+  .tf-mobile-overview-pill--review .tf-mobile-overview-dot { background: #f59e0b; }
+  .tf-mobile-overview-pill--done .tf-mobile-overview-dot { background: #1D9E75; }
+
   .tf-board {
     grid-template-columns: 1fr;
+    display: block;
+    padding: 0;
+    min-height: 0;
   }
 
   .tf-column {
+    display: none;
     height: auto;
-    min-height: 420px;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .tf-column.tf-column--mobile-active {
+    display: block;
+  }
+
+  .tf-column-header {
+    display: none;
+  }
+
+  .tf-tasks-list {
+    gap: 10px;
+    padding: 0;
+    overflow: visible;
   }
 
   .tf-task-footer-row {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-top: 0;
   }
 
   .tf-task-assignee-block {
-    width: 100%;
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
   }
 
   .tf-task-action {
-    width: 100%;
+    width: auto;
     justify-content: center;
+  }
+
+  .tf-empty-message {
+    min-height: 180px;
+    margin: 0;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .tf-task-card {
+    width: 100%;
+    border: 0.5px solid rgba(148, 163, 184, 0.34);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: none;
+    padding: 12px;
+  }
+
+  .tf-task-card:hover {
+    transform: none;
+    border-color: rgba(148, 163, 184, 0.34);
+  }
+
+  .tf-task-card-inner {
+    gap: 8px;
+    padding: 0;
+  }
+
+  .tf-task-card-topline {
+    min-height: 0;
+    margin: 0;
+  }
+
+  .tf-drag-handle,
+  .tf-status-line,
+  .tf-priority-prefix {
+    display: none;
+  }
+
+  .tf-priority-pill {
+    gap: 4px;
+    width: fit-content;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .tf-priority-urgent {
+    background: #FCEBEB;
+    color: #A32D2D;
+  }
+
+  .tf-priority-high {
+    background: #FFF4D6;
+    color: #9A5A00;
+  }
+
+  .tf-priority-medium {
+    background: #EAF2FF;
+    color: #2563eb;
+  }
+
+  .tf-priority-low {
+    background: #E8F7EF;
+    color: #1D9E75;
+  }
+
+  .tf-priority-unset {
+    background: #EEF2F4;
+    color: #64748b;
+  }
+
+  .tf-task-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: 0;
+  }
+
+  .tf-task-desc {
+    margin: -2px 0 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #6b7c8f;
+  }
+
+  .tf-task-divider {
+    height: 0.5px;
+    margin: 2px 0 0;
+    background: rgba(148, 163, 184, 0.36);
+  }
+
+  .tf-task-footer-meta {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .tf-task-creator {
+    min-width: 0;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tf-overdue-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 4px 7px;
+    border-radius: 999px;
+    background: #FCEBEB;
+    color: #A32D2D;
+    font-size: 0.64rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .tf-task-assignee-label,
+  .tf-task-unassigned {
+    display: none;
+  }
+
+  .tf-task-avatar {
+    width: 26px;
+    height: 26px;
+    box-shadow: none;
+  }
+
+  .tf-task-action {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    box-shadow: none;
+    font-size: 0.66rem;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .tf-task-action--take {
+    background: #E8F7EF;
+    border-color: transparent;
+    color: #1D9E75;
+  }
+
+  .tf-task-action--unassign {
+    background: #FCEBEB;
+    border-color: transparent;
+    color: #A32D2D;
   }
 }
 
