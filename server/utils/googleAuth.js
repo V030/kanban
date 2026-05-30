@@ -51,8 +51,6 @@ export async function exchangeGoogleAuthCode(code) {
 
     return {
       googleUser,
-      refreshToken: tokens.refresh_token || null,
-      scopes: tokens.scope || "",
     };
   } catch (error) {
     console.error("Google auth code exchange failed:", error.message);

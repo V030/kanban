@@ -18,11 +18,10 @@ export function isPreviewSupported(file) {
   const mime = getMimeType(file);
   const ext = getFileExtension(file);
 
-  if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return true;
+  if (["image/jpeg", "image/png", "image/webp"].includes(mime) || ["jpg", "jpeg", "png", "webp"].includes(ext)) return true;
   if (mime === "application/pdf" || ext === "pdf") return true;
-  if (mime.startsWith("video/") || ["mp4", "webm"].includes(ext)) return true;
-  if (mime.startsWith("audio/") || ["mp3", "wav"].includes(ext)) return true;
-  if (mime.startsWith("text/") || ["txt", "json", "md", "csv"].includes(ext)) return true;
+  if (mime === "video/mp4" || ext === "mp4") return true;
+  if (mime === "text/plain" || ext === "txt") return true;
   return false;
 }
 
@@ -33,15 +32,12 @@ export default function FilePreview({ file }) {
   const ext = getFileExtension(file);
   const fileName = getFileName(file);
   const url = file?.url || "";
-  const driveFileId = String(file?.drive_file_id || file?.driveFileId || "").trim();
-  const drivePreviewUrl = driveFileId ? `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/preview` : url;
 
   const previewType = useMemo(() => {
-    if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "image";
+    if (["image/jpeg", "image/png", "image/webp"].includes(mime) || ["jpg", "jpeg", "png", "webp"].includes(ext)) return "image";
     if (mime === "application/pdf" || ext === "pdf") return "pdf";
-    if (mime.startsWith("video/") || ["mp4", "webm"].includes(ext)) return "video";
-    if (mime.startsWith("audio/") || ["mp3", "wav"].includes(ext)) return "audio";
-    if (mime.startsWith("text/") || ["txt", "json", "md", "csv"].includes(ext)) return "text";
+    if (mime === "video/mp4" || ext === "mp4") return "video";
+    if (mime === "text/plain" || ext === "txt") return "text";
     return "download";
   }, [ext, mime]);
 
@@ -78,20 +74,25 @@ export default function FilePreview({ file }) {
     );
   }
 
+  if (previewError) {
+    return (
+      <div className="tdm-file-preview-fallback">
+        <div className="tdm-file-preview-icon" aria-hidden="true">FILE</div>
+        <p>{previewError}</p>
+      </div>
+    );
+  }
+
   if (previewType === "image") {
     return <img className="tdm-file-preview-media" src={url} alt={fileName} onError={() => setPreviewError("Preview failed to load.")} />;
   }
 
   if (previewType === "pdf") {
-    return <iframe className="tdm-file-preview-frame" src={drivePreviewUrl} title={fileName} />;
+    return <iframe className="tdm-file-preview-frame" src={url} title={fileName} onError={() => setPreviewError("Preview failed to load.")} />;
   }
 
   if (previewType === "video") {
-    return <video className="tdm-file-preview-media" src={url} controls />;
-  }
-
-  if (previewType === "audio") {
-    return <audio className="tdm-file-preview-audio" src={url} controls />;
+    return <video className="tdm-file-preview-media" src={url} controls onError={() => setPreviewError("Preview failed to load.")} />;
   }
 
   if (previewType === "text") {

@@ -2884,7 +2884,7 @@
 
 .tdm-attachments-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: stretch;
   gap: 8px;
   padding-bottom: 10px;
   border-bottom: 0.5px solid var(--color-border-tertiary);
@@ -2895,12 +2895,10 @@
 }
 
 .tdm-attachment-upload-btn,
-.tdm-attachment-actions button,
-.tdm-attachment-actions a,
 .tdm-file-preview-actions a {
   min-height: 34px;
   border: 1px solid #cbd9e6;
-  border-radius: 6px;
+  border-radius: 10px;
   background: #ffffff;
   color: #0f7f8f;
   font-size: 0.82rem;
@@ -2914,9 +2912,17 @@
 }
 
 .tdm-attachment-upload-btn {
+  width: 100%;
+  min-height: 42px;
   background: #0f7f8f;
   color: #ffffff;
   border-color: #0f7f8f;
+  box-shadow: 0 8px 18px -14px rgba(15, 127, 143, 0.8);
+}
+
+.tdm-attachment-upload-btn:hover:not(:disabled) {
+  background: #0b6f7d;
+  border-color: #0b6f7d;
 }
 
 .tdm-attachment-upload-btn:disabled,
@@ -2936,18 +2942,26 @@
 
 .tdm-attachment-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid #d8e4ef;
-  border-radius: 8px;
-  background: #ffffff;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #d7e1ec;
+  border-radius: 12px;
+  background: var(--color-bg-subtle);
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.tdm-attachment-row:hover {
+  background: #f7fafc;
+  border-color: #b9c9d8;
+  box-shadow: 0 8px 20px -18px rgba(18, 38, 58, 0.28);
 }
 
 .tdm-attachment-icon,
 .tdm-file-preview-icon {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 8px;
   background: #e7f8fb;
   color: #0f7f8f;
@@ -2958,8 +2972,47 @@
   letter-spacing: 0.04em;
 }
 
+.tdm-attachment-icon--docx,
+.tdm-attachment-icon--xlsx {
+  background: #e8f1ff;
+  color: #1d4ed8;
+}
+
+.tdm-attachment-icon--pdf {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.tdm-attachment-icon--image {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.tdm-attachment-icon--video {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tdm-attachment-icon--text,
+.tdm-attachment-icon--archive,
+.tdm-attachment-icon--file {
+  background: #eef2f7;
+  color: #475569;
+}
+
 .tdm-attachment-meta {
   min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tdm-attachment-meta:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 .tdm-attachment-meta strong {
@@ -2971,24 +3024,115 @@
   font-size: 0.9rem;
 }
 
-.tdm-attachment-meta span {
-  display: block;
+.tdm-attachment-meta:hover:not(:disabled) strong {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tdm-attachment-detail-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-top: 2px;
   color: #6d7f92;
   font-size: 0.78rem;
 }
 
+.tdm-attachment-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.tdm-attachment-type-badge--docx,
+.tdm-attachment-type-badge--xlsx {
+  background: #e8f1ff;
+  color: #1d4ed8;
+}
+
+.tdm-attachment-type-badge--pdf {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.tdm-attachment-type-badge--image {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.tdm-attachment-type-badge--video {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tdm-attachment-type-badge--text,
+.tdm-attachment-type-badge--archive,
+.tdm-attachment-type-badge--file {
+  background: #eef2f7;
+  color: #475569;
+}
+
 .tdm-attachment-actions {
-  grid-column: 1 / -1;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+}
+
+.tdm-attachment-actions a,
+.tdm-attachment-actions button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #5f7286;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.tdm-attachment-actions a:hover {
+  color: #162638;
+}
+
+.tdm-attachment-action-divider {
+  width: 1px;
+  height: 18px;
+  background: #d7e1ec;
 }
 
 .tdm-attachment-actions .tdm-attachment-delete {
+  color: #8a9bad;
+}
+
+.tdm-attachment-actions .tdm-attachment-delete:hover:not(:disabled) {
   color: #b91c1c;
-  border-color: #f2b8b5;
-  background: #fff7f7;
+}
+
+.tdm-attachment-footer {
+  grid-column: 2 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #7b8da1;
+  font-size: 0.74rem;
+}
+
+.tdm-attachments-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+  color: #7b8da1;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .tdm-file-preview-modal {

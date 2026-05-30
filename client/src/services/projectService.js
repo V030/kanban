@@ -1,7 +1,20 @@
 import { fetchWithAuth } from "./authService";
-import { transformErrorMessage } from "../utils/errorTransformer";
 
 const API_URL = "http://localhost:5000";
+const TASK_FILE_MAX_BYTES = 25 * 1024 * 1024;
+const TASK_FILE_ALLOWED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+  "video/mp4",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/octet-stream",
+]);
 
 export async function createProject(projectData) {
   const trimmedDescription = String(projectData?.description || "").trim();
@@ -396,6 +409,12 @@ export async function getTaskFiles(taskId) {
 export async function uploadTaskFile(taskId, file) {
   if (!taskId) throw new Error("Unable to upload attachment. Please select a task.");
   if (!file) throw new Error("Please choose a file to upload.");
+  if (file.size > TASK_FILE_MAX_BYTES) throw new Error("File is too large. Please choose a file under 25 MB.");
+
+  const mimeType = file.type || "application/octet-stream";
+  if (!TASK_FILE_ALLOWED_TYPES.has(mimeType)) {
+    throw new Error("This file type is not supported for task attachments.");
+  }
 
   const formData = new FormData();
   formData.append("file", file);

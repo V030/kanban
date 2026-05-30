@@ -2160,6 +2160,7 @@ export async function deleteTask({ taskId, requesterId }) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    let deletedTaskFiles = [];
 
     await client.query(
       `DELETE FROM reviews WHERE task_id = $1::int`,
@@ -2186,10 +2187,15 @@ export async function deleteTask({ taskId, requesterId }) {
       [normalizedTaskId]
     );
 
-    await client.query(
-      `DELETE FROM task_files WHERE task_id = $1::int`,
+    const deletedFilesResult = await client.query(
+      `
+      DELETE FROM task_files
+      WHERE task_id = $1::int
+      RETURNING id, task_id, storage_path, file_name, mime_type, url, file_size, created_by, created_on
+      `,
       [normalizedTaskId]
     );
+    deletedTaskFiles = deletedFilesResult.rows.map(mapTaskFileRow);
 
     await client.query(
       `DELETE FROM subtasks WHERE task_id = $1::int`,
@@ -2208,7 +2214,7 @@ export async function deleteTask({ taskId, requesterId }) {
     }
 
     await client.query("COMMIT");
-    return { taskId: deleteResult.rows[0].id };
+    return { taskId: deleteResult.rows[0].id, deletedTaskFiles };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -2223,12 +2229,19 @@ function mapTaskFileRow(row) {
   return {
     id: row.id,
     task_id: row.task_id,
-    drive_file_id: row.drive_file_id,
+    storage_path: row.storage_path,
     file_name: row.file_name,
     mime_type: row.mime_type,
     url: row.url,
     file_size: row.file_size == null ? null : Number(row.file_size),
     created_by: row.created_by,
+    uploaded_by: {
+      id: row.created_by,
+      firstName: row.uploader_first_name || "",
+      lastName: row.uploader_last_name || "",
+      email: row.uploader_email || "",
+      name: `${row.uploader_first_name || ""} ${row.uploader_last_name || ""}`.trim() || row.uploader_email || "",
+    },
     created_on: row.created_on,
   };
 }
@@ -2247,10 +2260,15 @@ export async function getTaskFiles({ taskId, requesterId }) {
 
   const result = await pool.query(
     `
-    SELECT id, task_id, drive_file_id, file_name, mime_type, url, file_size, created_by, created_on
-    FROM task_files
-    WHERE task_id = $1::int
-    ORDER BY created_on DESC, id DESC
+    SELECT
+      tf.id, tf.task_id, tf.storage_path, tf.file_name, tf.mime_type, tf.url, tf.file_size, tf.created_by, tf.created_on,
+      u.first_name AS uploader_first_name,
+      u.last_name AS uploader_last_name,
+      u.email AS uploader_email
+    FROM task_files tf
+    LEFT JOIN users u ON u.id = tf.created_by
+    WHERE tf.task_id = $1::int
+    ORDER BY tf.created_on DESC, tf.id DESC
     `,
     [normalizedTaskId]
   );
@@ -2258,9 +2276,9 @@ export async function getTaskFiles({ taskId, requesterId }) {
   return result.rows.map(mapTaskFileRow);
 }
 
-export async function createTaskFile({ taskId, driveFileId, fileName, mimeType, url, fileSize, createdBy }) {
+export async function createTaskFile({ taskId, storagePath, fileName, mimeType, url, fileSize, createdBy }) {
   const normalizedTaskId = Number(taskId);
-  const normalizedDriveFileId = String(driveFileId || "").trim();
+  const normalizedStoragePath = String(storagePath || "").trim();
   const normalizedFileName = String(fileName || "").trim();
   const normalizedMimeType = String(mimeType || "application/octet-stream").trim();
   const normalizedUrl = String(url || "").trim();
@@ -2273,7 +2291,7 @@ export async function createTaskFile({ taskId, driveFileId, fileName, mimeType, 
     throw error;
   }
 
-  if (!normalizedDriveFileId || !normalizedFileName || !normalizedUrl) {
+  if (!normalizedStoragePath || !normalizedFileName) {
     const error = new Error("File metadata is incomplete");
     error.code = "INVALID_FILE";
     throw error;
@@ -2287,13 +2305,23 @@ export async function createTaskFile({ taskId, driveFileId, fileName, mimeType, 
 
   const result = await pool.query(
     `
-    INSERT INTO task_files (task_id, drive_file_id, file_name, mime_type, url, file_size, created_by)
-    VALUES ($1::int, $2, $3, $4, $5, $6::bigint, $7::uuid)
-    RETURNING id, task_id, drive_file_id, file_name, mime_type, url, file_size, created_by, created_on
+    WITH inserted AS (
+      INSERT INTO task_files (task_id, storage_path, file_name, mime_type, url, file_size, created_by)
+      VALUES ($1::int, $2, $3, $4, $5, $6::bigint, $7::uuid)
+      RETURNING id, task_id, storage_path, file_name, mime_type, url, file_size, created_by, created_on
+    )
+    SELECT
+      inserted.id, inserted.task_id, inserted.storage_path, inserted.file_name, inserted.mime_type,
+      inserted.url, inserted.file_size, inserted.created_by, inserted.created_on,
+      u.first_name AS uploader_first_name,
+      u.last_name AS uploader_last_name,
+      u.email AS uploader_email
+    FROM inserted
+    LEFT JOIN users u ON u.id = inserted.created_by
     `,
     [
       normalizedTaskId,
-      normalizedDriveFileId,
+      normalizedStoragePath,
       normalizedFileName,
       normalizedMimeType,
       normalizedUrl,
@@ -2317,9 +2345,14 @@ export async function getTaskFileById({ fileId, requesterId }) {
 
   const result = await pool.query(
     `
-    SELECT id, task_id, drive_file_id, file_name, mime_type, url, file_size, created_by, created_on
-    FROM task_files
-    WHERE id = $1::int
+    SELECT
+      tf.id, tf.task_id, tf.storage_path, tf.file_name, tf.mime_type, tf.url, tf.file_size, tf.created_by, tf.created_on,
+      u.first_name AS uploader_first_name,
+      u.last_name AS uploader_last_name,
+      u.email AS uploader_email
+    FROM task_files tf
+    LEFT JOIN users u ON u.id = tf.created_by
+    WHERE tf.id = $1::int
     LIMIT 1
     `,
     [normalizedFileId]
@@ -2361,7 +2394,7 @@ export async function deleteTaskFile({ fileId, requesterId }) {
     `
     DELETE FROM task_files
     WHERE id = $1::int
-    RETURNING id, task_id, drive_file_id, file_name, mime_type, url, file_size, created_by, created_on
+    RETURNING id, task_id, storage_path, file_name, mime_type, url, file_size, created_by, created_on
     `,
     [normalizedFileId]
   );
@@ -3154,6 +3187,17 @@ export async function deleteProject({ projectId, requesterId }) {
   const client = await pool.connect();
 
   try {
+    const fileResult = await client.query(
+      `
+      SELECT tf.id, tf.task_id, tf.storage_path, tf.file_name, tf.mime_type, tf.url, tf.file_size, tf.created_by, tf.created_on
+      FROM task_files tf
+      JOIN tasks t ON t.id = tf.task_id
+      JOIN tasks_categories tc ON tc.id = t.category_id
+      WHERE tc.project_id = $1::uuid
+      `,
+      [normalizedProjectId]
+    );
+
     // Just delete the project - CASCADE will handle related tables
     const deleteResult = await client.query(
       `DELETE FROM projects WHERE id = $1::uuid RETURNING id`,
@@ -3166,7 +3210,10 @@ export async function deleteProject({ projectId, requesterId }) {
       throw error;
     }
 
-    return { id: deleteResult.rows[0].id };
+    return {
+      id: deleteResult.rows[0].id,
+      deletedTaskFiles: fileResult.rows.map(mapTaskFileRow),
+    };
   } catch (error) {
     throw error;
   } finally {

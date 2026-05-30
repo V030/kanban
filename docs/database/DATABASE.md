@@ -272,10 +272,10 @@ Create table:
 CREATE TABLE IF NOT EXISTS task_files (
   id SERIAL PRIMARY KEY,
   task_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  drive_file_id VARCHAR(255) NOT NULL,
+  storage_path TEXT NOT NULL,
   file_name VARCHAR(255) NOT NULL,
   mime_type VARCHAR(100) NOT NULL,
-  url TEXT NOT NULL,
+  url TEXT NOT NULL DEFAULT '',
   created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   file_size BIGINT NOT NULL,
   created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -283,13 +283,13 @@ CREATE TABLE IF NOT EXISTS task_files (
 
 CREATE INDEX IF NOT EXISTS idx_task_files_task_id ON task_files(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_files_created_by ON task_files(created_by);
-CREATE INDEX IF NOT EXISTS idx_task_files_drive_file_id ON task_files(drive_file_id);
+CREATE INDEX IF NOT EXISTS idx_task_files_storage_path ON task_files(storage_path);
 ```
 
 Important columns:
 - id
 - task_id
-- drive_file_id
+- storage_path
 - file_name
 - mime_type
 - url

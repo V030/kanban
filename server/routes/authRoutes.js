@@ -98,9 +98,17 @@ function taskFileUploadMiddleware(req, res, next) {
 		if (!error) return next();
 		cleanupUploadedFile(req.file);
 		if (error?.code === "LIMIT_FILE_SIZE") {
-			return res.status(413).json({ message: "File is too large. Please choose a smaller file." });
+			return res.status(413).json({
+				success: false,
+				error: "File is too large. Please choose a smaller file.",
+				code: "INVALID_FILE_SIZE",
+			});
 		}
-		return res.status(400).json({ message: error?.message || "Unable to upload file" });
+		return res.status(400).json({
+			success: false,
+			error: error?.message || "Unable to upload file",
+			code: error?.code || "INVALID_FILE",
+		});
 	});
 }
 

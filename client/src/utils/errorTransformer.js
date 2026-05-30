@@ -173,7 +173,7 @@ export function transformErrorMessage(error) {
 export async function extractErrorMessage(response) {
   try {
     const data = await response.json();
-    return data.message || `Request failed (${response.status})`;
+    return data.message || data.error || `Request failed (${response.status})`;
   } catch {
     const text = await response.text();
     return text || `Request failed (${response.status})`;

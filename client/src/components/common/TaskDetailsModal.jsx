@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { getCurrentUser } from "../../services/authService";
 import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask, getTaskFiles, uploadTaskFile, deleteTaskFile } from "../../services/projectService";
 import { SkeletonCommentInline, SkeletonRow } from "./SkeletonComponents";
-import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon, CalendarIcon } from "./AppIcons";
+import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon, CalendarIcon, DownloadIcon } from "./AppIcons";
 import FilePreview, { isPreviewSupported } from "./FilePreview";
 import "../styles/TaskDetailsModal.css";
 import "../styles/SkeletonLoading.css";
@@ -113,6 +113,28 @@ function getReviewEntryComment(review) {
 }
 
 const TASK_PRIORITY_OPTIONS = ["unset", "low", "medium", "high", "urgent"];
+const TASK_FILE_ACCEPT = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+  "video/mp4",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".pdf",
+  ".txt",
+  ".mp4",
+  ".zip",
+  ".docx",
+  ".xlsx",
+].join(",");
 
 function normalizeTaskPriority(value) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -148,6 +170,32 @@ function formatAttachmentDate(value) {
 
 function getAttachmentFileName(file) {
   return String(file?.file_name || file?.fileName || file?.name || "Attachment");
+}
+
+function getAttachmentExtension(file) {
+  const fileName = getAttachmentFileName(file);
+  const match = fileName.match(/\.([^.]+)$/);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function getAttachmentTypeInfo(file) {
+  const mime = String(file?.mime_type || file?.mimeType || "").toLowerCase();
+  const ext = getAttachmentExtension(file);
+
+  if (mime === "application/pdf" || ext === "pdf") return { label: "PDF", tone: "pdf" };
+  if (mime.includes("wordprocessingml") || ext === "docx") return { label: "DOCX", tone: "docx" };
+  if (mime.includes("spreadsheetml") || ext === "xlsx") return { label: "XLSX", tone: "xlsx" };
+  if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "webp"].includes(ext)) return { label: (ext || "IMG").toUpperCase(), tone: "image" };
+  if (mime === "video/mp4" || ext === "mp4") return { label: "MP4", tone: "video" };
+  if (mime === "text/plain" || ext === "txt") return { label: "TXT", tone: "text" };
+  if (mime.includes("zip") || ext === "zip") return { label: "ZIP", tone: "archive" };
+  return { label: (ext || "FILE").toUpperCase(), tone: "file" };
+}
+
+function getAttachmentUploaderName(file) {
+  const uploader = file?.uploaded_by || file?.uploadedBy;
+  const name = uploader?.name || `${uploader?.firstName || uploader?.first_name || ""} ${uploader?.lastName || uploader?.last_name || ""}`.trim();
+  return name || uploader?.email || file?.uploaded_by_name || file?.uploadedByName || "Unknown";
 }
 
 function normalizeCategoryName(value) {
@@ -273,6 +321,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   const canEditTaskTitle = useMemo(() => {
     if (currentUserRole === "owner") return true;
     if (currentUserRole === "admin") return canAdminsManageTasks;
+    if (currentUserRole === "manager") return true;
     if (currentUserRole === "member" || !currentUserRole) return canMembersEditTask;
     if (!currentUserIdValue) return false;
     const creatorId = taskData?.createdBy || taskData?.created_by;
@@ -293,9 +342,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   const isCurrentTaskDone = currentTaskCategoryName === "done";
   const isCurrentTaskToReview = isToReviewCategoryName(currentTaskCategoryName);
   const canDeleteCurrentTask = (currentUserRole === "member" ? canMembersDeleteTask : canManageAdminTaskActions) && onDeleteTask;
-  const canUploadAttachments =
-    !isCurrentTaskToReview &&
-    (canManageAdminTaskActions || currentUserRole === "manager" || canMembersEditTask || isCurrentUserAssigned || isCurrentUserCreator || canEditTaskTitle);
+  const canUploadAttachments = !isCurrentTaskToReview && canEditTaskTitle;
   const canEditTaskDetails = canEditTaskTitle && !isCurrentTaskToReview;
   const canChangeTaskCategory =
     !isCurrentTaskDone &&
@@ -1684,6 +1731,11 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
     return currentUserIdValue && String(file?.created_by || file?.createdBy || "") === String(currentUserIdValue);
   };
 
+  const totalAttachmentSize = useMemo(
+    () => attachments.reduce((total, file) => total + Number(file?.file_size || 0), 0),
+    [attachments]
+  );
+
   const attachmentsPanel = (
     <article className="tdm-section-card tdm-attachments-panel">
       <div className="tdm-attachments-toolbar">
@@ -1691,6 +1743,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
           ref={attachmentInputRef}
           type="file"
           className="tdm-attachment-input"
+          accept={TASK_FILE_ACCEPT}
           onChange={handleSelectAttachment}
           disabled={!canUploadAttachments || attachmentUploading}
         />
@@ -1718,35 +1771,55 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
               const fileName = getAttachmentFileName(file);
               const canPreview = isPreviewSupported(file);
               const isDeleting = String(deletingAttachmentId) === String(file?.id);
+              const typeInfo = getAttachmentTypeInfo(file);
+              const uploaderName = getAttachmentUploaderName(file);
 
               return (
                 <li key={file?.id || `${fileName}-${file?.created_on}`} className="tdm-attachment-row">
-                  <div className="tdm-attachment-icon" aria-hidden="true">
-                    {canPreview ? "VIEW" : "FILE"}
+                  <div className={`tdm-attachment-icon tdm-attachment-icon--${typeInfo.tone}`} aria-hidden="true">
+                    {typeInfo.label}
                   </div>
-                  <div className="tdm-attachment-meta">
+                  <button
+                    type="button"
+                    className="tdm-attachment-meta"
+                    onClick={() => canPreview && setPreviewFile(file)}
+                    disabled={!canPreview}
+                    title={canPreview ? `Preview ${fileName}` : `${fileName} cannot be previewed`}
+                  >
                     <strong title={fileName}>{fileName}</strong>
-                    <span>{formatFileSize(file?.file_size)} · {formatAttachmentDate(file?.created_on)}</span>
-                  </div>
+                    <span className="tdm-attachment-detail-row">
+                      <span>{formatFileSize(file?.file_size)}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{formatAttachmentDate(file?.created_on)}</span>
+                      <span className={`tdm-attachment-type-badge tdm-attachment-type-badge--${typeInfo.tone}`}>{typeInfo.label}</span>
+                    </span>
+                  </button>
                   <div className="tdm-attachment-actions">
-                    {canPreview && (
-                      <button type="button" onClick={() => setPreviewFile(file)}>
-                        Preview
-                      </button>
-                    )}
-                    <a href={file?.url} target="_blank" rel="noreferrer" download={fileName}>
-                      Download
+                    <a href={file?.download_url || file?.url} target="_blank" rel="noreferrer" download={fileName} aria-label={`Download ${fileName}`} title="Download">
+                      <DownloadIcon size={18} />
                     </a>
                     {canDeleteAttachment(file) && (
-                      <button type="button" className="tdm-attachment-delete" onClick={() => handleDeleteAttachment(file)} disabled={isDeleting}>
-                        {isDeleting ? "Deleting..." : "Delete"}
-                      </button>
+                      <>
+                        <span className="tdm-attachment-action-divider" aria-hidden="true" />
+                        <button type="button" className="tdm-attachment-delete" onClick={() => handleDeleteAttachment(file)} disabled={isDeleting} aria-label={`Delete ${fileName}`} title={isDeleting ? "Deleting" : "Delete"}>
+                          <TrashIcon size={18} />
+                        </button>
+                      </>
                     )}
+                  </div>
+                  <div className="tdm-attachment-footer">
+                    <span>Uploaded by {uploaderName}</span>
+                    <span>{formatFileSize(file?.file_size)}</span>
                   </div>
                 </li>
               );
             })}
           </ul>
+        )}
+        {attachments.length > 0 && (
+          <div className="tdm-attachments-footer">
+            Total size: {formatFileSize(totalAttachmentSize)}
+          </div>
         )}
       </div>
     </article>
@@ -2458,7 +2531,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                   <p>{formatFileSize(previewFile?.file_size)} · {formatAttachmentDate(previewFile?.created_on)}</p>
                 </div>
                 <div className="tdm-file-preview-actions">
-                  <a href={previewFile?.url} target="_blank" rel="noreferrer" download={getAttachmentFileName(previewFile)}>
+                  <a href={previewFile?.download_url || previewFile?.url} target="_blank" rel="noreferrer" download={getAttachmentFileName(previewFile)}>
                     Download
                   </a>
                   <button type="button" className="tdm-close-btn" onClick={() => setPreviewFile(null)} aria-label="Close attachment preview">

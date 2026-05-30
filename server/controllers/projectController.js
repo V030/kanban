@@ -51,11 +51,18 @@ import { createProject as createProjectModel,
 
 import { getProjectMetrics as getProjectMetricsController } from "./metricsController.js";
 import { createNotification, getUserSummary, getProjectSummary, getTaskContext } from "../models/notificationModel.js";
-import { getUserGoogleDriveToken } from "../models/authModel.js";
 import { getTaskPermissionContext } from "../utils/projectPermissions.js";
 import { broadcastProjectEvent, broadcastToastEvent } from "../utils/realtimeBroadcaster.js";
-import { uploadFile, deleteFile } from "../services/googleDriveService.js";
 import { cleanupUploadedFile } from "../middleware/taskFileUpload.js";
+import {
+  attachTaskFileUrls,
+  attachTaskFilesUrls,
+  deleteTaskFileFromStorage,
+  deleteTaskFilesFromStorage,
+  sanitizeTaskFileName,
+  toPublicTaskFile,
+  uploadTaskFileToStorage,
+} from "../services/taskFileStorageService.js";
 
 export { getProjectMetricsController as getProjectMetrics };
 
@@ -94,20 +101,12 @@ function buildActorPayload(actor) {
   };
 }
 
-function sanitizeFileName(name) {
-  return String(name || "attachment")
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 255) || "attachment";
-}
-
 function canAttachTaskFile(access) {
   if (!access) return false;
   if (access.isOwner || access.isManager) return true;
   if (access.isAdmin) return !!access.settings.allow_admin_manage_tasks;
   if (!access.isMember) return false;
-  return !!access.settings.allow_member_edit_task || access.isCreator || access.isAssignee;
+  return !!access.settings.allow_member_edit_task;
 }
 
 function serializeUploadError(error) {
@@ -121,9 +120,12 @@ function serializeUploadError(error) {
   };
 }
 
-function isServiceAccountQuotaError(error) {
-  const message = String(error?.message || error?.response?.data?.error?.message || "").toLowerCase();
-  return message.includes("service accounts do not have storage quota");
+function sendFileError(res, status, error, fallbackMessage) {
+  return res.status(status).json({
+    success: false,
+    error: error?.message || fallbackMessage,
+    code: error?.code || "TASK_FILE_ERROR",
+  });
 }
 
 function getMemberIds(members = []) {
@@ -1873,40 +1875,41 @@ export async function deleteTaskTag(req, res) {
 }
 
 export async function getTaskFiles(req, res) {
-  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+  if (!req.user?.userId) return sendFileError(res, 401, { code: "AUTH_REQUIRED" }, "Authentication required");
 
   const { taskId } = req.params;
-  if (!taskId) return res.status(400).json({ message: "Task ID is required" });
+  if (!taskId) return sendFileError(res, 400, { code: "INVALID_TASK" }, "Task ID is required");
 
   try {
     const files = await getTaskFilesModel({ taskId, requesterId: req.user.userId });
-    return res.status(200).json({ files });
+    const filesWithUrls = await attachTaskFilesUrls(files);
+    return res.status(200).json({ files: filesWithUrls });
   } catch (error) {
-    if (error?.code === "INVALID_TASK") return res.status(400).json({ message: error.message });
-    if (error?.code === "TASK_NOT_FOUND") return res.status(404).json({ message: error.message });
-    if (error?.code === "PROJECT_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "INVALID_TASK") return sendFileError(res, 400, error, "Invalid task");
+    if (error?.code === "TASK_NOT_FOUND") return sendFileError(res, 404, error, "Task not found");
+    if (error?.code === "PROJECT_FORBIDDEN") return sendFileError(res, 403, error, "Forbidden");
     console.error("Get task files error:", error);
-    return res.status(500).json({ message: error?.message || "Unable to fetch task files" });
+    return sendFileError(res, 500, error, "Unable to fetch task files");
   }
 }
 
 export async function uploadTaskFile(req, res) {
   if (!req.user?.userId) {
     cleanupUploadedFile(req.file);
-    return res.status(401).json({ message: "Authentication required" });
+    return sendFileError(res, 401, { code: "AUTH_REQUIRED" }, "Authentication required");
   }
 
   const { taskId } = req.params;
   if (!taskId) {
     cleanupUploadedFile(req.file);
-    return res.status(400).json({ message: "Task ID is required" });
+    return sendFileError(res, 400, { code: "INVALID_TASK" }, "Task ID is required");
   }
 
   if (!req.file) {
-    return res.status(400).json({ message: "File is required" });
+    return sendFileError(res, 400, { code: "INVALID_FILE" }, "File is required");
   }
 
-  let uploadedDriveFileId = "";
+  let uploadedStoragePath = "";
   let uploadPhase = "validate";
 
   try {
@@ -1914,29 +1917,34 @@ export async function uploadTaskFile(req, res) {
     const access = await getTaskPermissionContext({ taskId, requesterId: req.user.userId });
     if (!canAttachTaskFile(access)) {
       cleanupUploadedFile(req.file);
-      return res.status(403).json({ message: "Forbidden: you cannot attach files to this task" });
+      return sendFileError(res, 403, { code: "TASK_FORBIDDEN" }, "Forbidden: you cannot attach files to this task");
     }
 
-    const safeName = sanitizeFileName(req.file.originalname);
+    const safeName = sanitizeTaskFileName(req.file.originalname);
     req.file.originalname = safeName;
 
-    uploadPhase = "drive_upload";
-    const refreshToken = await getUserGoogleDriveToken(req.user.userId);
-    const driveFile = await uploadFile(req.file, { refreshToken });
-    uploadedDriveFileId = driveFile.driveFileId;
+    uploadPhase = "storage_upload";
+    const storedFile = await uploadTaskFileToStorage(req.file, {
+      taskId,
+      createdBy: req.user.userId,
+      fileName: safeName,
+    });
+    uploadedStoragePath = storedFile.storagePath;
 
     uploadPhase = "db_insert";
     const created = await createTaskFileModel({
       taskId,
-      driveFileId: driveFile.driveFileId,
-      fileName: safeName,
-      mimeType: req.file.mimetype || "application/octet-stream",
-      url: driveFile.url,
+      storagePath: storedFile.storagePath,
+      fileName: storedFile.fileName,
+      mimeType: storedFile.mimeType,
+      url: "",
       fileSize: req.file.size,
       createdBy: req.user.userId,
     });
+    uploadPhase = "url_sign";
+    const createdWithUrl = await attachTaskFileUrls(created);
 
-    return res.status(201).json({ file: created });
+    return res.status(201).json({ file: createdWithUrl });
   } catch (error) {
     console.error("Upload task file failed:", {
       phase: uploadPhase,
@@ -1950,77 +1958,60 @@ export async function uploadTaskFile(req, res) {
             path: req.file.path,
           }
         : null,
-      driveFileId: uploadedDriveFileId || null,
+      storagePath: uploadedStoragePath || null,
       error: serializeUploadError(error),
     });
 
-    if (uploadedDriveFileId) {
+    if (uploadedStoragePath && uploadPhase === "db_insert") {
       try {
-        uploadPhase = "drive_rollback";
-        await deleteFile(uploadedDriveFileId);
+        uploadPhase = "storage_rollback";
+        await deleteTaskFileFromStorage(uploadedStoragePath);
       } catch (rollbackError) {
-        console.error("Rollback Drive file delete failed:", {
+        console.error("Rollback storage file delete failed:", {
           phase: uploadPhase,
-          driveFileId: uploadedDriveFileId,
+          storagePath: uploadedStoragePath,
           error: serializeUploadError(rollbackError),
         });
       }
     }
 
-    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_FILE" || error?.code === "INVALID_FILE_SIZE") {
-      return res.status(400).json({ message: error.message });
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_FILE" || error?.code === "INVALID_FILE_SIZE" || error?.code === "INVALID_FILE_TYPE") {
+      return sendFileError(res, 400, error, "Invalid file upload");
     }
-    if (error?.code === "GOOGLE_DRIVE_AUTH_REQUIRED") {
-      return res.status(428).json({
-        message: error.message,
-        phase: uploadPhase,
-        code: error.code,
-      });
-    }
-    if (error?.code === "TASK_NOT_FOUND") return res.status(404).json({ message: error.message });
-    if (error?.code === "PROJECT_FORBIDDEN" || error?.code === "TASK_FORBIDDEN") return res.status(403).json({ message: error.message });
-    if (error?.code === "23503" || error?.code === "22P02") return res.status(400).json({ message: error.message || "Invalid task file reference" });
-    if (isServiceAccountQuotaError(error)) {
-      return res.status(502).json({
-        message: "Google Drive rejected the upload because service accounts do not have storage quota. Move the configured folder into a Google Shared Drive, or switch uploads to OAuth user credentials with Drive scope.",
-        phase: uploadPhase,
-        code: "GOOGLE_DRIVE_SERVICE_ACCOUNT_QUOTA",
-      });
-    }
+    if (error?.code === "TASK_NOT_FOUND") return sendFileError(res, 404, error, "Task not found");
+    if (error?.code === "PROJECT_FORBIDDEN" || error?.code === "TASK_FORBIDDEN") return sendFileError(res, 403, error, "Forbidden");
+    if (error?.code === "23503" || error?.code === "22P02") return sendFileError(res, 400, error, "Invalid task file reference");
+    if (error?.code === "STORAGE_UPLOAD_FAILED" || error?.code === "FILE_URL_FAILED") return sendFileError(res, 502, error, "Unable to store task file");
 
-    return res.status(500).json({
-      message: error?.message || "Unable to upload task file",
-      phase: uploadPhase,
-      code: error?.code || error?.response?.status || null,
-    });
+    return sendFileError(res, 500, error, "Unable to upload task file");
   } finally {
     cleanupUploadedFile(req.file);
   }
 }
 
 export async function deleteTaskFile(req, res) {
-  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+  if (!req.user?.userId) return sendFileError(res, 401, { code: "AUTH_REQUIRED" }, "Authentication required");
 
   const { taskId, fileId } = req.params;
-  if (!taskId) return res.status(400).json({ message: "Task ID is required" });
-  if (!fileId) return res.status(400).json({ message: "File ID is required" });
+  if (!taskId) return sendFileError(res, 400, { code: "INVALID_TASK" }, "Task ID is required");
+  if (!fileId) return sendFileError(res, 400, { code: "INVALID_FILE" }, "File ID is required");
 
   try {
     const file = await getTaskFileByIdModel({ fileId, requesterId: req.user.userId });
     if (String(file.task_id) !== String(taskId)) {
-      return res.status(400).json({ message: "File does not belong to the specified task" });
+      return sendFileError(res, 400, { code: "INVALID_FILE" }, "File does not belong to the specified task");
     }
 
-    const refreshToken = await getUserGoogleDriveToken(file.created_by);
-    await deleteFile(file.drive_file_id, { refreshToken });
+    await deleteTaskFileFromStorage(file.storage_path);
     const deleted = await deleteTaskFileModel({ fileId, requesterId: req.user.userId });
-    return res.status(200).json({ file: deleted });
+    return res.status(200).json({ file: toPublicTaskFile(deleted) });
   } catch (error) {
-    if (error?.code === "INVALID_FILE" || error?.code === "FILE_NOT_FOUND") return res.status(404).json({ message: error.message });
-    if (error?.code === "INVALID_TASK") return res.status(400).json({ message: error.message });
-    if (error?.code === "PROJECT_FORBIDDEN" || error?.code === "TASK_FORBIDDEN") return res.status(403).json({ message: error.message });
+    if (error?.code === "INVALID_FILE" || error?.code === "FILE_NOT_FOUND") return sendFileError(res, 404, error, "File not found");
+    if (error?.code === "INVALID_TASK") return sendFileError(res, 400, error, "Invalid task");
+    if (error?.code === "PROJECT_FORBIDDEN" || error?.code === "TASK_FORBIDDEN") return sendFileError(res, 403, error, "Forbidden");
+    if (error?.code === "STORAGE_DELETE_FAILED") return sendFileError(res, 502, error, "Unable to delete stored file");
     console.error("Delete task file error:", error);
-    return res.status(500).json({ message: error?.message || "Unable to delete task file" });
+    return sendFileError(res, 500, error, "Unable to delete task file");
   }
 }
 
@@ -2032,7 +2023,15 @@ export async function deleteTask(req, res) {
 
   try {
     const deleted = await deleteTaskModel({ taskId, requesterId: req.user.userId });
-    return res.status(200).json({ message: "Task removed successfully", task: deleted });
+    try {
+      await deleteTaskFilesFromStorage(deleted?.deletedTaskFiles || []);
+    } catch (cleanupError) {
+      console.error("Task storage cleanup failed after task delete:", {
+        taskId,
+        error: serializeUploadError(cleanupError),
+      });
+    }
+    return res.status(200).json({ message: "Task removed successfully", task: { taskId: deleted.taskId } });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER") {
       return res.status(400).json({ message: error.message });
@@ -2320,6 +2319,14 @@ export async function deleteProject(req, res) {
       projectId,
       requesterId: req.user.userId,
     });
+    try {
+      await deleteTaskFilesFromStorage(result?.deletedTaskFiles || []);
+    } catch (cleanupError) {
+      console.error("Project storage cleanup failed after project delete:", {
+        projectId,
+        error: serializeUploadError(cleanupError),
+      });
+    }
 
     console.log(`[deleteProject] Successfully deleted project: ${projectId}`);
     return res.status(200).json({ message: "Project deleted successfully", projectId: result.id });

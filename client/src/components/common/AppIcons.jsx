@@ -247,6 +247,14 @@ export function TrashIcon({ className = "", size = 24 }) {
   );
 }
 
+export function DownloadIcon({ className = "", size = 24 }) {
+  return (
+    <IconShell className={className} size={size}>
+      <path d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4 3.3 3.3V3Zm-6 15h14v2H5v-2Z" />
+    </IconShell>
+  );
+}
+
 export function DeleteWarningIcon({ className = "", size = 24 }) {
   return (
     <IconShell className={className} size={size}>
