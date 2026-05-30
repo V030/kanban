@@ -1,9 +1,10 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getCurrentUser } from "../../services/authService";
-import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask } from "../../services/projectService";
+import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask, getTaskFiles, uploadTaskFile, deleteTaskFile } from "../../services/projectService";
 import { SkeletonCommentInline, SkeletonRow } from "./SkeletonComponents";
 import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon, CalendarIcon } from "./AppIcons";
+import FilePreview, { isPreviewSupported } from "./FilePreview";
 import "../styles/TaskDetailsModal.css";
 import "../styles/SkeletonLoading.css";
 import normalizeProfileImage from "../../utils/normalizeProfileImage";
@@ -121,6 +122,34 @@ function normalizeTaskPriority(value) {
   return "unset";
 }
 
+function formatFileSize(value) {
+  const size = Number(value || 0);
+  if (!Number.isFinite(size) || size <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let nextSize = size;
+  let unitIndex = 0;
+  while (nextSize >= 1024 && unitIndex < units.length - 1) {
+    nextSize /= 1024;
+    unitIndex += 1;
+  }
+  return `${nextSize >= 10 || unitIndex === 0 ? Math.round(nextSize) : nextSize.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function formatAttachmentDate(value) {
+  if (!value) return "Just now";
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return String(value);
+  return parsedDate.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getAttachmentFileName(file) {
+  return String(file?.file_name || file?.fileName || file?.name || "Attachment");
+}
+
 function normalizeCategoryName(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -212,6 +241,13 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [attachmentsError, setAttachmentsError] = useState("");
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState("");
+  const [previewFile, setPreviewFile] = useState(null);
+  const attachmentInputRef = useRef(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approveReason, setApproveReason] = useState("");
   const [approveSubmitting, setApproveSubmitting] = useState(false);
@@ -229,6 +265,11 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
     if (!currentUserIdValue) return false;
     return assignees.some((member) => String(member?.id || member?.user_id || "") === String(currentUserIdValue));
   }, [assignees, currentUserIdValue]);
+  const isCurrentUserCreator = useMemo(() => {
+    if (!currentUserIdValue) return false;
+    const creatorId = taskData?.createdBy || taskData?.created_by;
+    return creatorId && String(creatorId) === String(currentUserIdValue);
+  }, [currentUserIdValue, taskData?.createdBy, taskData?.created_by]);
   const canEditTaskTitle = useMemo(() => {
     if (currentUserRole === "owner") return true;
     if (currentUserRole === "admin") return canAdminsManageTasks;
@@ -249,9 +290,12 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   const mobileStatusKey = getStatusBadgeKey(currentTaskCategoryName);
   const mobileStatusLabel = getStatusBadgeLabel(currentTaskCategoryName);
   const mobileProjectName = projectName || taskData?.project?.name || taskData?.projectName || taskData?.project_name || "Project Management TOOL";
-  const canDeleteCurrentTask = (currentUserRole === "member" ? canMembersDeleteTask : canManageAdminTaskActions) && onDeleteTask;
   const isCurrentTaskDone = currentTaskCategoryName === "done";
   const isCurrentTaskToReview = isToReviewCategoryName(currentTaskCategoryName);
+  const canDeleteCurrentTask = (currentUserRole === "member" ? canMembersDeleteTask : canManageAdminTaskActions) && onDeleteTask;
+  const canUploadAttachments =
+    !isCurrentTaskToReview &&
+    (canManageAdminTaskActions || currentUserRole === "manager" || canMembersEditTask || isCurrentUserAssigned || isCurrentUserCreator || canEditTaskTitle);
   const canEditTaskDetails = canEditTaskTitle && !isCurrentTaskToReview;
   const canChangeTaskCategory =
     !isCurrentTaskDone &&
@@ -471,6 +515,26 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
     }
   }, [fetchTaskComments, task?.id]);
 
+  const loadAttachments = useCallback(async () => {
+    if (!task?.id) {
+      setAttachments([]);
+      return;
+    }
+
+    setAttachmentsLoading(true);
+    setAttachmentsError("");
+
+    try {
+      const data = await getTaskFiles(task.id);
+      setAttachments(Array.isArray(data?.files) ? data.files : []);
+    } catch (err) {
+      setAttachmentsError(err?.message || "Unable to load attachments.");
+      setAttachments([]);
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  }, [task?.id]);
+
   useEffect(() => {
     setNewComment("");
     setReplyInputs({});
@@ -485,11 +549,15 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
     setAssignmentPendingIds({});
     setSubtaskError("");
     setSubtaskPendingIds({});
+    setAttachmentsError("");
+    setDeletingAttachmentId("");
+    setPreviewFile(null);
     setTagError("");
     setTaskPriority(normalizeTaskPriority(task?.priority));
     setTargetDate(task?.targetDate || task?.target_date || null);
     setIsPastDue(!!(task?.isPastDue ?? task?.is_past_due));
     loadComments();
+    loadAttachments();
     // initialize tags from task payload
     setTags(Array.isArray(task?.tags) ? task.tags : []);
 
@@ -505,7 +573,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
         }
       }
     })();
-  }, [task?.id, loadComments, getTaskTags, task?.priority, task?.targetDate, task?.target_date, task?.isPastDue, task?.is_past_due, task?.tags]);
+  }, [task?.id, loadComments, loadAttachments, getTaskTags, task?.priority, task?.targetDate, task?.target_date, task?.isPastDue, task?.is_past_due, task?.tags]);
 
   const openApproveModal = () => {
     setApproveReason("");
@@ -726,6 +794,47 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
       setCommentsError(err?.message || "Unable to add reply.");
     } finally {
       setReplySubmittingId("");
+    }
+  };
+
+  const handleSelectAttachment = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !task?.id || attachmentUploading) return;
+
+    setAttachmentUploading(true);
+    setAttachmentsError("");
+
+    try {
+      const data = await uploadTaskFile(task.id, file);
+      const created = data?.file;
+      if (created) {
+        setAttachments((prev) => [created, ...prev]);
+      } else {
+        await loadAttachments();
+      }
+    } catch (err) {
+      setAttachmentsError(err?.message || "Unable to upload attachment.");
+    } finally {
+      setAttachmentUploading(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (file) => {
+    const fileId = file?.id;
+    if (!task?.id || !fileId || deletingAttachmentId) return;
+
+    setDeletingAttachmentId(String(fileId));
+    setAttachmentsError("");
+
+    try {
+      await deleteTaskFile(task.id, fileId);
+      setAttachments((prev) => prev.filter((item) => String(item?.id) !== String(fileId)));
+      setPreviewFile((prev) => (String(prev?.id || "") === String(fileId) ? null : prev));
+    } catch (err) {
+      setAttachmentsError(err?.message || "Unable to delete attachment.");
+    } finally {
+      setDeletingAttachmentId("");
     }
   };
 
@@ -1570,10 +1679,75 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
     </article>
   );
 
+  const canDeleteAttachment = (file) => {
+    if (canManageAdminTaskActions) return true;
+    return currentUserIdValue && String(file?.created_by || file?.createdBy || "") === String(currentUserIdValue);
+  };
+
   const attachmentsPanel = (
     <article className="tdm-section-card tdm-attachments-panel">
+      <div className="tdm-attachments-toolbar">
+        <input
+          ref={attachmentInputRef}
+          type="file"
+          className="tdm-attachment-input"
+          onChange={handleSelectAttachment}
+          disabled={!canUploadAttachments || attachmentUploading}
+        />
+        <button
+          type="button"
+          className="tdm-attachment-upload-btn"
+          onClick={() => attachmentInputRef.current?.click()}
+          disabled={!canUploadAttachments || attachmentUploading}
+        >
+          {attachmentUploading ? "Uploading..." : "Upload file"}
+        </button>
+      </div>
       <div className="tdm-attachments-body">
-        <div className="tdm-empty-state">No attachments yet.</div>
+        {attachmentsError && <p className="tdm-comment-error">{attachmentsError}</p>}
+        {attachmentsLoading ? (
+          <div className="skeleton-list">
+            <SkeletonRow showAvatar={false} lineCount={2} />
+            <SkeletonRow showAvatar={false} lineCount={2} />
+          </div>
+        ) : attachments.length === 0 ? (
+          <div className="tdm-empty-state">No attachments yet.</div>
+        ) : (
+          <ul className="tdm-attachment-list" aria-label="Attachments">
+            {attachments.map((file) => {
+              const fileName = getAttachmentFileName(file);
+              const canPreview = isPreviewSupported(file);
+              const isDeleting = String(deletingAttachmentId) === String(file?.id);
+
+              return (
+                <li key={file?.id || `${fileName}-${file?.created_on}`} className="tdm-attachment-row">
+                  <div className="tdm-attachment-icon" aria-hidden="true">
+                    {canPreview ? "VIEW" : "FILE"}
+                  </div>
+                  <div className="tdm-attachment-meta">
+                    <strong title={fileName}>{fileName}</strong>
+                    <span>{formatFileSize(file?.file_size)} · {formatAttachmentDate(file?.created_on)}</span>
+                  </div>
+                  <div className="tdm-attachment-actions">
+                    {canPreview && (
+                      <button type="button" onClick={() => setPreviewFile(file)}>
+                        Preview
+                      </button>
+                    )}
+                    <a href={file?.url} target="_blank" rel="noreferrer" download={fileName}>
+                      Download
+                    </a>
+                    {canDeleteAttachment(file) && (
+                      <button type="button" className="tdm-attachment-delete" onClick={() => handleDeleteAttachment(file)} disabled={isDeleting}>
+                        {isDeleting ? "Deleting..." : "Delete"}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </article>
   );
@@ -2173,7 +2347,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                             checked={isCompleted}
                             onChange={(e) => { e.stopPropagation(); handleToggleSubtask(st, e); }}
                             onClick={(e) => e.stopPropagation()}
-                            disabled={isCurrentTaskToReview}
+                            disabled={isCurrentTaskToReview || isPending}
                             aria-label={`Mark ${st.title || 'subtask'} completed`}
                           />
                         </div>
@@ -2188,7 +2362,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                               type="button"
                               className="tdm-subtask-delete-btn"
                               onClick={(e) => { e.stopPropagation(); handleDeleteSubtask(st); }}
-                              disabled={isCurrentTaskToReview}
+                              disabled={isCurrentTaskToReview || isPending}
                               aria-label="Delete subtask"
                               title="Delete"
                             >
@@ -2266,6 +2440,37 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
           </div>
         </aside>
       </div>
+      {maybePortal(
+        previewFile && (
+          <div
+            className="tdm-file-preview-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Attachment preview"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setPreviewFile(null);
+            }}
+          >
+            <div className="tdm-file-preview-content">
+              <div className="tdm-file-preview-header">
+                <div>
+                  <h3>{getAttachmentFileName(previewFile)}</h3>
+                  <p>{formatFileSize(previewFile?.file_size)} · {formatAttachmentDate(previewFile?.created_on)}</p>
+                </div>
+                <div className="tdm-file-preview-actions">
+                  <a href={previewFile?.url} target="_blank" rel="noreferrer" download={getAttachmentFileName(previewFile)}>
+                    Download
+                  </a>
+                  <button type="button" className="tdm-close-btn" onClick={() => setPreviewFile(null)} aria-label="Close attachment preview">
+                    &times;
+                  </button>
+                </div>
+              </div>
+              <FilePreview file={previewFile} />
+            </div>
+          </div>
+        )
+      )}
       {maybePortal(
         showAssigneesModal && (
           <div

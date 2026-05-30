@@ -2187,6 +2187,11 @@ export async function deleteTask({ taskId, requesterId }) {
     );
 
     await client.query(
+      `DELETE FROM task_files WHERE task_id = $1::int`,
+      [normalizedTaskId]
+    );
+
+    await client.query(
       `DELETE FROM subtasks WHERE task_id = $1::int`,
       [normalizedTaskId]
     );
@@ -2210,6 +2215,158 @@ export async function deleteTask({ taskId, requesterId }) {
   } finally {
     client.release();
   }
+}
+
+function mapTaskFileRow(row) {
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    task_id: row.task_id,
+    drive_file_id: row.drive_file_id,
+    file_name: row.file_name,
+    mime_type: row.mime_type,
+    url: row.url,
+    file_size: row.file_size == null ? null : Number(row.file_size),
+    created_by: row.created_by,
+    created_on: row.created_on,
+  };
+}
+
+export async function getTaskFiles({ taskId, requesterId }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = String(requesterId || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+
+  const result = await pool.query(
+    `
+    SELECT id, task_id, drive_file_id, file_name, mime_type, url, file_size, created_by, created_on
+    FROM task_files
+    WHERE task_id = $1::int
+    ORDER BY created_on DESC, id DESC
+    `,
+    [normalizedTaskId]
+  );
+
+  return result.rows.map(mapTaskFileRow);
+}
+
+export async function createTaskFile({ taskId, driveFileId, fileName, mimeType, url, fileSize, createdBy }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedDriveFileId = String(driveFileId || "").trim();
+  const normalizedFileName = String(fileName || "").trim();
+  const normalizedMimeType = String(mimeType || "application/octet-stream").trim();
+  const normalizedUrl = String(url || "").trim();
+  const normalizedFileSize = Number(fileSize);
+  const normalizedCreatedBy = String(createdBy || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  if (!normalizedDriveFileId || !normalizedFileName || !normalizedUrl) {
+    const error = new Error("File metadata is incomplete");
+    error.code = "INVALID_FILE";
+    throw error;
+  }
+
+  if (!Number.isFinite(normalizedFileSize) || normalizedFileSize < 0) {
+    const error = new Error("file_size is required");
+    error.code = "INVALID_FILE_SIZE";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    INSERT INTO task_files (task_id, drive_file_id, file_name, mime_type, url, file_size, created_by)
+    VALUES ($1::int, $2, $3, $4, $5, $6::bigint, $7::uuid)
+    RETURNING id, task_id, drive_file_id, file_name, mime_type, url, file_size, created_by, created_on
+    `,
+    [
+      normalizedTaskId,
+      normalizedDriveFileId,
+      normalizedFileName,
+      normalizedMimeType,
+      normalizedUrl,
+      normalizedFileSize,
+      normalizedCreatedBy,
+    ]
+  );
+
+  return mapTaskFileRow(result.rows[0]);
+}
+
+export async function getTaskFileById({ fileId, requesterId }) {
+  const normalizedFileId = Number(fileId);
+  const normalizedRequesterId = String(requesterId || "").trim();
+
+  if (!Number.isInteger(normalizedFileId) || normalizedFileId <= 0) {
+    const error = new Error("fileId is required");
+    error.code = "INVALID_FILE";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT id, task_id, drive_file_id, file_name, mime_type, url, file_size, created_by, created_on
+    FROM task_files
+    WHERE id = $1::int
+    LIMIT 1
+    `,
+    [normalizedFileId]
+  );
+
+  const file = mapTaskFileRow(result.rows[0]);
+  if (!file) {
+    const error = new Error("File not found");
+    error.code = "FILE_NOT_FOUND";
+    throw error;
+  }
+
+  await getTaskPermissionContext({ taskId: file.task_id, requesterId: normalizedRequesterId });
+  return file;
+}
+
+export async function deleteTaskFile({ fileId, requesterId }) {
+  const normalizedFileId = Number(fileId);
+  const normalizedRequesterId = String(requesterId || "").trim();
+
+  if (!Number.isInteger(normalizedFileId) || normalizedFileId <= 0) {
+    const error = new Error("fileId is required");
+    error.code = "INVALID_FILE";
+    throw error;
+  }
+
+  const existing = await getTaskFileById({ fileId: normalizedFileId, requesterId: normalizedRequesterId });
+  const access = await getTaskPermissionContext({ taskId: existing.task_id, requesterId: normalizedRequesterId });
+
+  const isUploader = String(existing.created_by || "") === normalizedRequesterId;
+  const canDeleteAsAdmin = access.isOwner || (access.isAdmin && access.settings.allow_admin_manage_tasks);
+  if (!isUploader && !canDeleteAsAdmin) {
+    const error = new Error("Forbidden: you cannot delete this file");
+    error.code = "TASK_FORBIDDEN";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+    DELETE FROM task_files
+    WHERE id = $1::int
+    RETURNING id, task_id, drive_file_id, file_name, mime_type, url, file_size, created_by, created_on
+    `,
+    [normalizedFileId]
+  );
+
+  return mapTaskFileRow(result.rows[0]);
 }
 
 export async function getProjectTags(projectId) {

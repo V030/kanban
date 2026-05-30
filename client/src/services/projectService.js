@@ -384,6 +384,43 @@ export async function deleteTaskTag(taskId, tagId) {
   });
 }
 
+export async function getTaskFiles(taskId) {
+  if (!taskId) throw new Error("Unable to load attachments. Please select a task.");
+  return fetchWithAuth(`${API_URL}/auth/tasks/${taskId}/files`, {
+    method: "GET",
+    cache: "no-cache",
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+export async function uploadTaskFile(taskId, file) {
+  if (!taskId) throw new Error("Unable to upload attachment. Please select a task.");
+  if (!file) throw new Error("Please choose a file to upload.");
+
+  const formData = new FormData();
+  formData.append("file", file);
+  console.info("Uploading task attachment:", {
+    taskId,
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type || "application/octet-stream",
+  });
+
+  return fetchWithAuth(`${API_URL}/auth/tasks/${taskId}/files`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function deleteTaskFile(taskId, fileId) {
+  if (!taskId) throw new Error("Unable to delete attachment. Please select a task.");
+  if (!fileId) throw new Error("Please select an attachment.");
+
+  return fetchWithAuth(`${API_URL}/auth/tasks/${taskId}/files/${fileId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function deleteProject(projectId) {
   if (!projectId) throw new Error("Unable to delete project. Please select a project.");
 

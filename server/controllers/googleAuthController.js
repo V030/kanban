@@ -1,4 +1,4 @@
-import { verifyGoogleToken } from "../utils/googleAuth.js";
+import { exchangeGoogleAuthCode, verifyGoogleToken } from "../utils/googleAuth.js";
 import { findOrCreateGoogleUser } from "../models/authModel.js";
 import { generateToken } from "../utils/jwt.js";
 
@@ -11,15 +11,18 @@ import { generateToken } from "../utils/jwt.js";
  * @returns {Object} - { message, token, user }
  */
 export async function googleAuth(req, res) {
-  const { token } = req.body;
+  const { token, code } = req.body;
 
-  if (!token) {
-    return res.status(400).json({ message: "Google token is required" });
+  if (!token && !code) {
+    return res.status(400).json({ message: "Google token or authorization code is required" });
   }
 
   try {
     // Step 1: Verify Google token and extract user info
-    const googleUser = await verifyGoogleToken(token);
+    const authorization = code
+      ? await exchangeGoogleAuthCode(code)
+      : { googleUser: await verifyGoogleToken(token), refreshToken: null, scopes: "" };
+    const { googleUser, refreshToken, scopes } = authorization;
 
     // Step 2: Find existing user or create new one
     const user = await findOrCreateGoogleUser(
@@ -27,7 +30,8 @@ export async function googleAuth(req, res) {
       googleUser.email,
       googleUser.firstName,
       googleUser.lastName,
-      googleUser.profilePictureUrl
+      googleUser.profilePictureUrl,
+      refreshToken
     );
 
     // Step 3: Generate JWT token for session management
@@ -50,7 +54,9 @@ export async function googleAuth(req, res) {
         email: user.email,
         role: user.role,
         profileImageBase64: user.profile_picture_url,
+        hasGoogleDriveAccess: !!(refreshToken || user.google_refresh_token),
       },
+      googleDriveScopes: scopes,
     });
   } catch (error) {
     console.error("Google auth error:", error);

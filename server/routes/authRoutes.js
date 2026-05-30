@@ -50,6 +50,9 @@ import {
 	getTaskTags,
 	createTaskTag,
 	deleteTaskTag,
+	getTaskFiles,
+	uploadTaskFile,
+	deleteTaskFile,
 	deleteTask,
 	deleteProject,
 	removeMemberFromProject,
@@ -76,6 +79,7 @@ import {
 } from "../controllers/notificationController.js";
 
 import { authenticateToken } from "../middleware/authMiddleware.js";
+import { uploadTaskFile as uploadTaskFileMiddleware, cleanupUploadedFile } from "../middleware/taskFileUpload.js";
 import {
 	authLimiter,
 	passwordResetRequestLimiter,
@@ -88,6 +92,17 @@ import {
 
 
 const router = express.Router();
+
+function taskFileUploadMiddleware(req, res, next) {
+	uploadTaskFileMiddleware(req, res, (error) => {
+		if (!error) return next();
+		cleanupUploadedFile(req.file);
+		if (error?.code === "LIMIT_FILE_SIZE") {
+			return res.status(413).json({ message: "File is too large. Please choose a smaller file." });
+		}
+		return res.status(400).json({ message: error?.message || "Unable to upload file" });
+	});
+}
 
 router.post("/login", authLimiter, login);
 router.post("/register", authLimiter, register);
@@ -156,4 +171,7 @@ router.get("/projects/:projectId/metrics", authenticateToken, authenticatedLimit
 router.get("/api/tasks/:taskId/tags", authenticateToken, authenticatedLimiter, getTaskTags);
 router.post("/api/tasks/:taskId/tags", authenticateToken, taskWriteLimiter, createTaskTag);
 router.delete("/api/tasks/:taskId/tags/:tagId", authenticateToken, taskWriteLimiter, deleteTaskTag);
+router.get("/tasks/:taskId/files", authenticateToken, authenticatedLimiter, getTaskFiles);
+router.post("/tasks/:taskId/files", authenticateToken, taskWriteLimiter, taskFileUploadMiddleware, uploadTaskFile);
+router.delete("/tasks/:taskId/files/:fileId", authenticateToken, taskWriteLimiter, deleteTaskFile);
 export default router;

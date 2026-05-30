@@ -64,9 +64,10 @@ export async function fetchWithAuth(url, options = {}) {
   const optionalHeaders = Object.fromEntries(
     Object.entries(incomingHeaders).filter(([, value]) => value !== undefined)
   );
+  const isFormDataBody = typeof FormData !== "undefined" && restOptions.body instanceof FormData;
 
   const headers = {
-    "Content-Type": "application/json",
+    ...(isFormDataBody ? {} : { "Content-Type": "application/json" }),
     ...optionalHeaders,
     Authorization: `Bearer ${token}`,
   };
@@ -97,6 +98,16 @@ export async function fetchWithAuth(url, options = {}) {
   
   if (!response.ok) {
     let errorMessage = await extractErrorMessage(response);
+
+    if (url.includes("/files")) {
+      console.error("Authenticated file request failed:", {
+        url,
+        method: restOptions.method || "GET",
+        status: response.status,
+        statusText: response.statusText,
+        message: errorMessage,
+      });
+    }
     
     if (response.status === 413) {
       errorMessage = "Image is too large. Please choose a smaller file.";

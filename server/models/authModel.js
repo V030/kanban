@@ -41,13 +41,26 @@ export async function createUser(first_name, last_name, role, email, password_ha
 }
 
 // Find or create user by Google ID (OAuth)
-export async function findOrCreateGoogleUser(googleId, email, firstName, lastName, profilePictureUrl) {
+export async function findOrCreateGoogleUser(googleId, email, firstName, lastName, profilePictureUrl, googleRefreshToken = null) {
   try {
     // First, check if user exists by google_id
     const googleQuery = "SELECT * FROM users WHERE google_id = $1";
     const googleResult = await pool.query(googleQuery, [googleId]);
 
     if (googleResult.rows.length > 0) {
+      if (googleRefreshToken) {
+        const updateResult = await pool.query(
+          `
+          UPDATE users
+          SET google_refresh_token = $1,
+              google_drive_scope_granted_at = NOW()
+          WHERE google_id = $2
+          RETURNING *
+          `,
+          [googleRefreshToken, googleId]
+        );
+        return updateResult.rows[0];
+      }
       return googleResult.rows[0]; // Existing OAuth user
     }
 
@@ -59,15 +72,20 @@ export async function findOrCreateGoogleUser(googleId, email, firstName, lastNam
       // Link existing email-based account to Google
       const updateQuery = `
         UPDATE users 
-        SET google_id = $1, oauth_provider = $2, profile_picture_url = $3
+        SET google_id = $1,
+            oauth_provider = $2,
+            profile_picture_url = $3,
+            google_refresh_token = COALESCE($5, google_refresh_token),
+            google_drive_scope_granted_at = CASE WHEN $5 IS NULL THEN google_drive_scope_granted_at ELSE NOW() END
         WHERE email = $4
-        RETURNING id, first_name, last_name, email, role, profile_picture_url, google_id, oauth_provider
+        RETURNING id, first_name, last_name, email, role, profile_picture_url, google_id, oauth_provider, google_refresh_token, google_drive_scope_granted_at
       `;
       const updateResult = await pool.query(updateQuery, [
         googleId,
         "google",
         profilePictureUrl,
         email,
+        googleRefreshToken,
       ]);
       console.log("Google account linked to existing user:", email);
       return updateResult.rows[0];
@@ -75,9 +93,9 @@ export async function findOrCreateGoogleUser(googleId, email, firstName, lastNam
 
     // Create new user for Google OAuth
     const createQuery = `
-      INSERT INTO users (first_name, last_name, email, google_id, oauth_provider, profile_picture_url, role, password_hash)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
-      RETURNING id, first_name, last_name, email, role, profile_picture_url, google_id, oauth_provider
+      INSERT INTO users (first_name, last_name, email, google_id, oauth_provider, profile_picture_url, role, password_hash, google_refresh_token, google_drive_scope_granted_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, CASE WHEN $8 IS NULL THEN NULL ELSE NOW() END)
+      RETURNING id, first_name, last_name, email, role, profile_picture_url, google_id, oauth_provider, google_refresh_token, google_drive_scope_granted_at
     `;
 
     const createResult = await pool.query(createQuery, [
@@ -88,6 +106,7 @@ export async function findOrCreateGoogleUser(googleId, email, firstName, lastNam
       "google",
       profilePictureUrl,
       "user", // Default role for new OAuth users
+      googleRefreshToken,
     ]);
 
     console.log("New OAuth user created:", email);
@@ -96,6 +115,20 @@ export async function findOrCreateGoogleUser(googleId, email, firstName, lastNam
     console.error("Error in findOrCreateGoogleUser:", error);
     throw error;
   }
+}
+
+export async function getUserGoogleDriveToken(userId) {
+  const result = await pool.query(
+    `
+    SELECT google_refresh_token
+    FROM users
+    WHERE id = $1::uuid
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  return result.rows[0]?.google_refresh_token || null;
 }
 
 function generatePasswordResetOtp() {
