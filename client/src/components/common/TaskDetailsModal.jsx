@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getCurrentUser } from "../../services/authService";
-import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask, getTaskFiles, uploadTaskFile, deleteTaskFile } from "../../services/projectService";
+import { getTaskReviews, getTaskActivities, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask, getTaskFiles, uploadTaskFile, deleteTaskFile } from "../../services/projectService";
 import { SkeletonCommentInline, SkeletonRow } from "./SkeletonComponents";
 import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon, CalendarIcon, DownloadIcon, FilterIcon } from "./AppIcons";
 import FilePreview, { isPreviewSupported } from "./FilePreview";
@@ -142,6 +142,63 @@ function normalizeTaskPriority(value) {
   if (normalized === "unset") return "unset";
   if (TASK_PRIORITY_OPTIONS.includes(normalized)) return normalized;
   return "unset";
+}
+
+function formatActivityValue(value, fallback = "none") {
+  if (value == null || value === "") return fallback;
+  return String(value);
+}
+
+function formatActivityDateValue(value) {
+  if (!value) return "no date";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+}
+
+function formatActivityMessage(activity) {
+  const actorName = activity?.actorName || getMemberLabel(activity?.actor) || "Someone";
+  const details = activity?.details || {};
+  const type = activity?.activityType || activity?.activity_type || activity?.action || "";
+
+  switch (type) {
+    case "subtask_created":
+      return `${actorName} added a new subtask titled "${formatActivityValue(details.title, "Untitled subtask")}"`;
+    case "subtask_removed":
+      return `${actorName} removed the subtask "${formatActivityValue(details.title, "Untitled subtask")}"`;
+    case "task_name_updated":
+      return `${actorName} updated the task name from "${formatActivityValue(details.previousName)}" to "${formatActivityValue(details.newName)}"`;
+    case "task_description_updated":
+      return `${actorName} updated the description from "${formatActivityValue(details.previousDescription)}" to "${formatActivityValue(details.newDescription)}"`;
+    case "tag_added":
+      return `${actorName} added the tag "${formatActivityValue(details.tagName, "Untitled tag")}"`;
+    case "tag_removed":
+      return `${actorName} removed the tag "${formatActivityValue(details.tagName, "Untitled tag")}"`;
+    case "task_priority_updated":
+      return `${actorName} updated the task's priority from "${capitalizeFirst(formatActivityValue(details.previousPriority, "unset"))}" to "${capitalizeFirst(formatActivityValue(details.newPriority, "unset"))}"`;
+    case "task_status_updated":
+      return `${actorName} updated the task's status from "${formatActivityValue(details.previousStatus)}" to "${formatActivityValue(details.newStatus)}"`;
+    case "task_target_date_updated":
+      return `${actorName} updated the task's target date from "${formatActivityDateValue(details.previousTargetDate)}" to "${formatActivityDateValue(details.newTargetDate)}"`;
+    case "task_assigned":
+      return `${actorName} assigned this task to ${formatActivityValue(details.assigneeName, "a team member")}`;
+    case "task_unassigned":
+      return `${actorName} unassigned the task from ${formatActivityValue(details.assigneeName, "a team member")}`;
+    case "task_taken":
+      return `${actorName} took the task`;
+    case "task_self_unassigned":
+      return `${actorName} unassigned the task from themself`;
+    case "file_attached":
+      return `${actorName} attached a file: ${formatActivityValue(details.fileName, "Untitled file")}`;
+    case "file_removed":
+      return `${actorName} removed the file: ${formatActivityValue(details.fileName, "Untitled file")}`;
+    case "review_approved":
+      return `${actorName} approved the task${details.comment ? `: "${details.comment}"` : ""}`;
+    case "review_rejected":
+      return `${actorName} rejected the task${details.comment ? `: "${details.comment}"` : ""}`;
+    default:
+      return `${actorName} updated this task`;
+  }
 }
 
 function formatFileSize(value) {
@@ -289,6 +346,10 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
+  const [activities, setActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [activitiesError, setActivitiesError] = useState("");
+  const [sidebarTab, setSidebarTab] = useState("comments");
   const [attachments, setAttachments] = useState([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [attachmentsError, setAttachmentsError] = useState("");
@@ -707,6 +768,31 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
     loadReviews();
   }, [task?.id]);
+
+  const loadActivities = useCallback(async () => {
+    if (!task?.id) return setActivities([]);
+    setActivitiesLoading(true);
+    setActivitiesError("");
+    try {
+      const data = await getTaskActivities(task.id);
+      setActivities(data?.activities || data || []);
+    } catch (err) {
+      setActivitiesError(err?.message || "Unable to load activity");
+      setActivities([]);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  }, [task?.id]);
+
+  useEffect(() => {
+    loadActivities();
+  }, [loadActivities]);
+
+  useEffect(() => {
+    if (sidebarTab === "activity") {
+      loadActivities();
+    }
+  }, [loadActivities, sidebarTab]);
 
   useEffect(() => {
     async function loadProjectSuggestions() {
@@ -1482,8 +1568,6 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
 
   const sendIcon = <SendIcon className="tdm-send-icon" />;
 
-  const [sidebarTab, setSidebarTab] = useState("comments");
-
   const commentsPanel = (
     <article className="tdm-section-card tdm-comments-panel">
       <div className="tdm-comments-body">
@@ -1640,34 +1724,31 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
   const activitiesPanel = (
     <article className="tdm-section-card tdm-activities-panel">
       <div className="tdm-activities-body">
-        {reviewsError && <p className="tdm-comment-error">{reviewsError}</p>}
+        {activitiesError && <p className="tdm-comment-error">{activitiesError}</p>}
 
-        {reviewsLoading ? (
+        {activitiesLoading ? (
           <div className="skeleton-list">
             <SkeletonRow showAvatar={false} lineCount={3} />
             <SkeletonRow showAvatar={false} lineCount={2} />
           </div>
         ) : (
           <div className="tdm-activities-list-wrap">
-            {Array.isArray(reviews) && reviews.length > 0 ? (
+            {Array.isArray(activities) && activities.length > 0 ? (
               <ul className="tdm-review-list" aria-label="Activity">
-                {reviews.map((rev, idx) => {
-                  const actor = rev?.user || rev?.actor || {};
-                  const roleLabel = rev?.reviewerRole || actor?.role || actor?.projectRole || actor?.project_role;
-                  const displayName = rev?.reviewerName || getMemberLabel(actor);
-                  const actionNorm = getReviewEntryAction(rev) || rev?.action || "";
-                  const isApproved = String(actionNorm).toLowerCase() === "approved";
-                  const isRejected = String(actionNorm).toLowerCase() === "rejected";
-                  const comment = getReviewEntryComment(rev);
-                  const timeLabel = formatTimeAgo(rev?.createdAt || rev?.created_at);
+                {activities.map((activity, idx) => {
+                  const actor = activity?.actor || {};
+                  const displayName = activity?.actorName || getMemberLabel(actor);
+                  const activityType = activity?.activityType || activity?.activity_type || "";
+                  const isApproved = activityType === "review_approved";
+                  const isRejected = activityType === "review_rejected";
+                  const timeLabel = formatTimeAgo(activity?.createdAt || activity?.created_at);
+                  const message = formatActivityMessage(activity);
 
                   return (
-                    <li key={rev.id || idx} className="tdm-review-row">
+                    <li key={activity.id || idx} className="tdm-review-row">
                       <div className="tdm-review-icon">
                         {(() => {
-                          const memberFromProject = (projectMembers || []).find((m) =>
-                            String(m?.id || m?.userId || m?.user_id || "") === String(rev?.reviewerId || rev?.reviewer_id || "")
-                          );
+                          const memberFromProject = (projectMembers || []).find((m) => String(m?.id || m?.userId || m?.user_id || "") === String(activity?.actorId || activity?.actor_id || ""));
                           const memberImg =
                             memberFromProject?.profileImageBase64 ||
                             memberFromProject?.profile_image_base64 ||
@@ -1678,9 +1759,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                             memberFromProject?.profile_image;
 
                           const avatarSrc = normalizeProfileImage(
-                            rev?.reviewerProfileImageBase64 ||
-                              rev?.reviewer_profile_image_base64 ||
-                              memberImg ||
+                            memberImg ||
                               actor?.profileImageBase64 ||
                               actor?.profile_image_base64 ||
                               actor?.avatar ||
@@ -1699,10 +1778,9 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                       <div className="tdm-review-meta">
                         <div className="tdm-review-modal-name">
                           <strong>{displayName}</strong>
-                          {roleLabel ? <span className="tdm-review-modal-role">{capitalizeFirst(roleLabel)}</span> : null}
                         </div>
                         <div className="tdm-review-modal-time">{timeLabel}</div>
-                        {comment ? <div className="tdm-review-comment">{comment}</div> : null}
+                        <div className="tdm-review-comment">{message}</div>
                       </div>
                       {(isApproved || isRejected) ? (
                         <div className="tdm-review-action-col">

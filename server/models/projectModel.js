@@ -1,6 +1,129 @@
 import { pool } from "../config/db.js";
 import { getProjectPermissionContext, getTaskPermissionContext } from "../utils/projectPermissions.js";
 
+function formatUserDisplayName(row) {
+  if (!row) return "Someone";
+  const fullName = `${row.first_name || ""} ${row.last_name || ""}`.trim();
+  return fullName || row.email || "Someone";
+}
+
+function mapTaskActivityRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    actorId: row.actor_id,
+    actorName: row.actor_name || "Someone",
+    actor: {
+      id: row.actor_id,
+      firstName: row.actor_first_name || "",
+      lastName: row.actor_last_name || "",
+      email: row.actor_email || "",
+      profileImageBase64: row.actor_profile_image_base64 || null,
+    },
+    activityType: row.activity_type,
+    details: row.details || {},
+    createdAt: row.created_at,
+  };
+}
+
+export async function createTaskActivity({ taskId, actorId, activityType, details = {} }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedActorId = String(actorId || "").trim();
+  const normalizedType = String(activityType || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0 || !normalizedType) return null;
+
+  const result = await pool.query(
+    `
+    INSERT INTO task_activities (task_id, actor_id, activity_type, details)
+    VALUES ($1::int, NULLIF($2, '')::uuid, $3, $4::jsonb)
+    RETURNING id, task_id, actor_id, activity_type, details, created_at
+    `,
+    [normalizedTaskId, normalizedActorId, normalizedType, JSON.stringify(details || {})]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function getTaskActivities({ taskId, requesterId }) {
+  const normalizedTaskId = Number(taskId);
+  const normalizedRequesterId = String(requesterId || "").trim();
+
+  if (!Number.isInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    const error = new Error("taskId is required");
+    error.code = "INVALID_TASK";
+    throw error;
+  }
+
+  await getTaskPermissionContext({ taskId: normalizedTaskId, requesterId: normalizedRequesterId });
+
+  let activityRows = [];
+  try {
+    const activityResult = await pool.query(
+      `
+      SELECT
+        ta.id::text,
+        ta.task_id,
+        ta.actor_id,
+        ta.activity_type,
+        ta.details,
+        ta.created_at,
+        u.first_name AS actor_first_name,
+        u.last_name AS actor_last_name,
+        u.email AS actor_email,
+        u.profile_image_base64 AS actor_profile_image_base64,
+        CONCAT_WS(' ', NULLIF(u.first_name, ''), NULLIF(u.last_name, '')) AS actor_name
+      FROM task_activities ta
+      LEFT JOIN users u ON u.id = ta.actor_id
+      WHERE ta.task_id = $1::int
+      ORDER BY ta.created_at DESC, ta.id DESC
+      `,
+      [normalizedTaskId]
+    );
+    activityRows = activityResult.rows || [];
+  } catch (error) {
+    if (error?.code !== "42P01") throw error;
+  }
+
+  const reviewResult = await pool.query(
+    `
+    SELECT
+      ('review-' || r.id)::text AS id,
+      r.task_id,
+      r.reviewer_id AS actor_id,
+      CASE WHEN r.action = 'approved' THEN 'review_approved' ELSE 'review_rejected' END AS activity_type,
+      jsonb_build_object('comment', r.comment, 'action', r.action) AS details,
+      r.created_at,
+      u.first_name AS actor_first_name,
+      u.last_name AS actor_last_name,
+      u.email AS actor_email,
+      u.profile_image_base64 AS actor_profile_image_base64,
+      CONCAT_WS(' ', NULLIF(u.first_name, ''), NULLIF(u.last_name, '')) AS actor_name
+    FROM reviews r
+    LEFT JOIN users u ON u.id = r.reviewer_id
+    WHERE r.task_id = $1::int
+    ORDER BY r.created_at DESC, r.id DESC
+    `,
+    [normalizedTaskId]
+  );
+
+  const byKey = new Map();
+  [...activityRows, ...reviewResult.rows].forEach((row) => {
+    const key = `${row.activity_type}:${row.actor_id || ""}:${new Date(row.created_at).getTime()}:${JSON.stringify(row.details || {})}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, {
+        ...row,
+        actor_name: String(row.actor_name || "").trim() || formatUserDisplayName(row),
+      });
+    }
+  });
+
+  return Array.from(byKey.values())
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .map(mapTaskActivityRow);
+}
+
 export async function createSubtask({ taskId, title, createdBy, status }) {
   const client = await pool.connect();
 
@@ -106,6 +229,7 @@ export async function getTaskById({ taskId, requesterId }) {
       t.target_date,
       t.is_past_due,
       t.position,
+      tc.name AS category_name,
       p.id AS project_id,
       p.name AS project_name,
       p.owner AS project_owner,
@@ -169,6 +293,7 @@ export async function getTaskById({ taskId, requesterId }) {
         ), '[]'::json
       ) AS tags
     FROM tasks t
+    JOIN tasks_categories tc ON tc.id = t.category_id
     JOIN board b ON t.board_id = b.id
     JOIN projects p ON b.project_id = p.id
     LEFT JOIN project_settings ps ON ps.project_id = p.id
@@ -191,6 +316,7 @@ export async function getTaskById({ taskId, requesterId }) {
     id: row.id,
     boardId: row.board_id,
     categoryId: row.category_id,
+    categoryName: row.category_name,
     title: row.title,
     description: row.description,
     priority: row.priority === "critical" ? "urgent" : row.priority,

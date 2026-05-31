@@ -8,6 +8,8 @@ import { createProject as createProjectModel,
          declineProjectInvitation as declineProjectInvitationModel,
          getTaskCategories as getTaskCategoriesModel,
          getTaskById as getTaskByIdModel,
+         getTaskActivities as getTaskActivitiesModel,
+         createTaskActivity as createTaskActivityModel,
          createTaskCategory as createTaskCategoryModel,
          createTask as createTaskModel,
          getProjectSettings as getProjectSettingsModel,
@@ -99,6 +101,19 @@ function buildActorPayload(actor) {
     profileImageBase64: actor.profileImageBase64 || null,
     profilePictureUrl: actor.profilePictureUrl || null,
   };
+}
+
+async function recordTaskActivity({ taskId, actorId, activityType, details = {} }) {
+  try {
+    await createTaskActivityModel({ taskId, actorId, activityType, details });
+  } catch (error) {
+    console.error("Task activity log error:", {
+      taskId,
+      actorId,
+      activityType,
+      error: error?.message || error,
+    });
+  }
 }
 
 function canAttachTaskFile(access) {
@@ -700,6 +715,13 @@ export async function takeProjectTask(req, res) {
   try {
     const taskTaken = await takeProjectTaskModel({ taskId: taskId, userId: req.user?.userId });
 
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "task_taken",
+      details: {},
+    });
+
     try {
       const taskContext = await getTaskContext(taskId);
       if (taskContext?.projectId) {
@@ -753,14 +775,28 @@ export async function updateTaskStatus(req, res) {
   }
 
   try {
+    const previousTask = await getTaskByIdModel({ taskId, requesterId: req.user.userId });
     const task = await updateTaskStatusModel({
       taskId,
       userId: req.user.userId,
       categoryId,
     });
 
+    const taskContextForActivity = await getTaskContext(taskId);
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "task_status_updated",
+      details: {
+        previousStatus: previousTask?.categoryName || previousTask?.statusName || "",
+        newStatus: taskContextForActivity?.categoryName || "",
+        previousCategoryId: previousTask?.categoryId || null,
+        newCategoryId: taskContextForActivity?.categoryId || task?.categoryId || null,
+      },
+    });
+
     try {
-      const taskContext = await getTaskContext(taskId);
+      const taskContext = taskContextForActivity || await getTaskContext(taskId);
       if (taskContext?.projectId) {
         await broadcastProjectMembersEvent({
           projectId: taskContext.projectId,
@@ -781,9 +817,9 @@ export async function updateTaskStatus(req, res) {
 
     try {
       const actor = await getUserSummary(req.user.userId);
-      const taskContext = await getTaskContext(taskId);
+      const taskContext = taskContextForActivity || await getTaskContext(taskId);
       // Only send notification if assigning to someone other than the actor
-      if (actor && taskContext && String(memberId) !== String(req.user.userId)) {
+      if (actor && taskContext) {
         const recipients = buildNotificationRecipients({
           creatorId: taskContext.creatorId,
           assigneeIds: taskContext.assigneeIds,
@@ -851,6 +887,23 @@ export async function getTaskReviews(req, res) {
   }
 }
 
+export async function getTaskActivities(req, res) {
+  if (!req.user?.userId) return res.status(401).json({ message: "Authentication required" });
+
+  const { taskId } = req.params;
+  if (!taskId) return res.status(400).json({ message: "taskId parameter is required" });
+
+  try {
+    const activities = await getTaskActivitiesModel({ taskId, requesterId: req.user.userId });
+    return res.status(200).json({ activities });
+  } catch (error) {
+    if (error?.code === "INVALID_TASK" || error?.code === "INVALID_USER") return res.status(400).json({ message: error.message });
+    if (error?.code === "TASK_NOT_FOUND" || error?.code === "PROJECT_FORBIDDEN") return res.status(403).json({ message: error.message });
+    console.error("Get task activities error:", error);
+    return res.status(500).json({ message: "Unable to fetch activities" });
+  }
+}
+
 function getReviewTextFromBody(body) {
   const payload = body || {};
   return payload.review ?? payload.reason ?? payload.comment ?? payload.note ?? payload.message;
@@ -870,14 +923,26 @@ export async function approveTaskReview(req, res) {
 
   try {
     const comment = String(reviewRaw).trim();
+    const previousTask = await getTaskByIdModel({ taskId, requesterId: req.user.userId });
     const updated = await approveTaskReviewModel({
       taskId,
       reviewerId: req.user.userId,
       comment,
     });
+    const taskContextForActivity = await getTaskContext(taskId);
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "review_approved",
+      details: {
+        comment,
+        previousStatus: previousTask?.categoryName || "",
+        newStatus: taskContextForActivity?.categoryName || "Done",
+      },
+    });
 
     try {
-      const taskContext = await getTaskContext(taskId);
+      const taskContext = taskContextForActivity || await getTaskContext(taskId);
       if (taskContext?.projectId) {
         await broadcastProjectMembersEvent({
           projectId: taskContext.projectId,
@@ -957,10 +1022,22 @@ export async function rejectTaskReview(req, res) {
   if (!reviewRaw || String(reviewRaw).trim() === "") return res.status(400).json({ message: "Rejection reason is required" });
 
   try {
+    const previousTask = await getTaskByIdModel({ taskId, requesterId: req.user.userId });
     const updated = await rejectTaskReviewModel({ taskId, reviewerId: req.user.userId, comment: reviewRaw });
+    const taskContextForActivity = await getTaskContext(taskId);
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "review_rejected",
+      details: {
+        comment: reviewRaw,
+        previousStatus: previousTask?.categoryName || "",
+        newStatus: taskContextForActivity?.categoryName || "Todo",
+      },
+    });
 
     try {
-      const taskContext = await getTaskContext(taskId);
+      const taskContext = taskContextForActivity || await getTaskContext(taskId);
       if (taskContext?.projectId) {
         await broadcastProjectMembersEvent({
           projectId: taskContext.projectId,
@@ -1047,7 +1124,17 @@ export async function updateTaskPriority(req, res) {
   }
 
   try {
+    const previousTask = await getTaskByIdModel({ taskId, requesterId: req.user.userId });
     const task = await updateTaskPriorityModel({ taskId, requesterId: req.user.userId, priority });
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "task_priority_updated",
+      details: {
+        previousPriority: previousTask?.priority || "unset",
+        newPriority: task?.priority || priority,
+      },
+    });
     return res.status(200).json({ message: "Task priority updated successfully", task });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_PRIORITY") {
@@ -1083,7 +1170,17 @@ export async function updateTaskTargetDate(req, res) {
   }
 
   try {
+    const previousTask = await getTaskByIdModel({ taskId, requesterId: req.user.userId });
     const task = await updateTaskTargetDateModel({ taskId, requesterId: req.user.userId, targetDate: targetDate ?? null });
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "task_target_date_updated",
+      details: {
+        previousTargetDate: previousTask?.targetDate || null,
+        newTargetDate: task?.targetDate || null,
+      },
+    });
     return res.status(200).json({ message: "Target date updated successfully", task });
   } catch (error) {
     if (error?.code === "INVALID_TASK") {
@@ -1125,10 +1222,20 @@ export async function updateTaskName(req, res) {
   }
 
   try {
+    const previousTask = await getTaskByIdModel({ taskId, requesterId: req.user.userId });
     const task = await updateTaskNameModel({
       taskId,
       requesterId: req.user.userId,
       name: trimmed,
+    });
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "task_name_updated",
+      details: {
+        previousName: previousTask?.title || "",
+        newName: task?.title || trimmed,
+      },
     });
 
     try {
@@ -1193,10 +1300,20 @@ export async function updateTaskDescription(req, res) {
   }
 
   try {
+    const previousTask = await getTaskByIdModel({ taskId, requesterId: req.user.userId });
     const task = await updateTaskDescriptionModel({
       taskId,
       requesterId: req.user.userId,
       description: trimmed,
+    });
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "task_description_updated",
+      details: {
+        previousDescription: previousTask?.description || "",
+        newDescription: task?.description || trimmed,
+      },
     });
 
     try {
@@ -1442,6 +1559,17 @@ export async function assignTaskToOthers(req, res) {
       requesterId: req.user.userId,
     });
 
+    const assignedUser = await getUserSummary(memberId);
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: isSelfAssignment ? "task_taken" : "task_assigned",
+      details: {
+        assigneeId: memberId,
+        assigneeName: assignedUser?.displayName || "Team member",
+      },
+    });
+
     try {
       const actor = await getUserSummary(req.user.userId);
       const taskContext = await getTaskContext(taskId);
@@ -1519,6 +1647,16 @@ export async function createSubtask(req, res) {
       title,
       createdBy,
       status,
+    });
+
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "subtask_created",
+      details: {
+        subtaskId: newSubtask?.id || null,
+        title: newSubtask?.title || title,
+      },
     });
 
     try {
@@ -1833,6 +1971,15 @@ export async function createTaskTag(req, res) {
 
   try {
     const created = await createTaskTagModel({ taskId, tagName, projectId, requesterId: req.user.userId });
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "tag_added",
+      details: {
+        tagId: created?.id || null,
+        tagName: created?.tagName || tagName,
+      },
+    });
     return res.status(201).json({ tag: created });
   } catch (error) {
     if (error?.code === "INVALID_TASK" || error?.code === "INVALID_PROJECT" || error?.code === "INVALID_TAG") {
@@ -1864,6 +2011,16 @@ export async function deleteTaskTag(req, res) {
     if (String(deleted.taskId) !== String(taskId)) {
       return res.status(400).json({ message: "Tag does not belong to the specified task" });
     }
+
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "tag_removed",
+      details: {
+        tagId: deleted?.id || null,
+        tagName: deleted?.tagName || "",
+      },
+    });
 
     return res.status(200).json({ tag: deleted });
   } catch (error) {
@@ -1944,6 +2101,16 @@ export async function uploadTaskFile(req, res) {
     uploadPhase = "url_sign";
     const createdWithUrl = await attachTaskFileUrls(created);
 
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "file_attached",
+      details: {
+        fileId: created?.id || null,
+        fileName: created?.file_name || created?.fileName || safeName,
+      },
+    });
+
     return res.status(201).json({ file: createdWithUrl });
   } catch (error) {
     console.error("Upload task file failed:", {
@@ -2004,6 +2171,15 @@ export async function deleteTaskFile(req, res) {
 
     await deleteTaskFileFromStorage(file.storage_path);
     const deleted = await deleteTaskFileModel({ fileId, requesterId: req.user.userId });
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "file_removed",
+      details: {
+        fileId: deleted?.id || fileId,
+        fileName: deleted?.file_name || deleted?.fileName || file?.file_name || "",
+      },
+    });
     return res.status(200).json({ file: toPublicTaskFile(deleted) });
   } catch (error) {
     if (error?.code === "INVALID_FILE" || error?.code === "FILE_NOT_FOUND") return sendFileError(res, 404, error, "File not found");
@@ -2162,6 +2338,16 @@ export async function deleteSubtask(req, res) {
       subtaskId: Number(subtaskId),
     });
 
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "subtask_removed",
+      details: {
+        subtaskId: deletedSubtask?.id || subtaskId,
+        title: deletedSubtask?.title || "",
+      },
+    });
+
     return res.status(200).json(deletedSubtask);
   } catch (err) {
     console.error("Error deleting subtask:", err);
@@ -2197,6 +2383,17 @@ export async function unassignTaskFromMember(req, res) {
       taskId,
       memberId,
       requesterId: req.user.userId,
+    });
+
+    const unassignedUser = await getUserSummary(memberId);
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "task_unassigned",
+      details: {
+        assigneeId: memberId,
+        assigneeName: unassignedUser?.displayName || "Team member",
+      },
     });
 
     try {
@@ -2267,6 +2464,13 @@ export async function unassignTaskFromSelf(req, res) {
     const unassigned = await unassignTaskFromSelfModel({
       taskId,
       userId: req.user.userId,
+    });
+
+    await recordTaskActivity({
+      taskId,
+      actorId: req.user.userId,
+      activityType: "task_self_unassigned",
+      details: {},
     });
 
     try {

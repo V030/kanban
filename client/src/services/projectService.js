@@ -477,6 +477,15 @@ export async function getTaskReviews(taskId) {
   });
 }
 
+export async function getTaskActivities(taskId) {
+  if (!taskId) throw new Error("Unable to load activity. Please select a task.");
+  return fetchWithAuth(`${API_URL}/auth/project/tasks/${taskId}/activities`, {
+    method: "GET",
+    cache: "no-cache",
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
 export async function approveTaskReview(taskId, reason) {
   if (!taskId) throw new Error("Unable to approve task. Please select a task.");
   const trimmed = String(reason ?? "").trim();

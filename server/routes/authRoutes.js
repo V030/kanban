@@ -23,6 +23,7 @@ import {
 	declineProjectInvitation,
 	getTaskCategories,
 	getTaskById,
+	getTaskActivities,
 	getTaskReviews,
 	approveTaskReview,
 	rejectTaskReview,
@@ -148,6 +149,7 @@ router.patch("/projects/invitations/:requestId/accept", authenticateToken, invit
 router.patch("/projects/invitations/:requestId/decline", authenticateToken, inviteLimiter, declineProjectInvitation);
 router.get("/projects/:projectId/get-task-categories", authenticateToken, authenticatedLimiter, getTaskCategories);
 router.get("/project/tasks/:taskId", authenticateToken, authenticatedLimiter, getTaskById);
+router.get("/project/tasks/:taskId/activities", authenticateToken, authenticatedLimiter, getTaskActivities);
 router.get("/project/tasks/:taskId/reviews", authenticateToken, authenticatedLimiter, getTaskReviews);
 router.post("/project/tasks/:taskId/review/approve", authenticateToken, taskWriteLimiter, approveTaskReview);
 router.post("/project/tasks/:taskId/review/reject", authenticateToken, taskWriteLimiter, rejectTaskReview);
