@@ -1,6 +1,12 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import { useToast } from "../hooks/useToast";
-import { getCurrentUser, changePassword, updateProfile } from "../services/authService";
+import {
+    getCurrentUser,
+    changePassword,
+    updateProfile,
+    requestProfileEmailVerificationCode,
+    verifyProfileEmailVerificationCode,
+} from "../services/authService";
 import "../components/styles/WorkspacePages.css";
 import "../components/styles/SkeletonLoading.css";
 import normalizeProfileImage from "../utils/normalizeProfileImage";
@@ -48,6 +54,88 @@ function toBase64(file) {
     });
 }
 
+const OTP_LENGTH = 6;
+
+function formatCountdown(seconds) {
+    const safe = Math.max(0, Number(seconds) || 0);
+    return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function OtpInput({ value, onChange, disabled = false, idPrefix = "profile-email-otp" }) {
+    const inputsRef = useRef([]);
+    const digits = Array.from({ length: OTP_LENGTH }, (_, index) => value[index] || "");
+
+    const updateAt = (index, digit) => {
+        const next = digits.slice();
+        next[index] = digit;
+        onChange(next.join(""));
+    };
+
+    const handleChange = (index, rawValue) => {
+        const numeric = String(rawValue || "").replace(/\D/g, "");
+        if (!numeric) {
+            updateAt(index, "");
+            return;
+        }
+
+        if (numeric.length > 1) {
+            const next = digits.slice();
+            numeric.slice(0, OTP_LENGTH).split("").forEach((digit, offset) => {
+                if (index + offset < OTP_LENGTH) next[index + offset] = digit;
+            });
+            onChange(next.join(""));
+            inputsRef.current[Math.min(index + numeric.length, OTP_LENGTH - 1)]?.focus();
+            return;
+        }
+
+        updateAt(index, numeric);
+        if (index < OTP_LENGTH - 1) inputsRef.current[index + 1]?.focus();
+    };
+
+    const handleKeyDown = (index, event) => {
+        if (event.key === "Backspace" && !digits[index] && index > 0) inputsRef.current[index - 1]?.focus();
+        if (event.key === "ArrowLeft" && index > 0) {
+            event.preventDefault();
+            inputsRef.current[index - 1]?.focus();
+        }
+        if (event.key === "ArrowRight" && index < OTP_LENGTH - 1) {
+            event.preventDefault();
+            inputsRef.current[index + 1]?.focus();
+        }
+    };
+
+    const handlePaste = (event) => {
+        const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LENGTH);
+        if (pasted.length !== OTP_LENGTH) return;
+        event.preventDefault();
+        onChange(pasted);
+        inputsRef.current[OTP_LENGTH - 1]?.focus();
+    };
+
+    return (
+        <div className="otp-input-group" role="group" aria-label="Six digit verification code" onPaste={handlePaste}>
+            {digits.map((digit, index) => (
+                <input
+                    key={`${idPrefix}-${index}`}
+                    ref={(node) => { inputsRef.current[index] = node; }}
+                    id={`${idPrefix}-${index}`}
+                    className="otp-input"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete={index === 0 ? "one-time-code" : "off"}
+                    maxLength={1}
+                    value={digit}
+                    disabled={disabled}
+                    aria-label={`Verification code digit ${index + 1}`}
+                    onChange={(event) => handleChange(index, event.target.value)}
+                    onKeyDown={(event) => handleKeyDown(index, event)}
+                />
+            ))}
+        </div>
+    );
+}
+
 function Profile() {
     const toast = useToast();
     const user = getCurrentUser();
@@ -67,6 +155,13 @@ function Profile() {
     });
     const [loading, setLoading] = useState(false);
     const [imageError, setImageError] = useState(false);
+    const [emailOtp, setEmailOtp] = useState("");
+    const [emailOtpToken, setEmailOtpToken] = useState("");
+    const [emailOtpSent, setEmailOtpSent] = useState(false);
+    const [emailOtpExpiresIn, setEmailOtpExpiresIn] = useState(0);
+    const [emailOtpResendIn, setEmailOtpResendIn] = useState(0);
+    const [emailOtpLoading, setEmailOtpLoading] = useState(false);
+    const [emailOtpError, setEmailOtpError] = useState("");
 
     const fullName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "User";
     const initials = `${(user?.firstName || "").charAt(0)}${(user?.lastName || "").charAt(0)}`.toUpperCase() || "U";
@@ -78,6 +173,72 @@ function Profile() {
     useEffect(() => {
         setImageError(false);
     }, [editFormData.profileImageBase64, user?.profileImageBase64, user?.profile_image_base64]);
+
+    useEffect(() => {
+        if (!emailOtpExpiresIn && !emailOtpResendIn) return undefined;
+        const timer = window.setInterval(() => {
+            setEmailOtpExpiresIn((value) => Math.max(0, value - 1));
+            setEmailOtpResendIn((value) => Math.max(0, value - 1));
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [emailOtpExpiresIn, emailOtpResendIn]);
+
+    const emailChanged = String(editFormData.email || "").trim().toLowerCase() !== String(user?.email || "").trim().toLowerCase();
+
+    const resetEmailVerification = useCallback(() => {
+        setEmailOtp("");
+        setEmailOtpToken("");
+        setEmailOtpSent(false);
+        setEmailOtpExpiresIn(0);
+        setEmailOtpResendIn(0);
+        setEmailOtpError("");
+    }, []);
+
+    const sendEmailChangeCode = useCallback(async () => {
+        const nextEmail = String(editFormData.email || "").trim().toLowerCase();
+        if (!nextEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+            setEmailOtpError("Enter a valid new email address");
+            return;
+        }
+
+        setEmailOtpLoading(true);
+        setEmailOtpError("");
+
+        try {
+            const result = await requestProfileEmailVerificationCode(nextEmail);
+            setEmailOtpSent(true);
+            setEmailOtp("");
+            setEmailOtpToken("");
+            setEmailOtpExpiresIn(result?.expiresInSeconds || 600);
+            setEmailOtpResendIn(result?.resendAfterSeconds || 60);
+            toast.showInfo("Verification code sent.");
+        } catch (error) {
+            setEmailOtpError(error?.message || "Unable to send verification code.");
+        } finally {
+            setEmailOtpLoading(false);
+        }
+    }, [editFormData.email, toast]);
+
+    const verifyEmailChangeCode = useCallback(async () => {
+        const nextEmail = String(editFormData.email || "").trim().toLowerCase();
+        if (!/^\d{6}$/.test(emailOtp)) {
+            setEmailOtpError("Enter the 6-digit verification code");
+            return;
+        }
+
+        setEmailOtpLoading(true);
+        setEmailOtpError("");
+
+        try {
+            const result = await verifyProfileEmailVerificationCode(nextEmail, emailOtp);
+            setEmailOtpToken(result.verificationToken);
+            toast.showSuccess("Email verified.");
+        } catch (error) {
+            setEmailOtpError(error?.message || "Invalid or expired verification code.");
+        } finally {
+            setEmailOtpLoading(false);
+        }
+    }, [editFormData.email, emailOtp, toast]);
 
     const handleProfileUpdate = useCallback(
         async (e) => {
@@ -95,6 +256,10 @@ function Profile() {
                 toast.showValidationError("Email is required");
                 return;
             }
+            if (emailChanged && !emailOtpToken) {
+                toast.showValidationError("Please verify your new email before saving.");
+                return;
+            }
 
             setLoading(true);
             try {
@@ -102,16 +267,18 @@ function Profile() {
                     editFormData.firstName,
                     editFormData.lastName,
                     editFormData.email,
-                    editFormData.profileImageBase64
+                    editFormData.profileImageBase64,
+                    emailChanged ? emailOtpToken : undefined
                 );
                 toast.showSuccess("Profile updated successfully!");
+                resetEmailVerification();
             } catch (error) {
                 toast.showError(error?.message || "Failed to update profile");
             } finally {
                 setLoading(false);
             }
         },
-        [editFormData, toast]
+        [editFormData, emailChanged, emailOtpToken, resetEmailVerification, toast]
     );
 
     const handlePasswordChange = useCallback(
@@ -153,6 +320,7 @@ function Profile() {
     const handleEditInputChange = (e) => {
         const { name, value } = e.target;
         setEditFormData((prev) => ({ ...prev, [name]: value }));
+        if (name === "email") resetEmailVerification();
     };
 
     const handlePasswordInputChange = (e) => {
@@ -196,19 +364,6 @@ function Profile() {
             <header className="profile-header workspace-hero">
                 <div className="profile-hero-content">
                     <div className="profile-hero-main">
-                        <div className="profile-hero-avatar-wrap">
-                            {accountImageSource && !imageError ? (
-                                <img
-                                    src={accountImageSource}
-                                    alt={fullName}
-                                    className="profile-avatar-lg"
-                                    onError={() => setImageError(true)}
-                                />
-                            ) : (
-                                <div className="profile-avatar-lg">{initials}</div>
-                            )}
-                        </div>
-
                         <div>
                             <h1 className="page-title">Account Settings</h1>
                             <p className="page-subtitle">Manage your profile details, password, and communication preferences.</p>
@@ -341,6 +496,53 @@ function Profile() {
                                 />
                             </div>
 
+                            {emailChanged && (
+                                <div className="email-verification-section profile-email-verification">
+                                    <div className="email-verification-header">
+                                        <div>
+                                            <strong>Email Verification</strong>
+                                            {emailOtpToken ? (
+                                                <span>New email verified</span>
+                                            ) : emailOtpSent && emailOtpExpiresIn > 0 ? (
+                                                <span>Code expires in {formatCountdown(emailOtpExpiresIn)}</span>
+                                            ) : (
+                                                <span>Verify this address before saving</span>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={sendEmailChangeCode}
+                                            disabled={loading || emailOtpLoading || (emailOtpSent && emailOtpResendIn > 0)}
+                                        >
+                                            {emailOtpLoading && !emailOtpSent ? "Sending..." : emailOtpSent ? "Resend Code" : "Send Code"}
+                                        </button>
+                                    </div>
+
+                                    {emailOtpSent && !emailOtpToken && (
+                                        <>
+                                            <OtpInput
+                                                value={emailOtp}
+                                                onChange={(value) => { setEmailOtp(value); setEmailOtpError(""); }}
+                                                disabled={loading || emailOtpLoading || emailOtpExpiresIn <= 0}
+                                            />
+                                            {emailOtpResendIn > 0 && <small>Resend available in {emailOtpResendIn}s</small>}
+                                            {emailOtpExpiresIn <= 0 && <small className="field-error-text">Code expired. Please resend a new code.</small>}
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary btn-sm"
+                                                onClick={verifyEmailChangeCode}
+                                                disabled={loading || emailOtpLoading || emailOtp.length !== OTP_LENGTH || emailOtpExpiresIn <= 0}
+                                            >
+                                                {emailOtpLoading ? "Verifying..." : "Verify Code"}
+                                            </button>
+                                        </>
+                                    )}
+
+                                    {emailOtpError && <div className="field-error-text">{emailOtpError}</div>}
+                                </div>
+                            )}
+
                             <div className="form-group">
                                 <label htmlFor="bio">Bio</label>
                                 <textarea
@@ -369,7 +571,7 @@ function Profile() {
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary" disabled={loading}>
+                                <button type="submit" className="btn btn-primary" disabled={loading || (emailChanged && !emailOtpToken)}>
                                     {loading ? "Saving..." : "Save Changes"}
                                 </button>
                             </div>

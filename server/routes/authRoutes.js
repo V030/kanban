@@ -7,6 +7,8 @@ import {
 	resetPasswordController,
 	verifyPasswordResetController,
 	completePasswordResetController,
+	requestEmailVerificationController,
+	verifyEmailVerificationController,
 	testEmailController,
 } from "../controllers/authController.js";
 import { googleAuth } from "../controllers/googleAuthController.js";
@@ -116,6 +118,8 @@ router.post("/login", authLimiter, login);
 router.post("/register", authLimiter, register);
 router.post("/check-email", authLimiter, checkEmailController);
 router.post("/google", authLimiter, googleAuth);
+router.post("/email-verification/request", passwordResetRequestLimiter, requestEmailVerificationController);
+router.post("/email-verification/verify", passwordResetConfirmLimiter, verifyEmailVerificationController);
 router.post("/forgot-password/request-otp", passwordResetRequestLimiter, requestPasswordResetController);
 router.post("/forgot-password/verify-otp", passwordResetConfirmLimiter, verifyPasswordResetController);
 router.post("/forgot-password/complete", passwordResetConfirmLimiter, completePasswordResetController);

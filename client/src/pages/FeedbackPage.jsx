@@ -220,18 +220,17 @@ function FeedbackPage() {
       <header className="workspace-hero feedback-hero">
         <div className="workspace-hero-content feedback-hero-content">
           <div>
-            <p className="feedback-eyebrow">Workspace feedback</p>
             <h1 className="page-title">Send product feedback</h1>
             <p className="page-subtitle">
               Share bugs, feature ideas, or product impressions. Feedback is sent directly to the team by email and is not stored in the database.
             </p>
           </div>
 
-          <div className="feedback-hero-actions">
+          {/* <div className="feedback-hero-actions">
             <div className="feedback-chip">Authenticated</div>
             <div className="feedback-chip">Email only</div>
             <div className="feedback-chip">No database storage</div>
-          </div>
+          </div> */}
         </div>
       </header>
 

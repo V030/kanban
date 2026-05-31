@@ -2,7 +2,12 @@ import express from "express";
 import { pool } from "../config/db.js";
 import { authenticateToken, authorizeRole } from "../middleware/authMiddleware.js";
 import { authenticatedLimiter } from "../middleware/rateLimiter.js";
-import { changePasswordController, updateProfileController } from "../controllers/authController.js";
+import {
+    changePasswordController,
+    requestEmailVerificationController,
+    updateProfileController,
+    verifyEmailVerificationController,
+} from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -41,6 +46,8 @@ router.get("/profile", authenticateToken, authenticatedLimiter, async (req, res)
 
 router.post("/change-password", authenticateToken, authenticatedLimiter, changePasswordController);
 
+router.post("/profile/email-verification/request", authenticateToken, authenticatedLimiter, requestEmailVerificationController);
+router.post("/profile/email-verification/verify", authenticateToken, authenticatedLimiter, verifyEmailVerificationController);
 router.put("/profile", authenticateToken, authenticatedLimiter, updateProfileController);
 
 export default router;

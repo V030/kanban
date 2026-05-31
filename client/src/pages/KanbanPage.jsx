@@ -166,6 +166,7 @@ function KanbanPage() {
 	const [dragReviewReason, setDragReviewReason] = useState("");
 	const [dragReviewSubmitting, setDragReviewSubmitting] = useState(false);
 	const taskCategoriesRef = useRef(taskCategories);
+	const isDeletingProjectRef = useRef(false);
 
 
 	const currentUser = useMemo(() => getCurrentUser(), []);
@@ -245,14 +246,16 @@ function KanbanPage() {
 	}, [projectId, navigate, toast]);
 
 	const loadProjectMembers = useCallback(async () => {
-		if (!projectId) return;
+		if (!projectId || isDeletingProjectRef.current) return;
 
 		setMembersLoading(true);
 
 		try {
 			const data = await getProjectMembers(projectId);
+			if (isDeletingProjectRef.current) return;
 			setProjectMembers(data.members || []);
 		} catch (membersRequestError) {
+			if (isDeletingProjectRef.current) return;
 			// Check if this is a project-access error (project deleted or access revoked)
 			const errorMsg = String(membersRequestError?.message || "").toLowerCase();
 			if (errorMsg.includes("not found") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
@@ -264,17 +267,21 @@ function KanbanPage() {
 			toast.showError(membersRequestError?.message || "Unable to load project members.");
 			setProjectMembers([]);
 		} finally {
-			setMembersLoading(false);
+			if (!isDeletingProjectRef.current) {
+				setMembersLoading(false);
+			}
 		}
 	}, [projectId, navigate, toast]);
 
 	const loadProjectSettings = useCallback(async () => {
-		if (!projectId) return;
+		if (!projectId || isDeletingProjectRef.current) return;
 
 		try {
 			const settings = await getProjectSettings(projectId);
+			if (isDeletingProjectRef.current) return;
 			setTaskPermissions({ ...DEFAULT_TASK_PERMISSIONS, ...settings });
 		} catch (settingsError) {
+			if (isDeletingProjectRef.current) return;
 			// Check if this is a project-access error
 			const errorMsg = String(settingsError?.message || "").toLowerCase();
 			if (errorMsg.includes("not found") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
@@ -323,14 +330,16 @@ function KanbanPage() {
 
 	// Fetch full project details when projectId comes from route params
 	useEffect(() => {
-		if (!routeProjectId || project?.name) return; // Skip if we already have project name
+		if (!routeProjectId || project?.name || isDeletingProjectRef.current) return; // Skip if we already have project name
 		
 		(async () => {
+			if (isDeletingProjectRef.current) return;
 			try {
 				const [ownedResult, memberResult] = await Promise.allSettled([
 					getProjects(),
 					getMemberProjects()
 				]);
+				if (isDeletingProjectRef.current) return;
 				
 				const owned = ownedResult.status === "fulfilled" ? ownedResult.value?.projects || [] : [];
 				const member = memberResult.status === "fulfilled" ? memberResult.value?.projects || [] : [];
@@ -343,12 +352,13 @@ function KanbanPage() {
 					// Project was not found in user's accessible projects.
 					// This could mean it was deleted, access was revoked, or the ID is invalid.
 					console.warn(`Project ${routeProjectId} not found in accessible projects. Redirecting to projects list.`);
-					navigate("/projects", { replace: true });
+					navigate("/main-page/projects", { replace: true });
 				}
 			} catch (err) {
+				if (isDeletingProjectRef.current) return;
 				console.error("Unable to fetch project details:", err);
 				// On error, treat as project not accessible and redirect
-				navigate("/projects", { replace: true });
+				navigate("/main-page/projects", { replace: true });
 			}
 		})();
 	}, [routeProjectId, project?.name, navigate]);
@@ -596,13 +606,16 @@ function KanbanPage() {
 			if (!project?.id || projectRole !== "owner") return;
 
 			setDeleteProjectPending(true);
+			isDeletingProjectRef.current = true;
 
 			try {
 				await deleteProject(project.id);
 				toast.showSuccess("Project deleted successfully!");
 				setSettingsOpen(false);
-				navigate("/main-page/projects");
+				setMembersOpen(false);
+				navigate("/main-page/projects", { replace: true });
 			} catch (err) {
+				isDeletingProjectRef.current = false;
 				toast.showError(err?.message || "Unable to delete project.");
 			} finally {
 				setDeleteProjectPending(false);

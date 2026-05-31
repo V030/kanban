@@ -2,7 +2,7 @@
 
 import { transformErrorMessage, extractErrorMessage } from "../utils/errorTransformer";
 
-const API_URL = "http://localhost:5000";
+const API_URL = process.env.REACT_APP_API_URL;
 
 const NETWORK_ERROR_EVENT = "kanban:network-error";
 const SESSION_EXPIRED_EVENT = "kanban:session-expired";
@@ -56,7 +56,7 @@ export async function fetchWithAuth(url, options = {}) {
     throw new Error("No token found. Please log in.");
   }
   
-  console.log("Making authenticated request to:", url);
+  // console.log("Making authenticated request to:", url);
   
   // Pull `headers` out so spreading options never duplicates or drops fields (must keep JSON body intact).
   const { headers: incomingHeaders = {}, ...restOptions } = options;
@@ -124,6 +124,7 @@ export async function login(email, password) {
   let response;
 
   try {
+    console.log("API_URL:", process.env.REACT_APP_API_URL);
     response = await fetch(`${API_URL}/auth/login`, {
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -175,7 +176,8 @@ export async function register(
     first_name, 
     last_name, 
     email, 
-    password
+    password,
+    emailVerificationToken
   ) {
   let response;
 
@@ -183,7 +185,7 @@ export async function register(
     response = await fetch(`${API_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ first_name, last_name, email, password }),
+      body: JSON.stringify({ first_name, last_name, email, password, emailVerificationToken }),
     });
   } catch (error) {
     handleNetworkFailure(error);
@@ -200,6 +202,64 @@ export async function register(
   localStorage.setItem("token", data.token);
   cachedUser = data.user || null;
   return data;
+}
+
+export async function requestEmailVerificationCode(email, purpose = "registration") {
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/email-verification/request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, purpose }),
+    });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
+
+  if (!response.ok) {
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
+  }
+
+  return response.json();
+}
+
+export async function verifyEmailVerificationCode(email, otp, purpose = "registration") {
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/email-verification/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, otp, purpose }),
+    });
+  } catch (error) {
+    handleNetworkFailure(error);
+  }
+
+  if (!response.ok) {
+    const errorMessage = await extractErrorMessage(response);
+    const userFriendlyMessage = transformErrorMessage(errorMessage);
+    throw new Error(userFriendlyMessage);
+  }
+
+  return response.json();
+}
+
+export async function requestProfileEmailVerificationCode(email) {
+  return fetchWithAuth(`${API_URL}/api/protected/profile/email-verification/request`, {
+    method: "POST",
+    body: JSON.stringify({ email, purpose: "email_change" }),
+  });
+}
+
+export async function verifyProfileEmailVerificationCode(email, otp) {
+  return fetchWithAuth(`${API_URL}/api/protected/profile/email-verification/verify`, {
+    method: "POST",
+    body: JSON.stringify({ email, otp, purpose: "email_change" }),
+  });
 }
 
 export async function googleLogin(credentialResponse) {
@@ -346,10 +406,10 @@ export async function changePassword(currentPassword, newPassword) {
   });
 }
 
-export async function updateProfile(firstName, lastName, email, profileImageBase64) {
+export async function updateProfile(firstName, lastName, email, profileImageBase64, emailVerificationToken) {
   const response = await fetchWithAuth(`${API_URL}/api/protected/profile`, {
     method: "PUT",
-    body: JSON.stringify({ firstName, lastName, email, profileImageBase64 }),
+    body: JSON.stringify({ firstName, lastName, email, profileImageBase64, emailVerificationToken }),
   });
   
   // Update cached user with new profile data

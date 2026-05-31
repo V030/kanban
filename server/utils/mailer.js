@@ -118,6 +118,69 @@ export async function sendPasswordResetOtpEmail({ to, otp, expiresAt }) {
   }
 }
 
+export async function sendEmailVerificationOtpEmail({ to, otp, expiresAt }) {
+  const transporter = getTransporter();
+
+  if (!transporter) {
+    const env = String(process.env.NODE_ENV || "development").toLowerCase();
+    console.warn("[email-verification] SMTP transporter not configured", {
+      env,
+      SMTP_HOST: !!process.env.SMTP_HOST,
+      SMTP_PORT: !!process.env.SMTP_PORT,
+      SMTP_USER: !!process.env.SMTP_USER,
+      SMTP_FROM: !!process.env.SMTP_FROM,
+    });
+
+    if (env !== "production") {
+      console.warn("[email-verification] SMTP is not configured. Verification email skipped in development.");
+      return;
+    }
+
+    throw new Error("Email transport is not configured");
+  }
+
+  const sender = String(process.env.SMTP_FROM || process.env.SMTP_USER || "").trim();
+  const expiresText = expiresAt instanceof Date ? expiresAt.toISOString() : String(expiresAt || "");
+
+  try {
+    const info = await transporter.sendMail({
+      from: sender,
+      to,
+      subject: "Verify Your Email",
+      text: [
+        "Your verification code is:",
+        "",
+        otp,
+        "",
+        "This code expires in 10 minutes.",
+        "",
+        "If you did not request this code, please ignore this email.",
+      ].join("\n"),
+      html: `
+        <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#1f2937">
+          <p>Your verification code is:</p>
+          <p style="font-size:28px;font-weight:700;letter-spacing:0.16em">${escapeHtml(otp)}</p>
+          <p>This code expires in 10 minutes.</p>
+          <p>If you did not request this code, please ignore this email.</p>
+          <p style="color:#6b7280;font-size:12px">Expires at ${escapeHtml(expiresText)}</p>
+        </div>
+      `,
+    });
+
+    console.info("[email-verification] Email sent", { to, messageId: info && info.messageId });
+    return info;
+  } catch (err) {
+    console.error("[email-verification] Failed to send email", {
+      to,
+      message: err && (err.message || String(err)),
+      code: err && err.code,
+      response: err && err.response,
+      stack: err && err.stack,
+    });
+    throw err;
+  }
+}
+
 export async function sendFeedbackEmail({ to, feedback }) {
   const transporter = getTransporter();
 

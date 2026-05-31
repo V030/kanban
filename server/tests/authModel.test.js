@@ -21,11 +21,18 @@ vi.mock("bcrypt", () => ({
   hash: bcryptHashMock,
 }));
 
-import { changePassword, resetPasswordWithOtp } from "../models/authModel.js";
+import {
+  changePassword,
+  requestEmailVerificationOtp,
+  resetPasswordWithOtp,
+  verifyEmailVerificationOtp,
+} from "../models/authModel.js";
 
 describe("authModel password flows", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("JWT_SECRET", "test-secret");
+    vi.stubEnv("OTP_HASH_SECRET", "otp-test-secret");
     bcryptHashMock.mockResolvedValue("new-password-hash");
   });
 
@@ -110,5 +117,84 @@ describe("authModel password flows", () => {
     );
 
     expect(poolQueryMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("creates a registration email verification OTP without storing the plaintext code", async () => {
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await requestEmailVerificationOtp({
+      email: "  MAYA@example.com ",
+      purpose: "registration",
+    });
+
+    expect(result.email).toBe("maya@example.com");
+    expect(result.otp).toMatch(/^\d{6}$/);
+    expect(poolQueryMock).toHaveBeenCalledTimes(2);
+
+    const insertParams = poolQueryMock.mock.calls[1][1];
+    expect(insertParams[0]).toBe("maya@example.com");
+    expect(insertParams[1]).toBe("registration");
+    expect(insertParams[3]).not.toBe(result.otp);
+    expect(insertParams[3]).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("verifies and consumes a valid email verification OTP", async () => {
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const request = await requestEmailVerificationOtp({
+      email: "maya@example.com",
+      purpose: "registration",
+    });
+    const otpHash = poolQueryMock.mock.calls[1][1][3];
+
+    poolQueryMock.mockClear();
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          email: "maya@example.com",
+          purpose: "registration",
+          user_id: null,
+          otp_hash: otpHash,
+          expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+          attempts: 0,
+          consumed_at: null,
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await verifyEmailVerificationOtp({
+      email: "maya@example.com",
+      otp: request.otp,
+      purpose: "registration",
+    });
+
+    expect(result.verificationToken).toEqual(expect.any(String));
+    expect(poolQueryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("increments attempts for an invalid email verification OTP", async () => {
+    poolQueryMock.mockResolvedValueOnce({
+      rows: [{
+        email: "maya@example.com",
+        purpose: "registration",
+        user_id: null,
+        otp_hash: "a".repeat(64),
+        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        attempts: 1,
+        consumed_at: null,
+      }],
+    }).mockResolvedValueOnce({ rows: [] });
+
+    await expect(verifyEmailVerificationOtp({
+      email: "maya@example.com",
+      otp: "000000",
+      purpose: "registration",
+    })).rejects.toThrow("Invalid or expired verification code.");
+
+    expect(poolQueryMock.mock.calls[1][1][2]).toBe(2);
   });
 });

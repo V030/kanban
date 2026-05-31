@@ -976,9 +976,10 @@ export async function createProject(projectData) {
         allow_member_delete_task,
         allow_member_add_board,
         allow_member_add_member,
-        allow_assign_task_to_member
+        allow_assign_task_to_member,
+        allow_member_create_tag
       )
-      VALUES ($1, true, true, true, true, true, true, false)
+      VALUES ($1, true, true, true, true, true, true, true, true)
       `,
       [project.id]
     );

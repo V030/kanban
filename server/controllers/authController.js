@@ -12,14 +12,20 @@ import {
   resetPasswordWithOtp,
   verifyPasswordResetOtp,
   completePasswordReset,
-} from "../models/authModel.js";  
+  normalizeEmail,
+  sanitizeName,
+  isValidEmail,
+  requestEmailVerificationOtp,
+  verifyEmailVerificationOtp,
+  validateEmailVerificationToken,
+  clearEmailVerificationOtp,
+} from "../models/authModel.js";
 import { generateToken } from "../utils/jwt.js";
-import { sendPasswordResetOtpEmail } from "../utils/mailer.js";
+import { sendEmailVerificationOtpEmail, sendPasswordResetOtpEmail } from "../utils/mailer.js";
 
 function sanitizeErrorForClient(err, fallback) {
   const msg = err && (err.message || String(err)) || "";
 
-  // Known business errors — pass through
   const business = [
     "Invalid OTP",
     "Invalid or expired OTP",
@@ -28,10 +34,15 @@ function sanitizeErrorForClient(err, fallback) {
     "User not found",
     "Invalid or expired reset token",
     "Invalid reset token",
+    "Invalid email format",
+    "Invalid or expired verification code.",
+    "Email is already taken",
+    "Email already in use",
+    "Email verification is required",
+    "Password must be at least 8 characters",
   ];
   if (business.includes(msg)) return msg;
 
-  // Common SQL / PG driver technical errors — map to friendly text
   const technicalPatterns = [
     "inconsistent types",
     "parameter $",
@@ -47,103 +58,109 @@ function sanitizeErrorForClient(err, fallback) {
     }
   }
 
-  // Default: if fallback provided use it, otherwise expose a generic message
   return fallback || "Server error";
 }
 
+function maskEmail(email) {
+  return String(email || "").replace(/(^.{2})(.*)(@.*$)/, (_m, a, _b, c) => `${a}***${c}`);
+}
 
 export async function login(req, res) {
   const { email, password } = req.body;
+  const normalizedEmail = normalizeEmail(email);
 
-  try {  
-    const user = await logUser(email);
-    
+  try {
+    const user = await logUser(normalizedEmail);
+
     if (!user) {
-      // throw new Error("User not found");
-      return res.status(401).json(
-        {
-          message: "Invalid Credentials"
-        }
-      );
+      return res.status(401).json({ message: "Invalid Credentials" });
     }
 
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
-      }
-      const isMatch = await bcrypt.compare(password, user.password_hash);
-    
+    if (!normalizedEmail || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+
     if (!isMatch) {
-      // throw new error ("Invalid Credentials");
-      return res.status(401).json(
-        {
-          message: "Invalid Credentials"
-        }
-      );
+      return res.status(401).json({ message: "Invalid Credentials" });
     }
 
     const payload = {
       userId: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
     };
 
     const token = generateToken(payload);
 
-    return res.status(200).json(
-      {
-        message: "Login Successful",
-        token: token,
-        user: {
-          id: user.id,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          email: user.email,
-          role: user.role,
-          profileImageBase64: user.profile_image_base64,
-        }
-      }
-    );
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({
-      message: "Server error"
+    return res.status(200).json({
+      message: "Login Successful",
+      token,
+      user: {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role,
+        profileImageBase64: user.profile_image_base64,
+      },
     });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
-
 }
 
-
 export async function register(req, res) {
-  const { first_name, last_name, email, password } = req.body;
+  const { first_name, last_name, email, password, emailVerificationToken } = req.body;
+  const cleanFirstName = sanitizeName(first_name);
+  const cleanLastName = sanitizeName(last_name);
+  const normalizedEmail = normalizeEmail(email);
 
-  if (!first_name || !last_name || !email || !password) {
+  if (!cleanFirstName || !cleanLastName || !normalizedEmail || !password) {
     return res.status(400).json({ message: "Missing fields" });
   }
 
+  if (!isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
+  if (!emailVerificationToken) {
+    return res.status(400).json({ message: "Email verification is required" });
+  }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ message: "Password must be at least 8 characters" });
+  }
+
   try {
-    const existingUser = await findByEmail(email);
+    validateEmailVerificationToken(emailVerificationToken, {
+      email: normalizedEmail,
+      purpose: "registration",
+    });
+
+    const existingUser = await findByEmail(normalizedEmail);
     if (existingUser) {
-      console.log("User already exists: ", email);
       return res.status(409).json({ message: "User already exists" });
     }
 
-    const password_hash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const newUser = await createUser(cleanFirstName, cleanLastName, "user", normalizedEmail, passwordHash);
 
-    const newUser = await createUser(first_name, last_name, "user", email, password_hash);
+    console.info("[registration] User created", { userId: newUser.id });
 
-    console.log("User created: ", email, " | ID: ", newUser.id);
-
-    const payload = {
+    const token = generateToken({
       userId: newUser.id,
       email: newUser.email,
-      role: newUser.role || "user"
-    };
+      role: newUser.role || "user",
+    });
 
-    const token = generateToken(payload);
+    await clearEmailVerificationOtp({ email: normalizedEmail, purpose: "registration" });
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Account created successfully",
-      token: token,  // ← NEW: Send token immediately after registration
+      token,
       user: {
         id: newUser.id,
         firstName: newUser.first_name,
@@ -151,12 +168,95 @@ export async function register(req, res) {
         email: newUser.email,
         role: newUser.role || "user",
         profileImageBase64: newUser.profile_image_base64 || null,
-      }
+      },
     });
-    
   } catch (err) {
-    console.error("❌ Registration error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Registration error:", {
+      email: maskEmail(normalizedEmail),
+      message: err && (err.message || String(err)),
+      stack: err && err.stack,
+    });
+    const clientMsg = sanitizeErrorForClient(err, "Server error");
+    const status = clientMsg === "User already exists" ? 409 : 400;
+    return res.status(status).json({ message: clientMsg });
+  }
+}
+
+export async function requestEmailVerificationController(req, res) {
+  const { email, purpose = "registration" } = req.body;
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedEmail) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  try {
+    const request = await requestEmailVerificationOtp({
+      email: normalizedEmail,
+      purpose,
+      userId: req.user?.userId || null,
+    });
+
+    await sendEmailVerificationOtpEmail({
+      to: request.email,
+      otp: request.otp,
+      expiresAt: request.expiresAt,
+    });
+
+    console.info("[email-verification] OTP requested", {
+      purpose: request.purpose,
+      authenticated: !!req.user?.userId,
+    });
+
+    return res.status(200).json({
+      message: "Verification code sent.",
+      expiresInSeconds: 600,
+      resendAfterSeconds: 60,
+    });
+  } catch (err) {
+    console.error("[email-verification] OTP request error:", {
+      email: maskEmail(normalizedEmail),
+      message: err && (err.message || String(err)),
+      stack: err && err.stack,
+    });
+    const clientMsg = sanitizeErrorForClient(err, "Unable to send verification code.");
+    const status = clientMsg.includes("already") ? 409 : 400;
+    return res.status(status).json({ message: clientMsg });
+  }
+}
+
+export async function verifyEmailVerificationController(req, res) {
+  const { email, otp, purpose = "registration" } = req.body;
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedOtp = String(otp || "").trim();
+
+  if (!normalizedEmail || !normalizedOtp) {
+    return res.status(400).json({ message: "Email and verification code are required" });
+  }
+
+  try {
+    const result = await verifyEmailVerificationOtp({
+      email: normalizedEmail,
+      otp: normalizedOtp,
+      purpose,
+      userId: req.user?.userId || null,
+    });
+
+    console.info("[email-verification] OTP verified", {
+      purpose: String(purpose || "").toLowerCase(),
+      authenticated: !!req.user?.userId,
+    });
+
+    return res.status(200).json({
+      message: "Email verified.",
+      verificationToken: result.verificationToken,
+    });
+  } catch (err) {
+    console.warn("[email-verification] OTP verify failed", {
+      email: maskEmail(normalizedEmail),
+      message: err && (err.message || String(err)),
+    });
+    return res.status(400).json({ message: "Invalid or expired verification code." });
   }
 }
 
@@ -180,8 +280,8 @@ export async function changePasswordController(req, res) {
     await changePassword(userId, currentPassword, newPassword);
     return res.status(200).json({ message: "Password changed successfully" });
   } catch (err) {
-    console.error("❌ Change password error:", err);
-    
+    console.error("Change password error:", err);
+
     if (err.message === "Current password is incorrect") {
       return res.status(401).json({ message: "Current password is incorrect" });
     }
@@ -195,13 +295,14 @@ export async function changePasswordController(req, res) {
 
 export async function requestPasswordResetController(req, res) {
   const { email } = req.body;
+  const normalizedEmail = normalizeEmail(email);
 
-  if (!email) {
+  if (!normalizedEmail) {
     return res.status(400).json({ message: "Email is required" });
   }
 
   try {
-    const resetRequest = await requestPasswordResetOtp(email);
+    const resetRequest = await requestPasswordResetOtp(normalizedEmail);
 
     if (resetRequest) {
       try {
@@ -211,13 +312,11 @@ export async function requestPasswordResetController(req, res) {
           expiresAt: resetRequest.expiresAt,
         });
       } catch (mailErr) {
-        const masked = (email || "").replace(/(^.{2})(.*)(@.*$)/, (m, a, b, c) => a + "***" + c);
-        console.error("❌ Failed to send password reset email", {
-          email: masked,
+        console.error("Failed to send password reset email", {
+          email: maskEmail(normalizedEmail),
           mailError: mailErr && (mailErr.message || String(mailErr)),
           stack: mailErr && mailErr.stack,
         });
-        // Re-throw so outer catch will return 500 and we capture DB vs mail issues together
         throw mailErr;
       }
     }
@@ -226,9 +325,8 @@ export async function requestPasswordResetController(req, res) {
       message: "If the email exists, a password reset code has been sent.",
     });
   } catch (err) {
-    const masked = (email || "").replace(/(^.{2})(.*)(@.*$)/, (m, a, b, c) => a + "***" + c);
-    console.error("❌ Password reset OTP request error:", {
-      email: masked,
+    console.error("Password reset OTP request error:", {
+      email: maskEmail(normalizedEmail),
       message: err && (err.message || String(err)),
       stack: err && err.stack,
     });
@@ -244,11 +342,11 @@ export async function verifyPasswordResetController(req, res) {
   }
 
   try {
-    const result = await verifyPasswordResetOtp(email.trim(), otp.trim());
+    const result = await verifyPasswordResetOtp(normalizeEmail(email), String(otp).trim());
     return res.status(200).json({ message: "OTP verified", resetToken: result.resetToken });
   } catch (err) {
-    console.error("❌ Verify OTP error:", {
-      email: (email || "").replace(/(^.{2})(.*)(@.*$)/, (m, a, b, c) => a + "***" + c),
+    console.error("Verify OTP error:", {
+      email: maskEmail(email),
       message: err && (err.message || String(err)),
       stack: err && err.stack,
     });
@@ -269,11 +367,11 @@ export async function resetPasswordController(req, res) {
   }
 
   try {
-    await resetPasswordWithOtp(email, otp, newPassword);
+    await resetPasswordWithOtp(normalizeEmail(email), String(otp).trim(), newPassword);
 
     return res.status(200).json({ message: "Password reset successfully" });
   } catch (err) {
-    console.error("❌ Password reset error:", err);
+    console.error("Password reset error:", err);
 
     if (err.message === "New password must be different from the current password") {
       return res.status(400).json({ message: err.message });
@@ -302,7 +400,7 @@ export async function completePasswordResetController(req, res) {
     await completePasswordReset(resetToken, newPassword);
     return res.status(200).json({ message: "Password reset successfully" });
   } catch (err) {
-    console.error("❌ Complete password reset error:", {
+    console.error("Complete password reset error:", {
       message: err && (err.message || String(err)),
       stack: err && err.stack,
     });
@@ -312,19 +410,48 @@ export async function completePasswordResetController(req, res) {
 }
 
 export async function updateProfileController(req, res) {
-  const { firstName, lastName, email, profileImageBase64 } = req.body;
+  const { firstName, lastName, email, profileImageBase64, emailVerificationToken } = req.body;
   const userId = req.user?.userId;
+  const normalizedEmail = email ? normalizeEmail(email) : null;
 
   if (!userId) {
     return res.status(401).json({ message: "User not authenticated" });
   }
 
-  if (!firstName && !lastName && !email && !profileImageBase64) {
+  if (!firstName && !lastName && !normalizedEmail && profileImageBase64 === undefined) {
     return res.status(400).json({ message: "At least one field must be provided" });
   }
 
   try {
-    const updated = await updateUserProfile(userId, firstName, lastName, email, profileImageBase64);
+    if (normalizedEmail) {
+      const currentUserResult = await pool.query("SELECT email FROM users WHERE id = $1", [userId]);
+      const currentEmail = normalizeEmail(currentUserResult.rows[0]?.email);
+
+      if (normalizedEmail !== currentEmail) {
+        if (!emailVerificationToken) {
+          return res.status(400).json({ message: "Email verification is required" });
+        }
+
+        validateEmailVerificationToken(emailVerificationToken, {
+          email: normalizedEmail,
+          purpose: "email_change",
+          userId,
+        });
+      }
+    }
+
+    const updated = await updateUserProfile(
+      userId,
+      firstName ? sanitizeName(firstName) : firstName,
+      lastName ? sanitizeName(lastName) : lastName,
+      normalizedEmail,
+      profileImageBase64
+    );
+
+    if (normalizedEmail) {
+      await clearEmailVerificationOtp({ email: normalizedEmail, purpose: "email_change" });
+    }
+
     return res.status(200).json({
       message: "Profile updated successfully",
       user: {
@@ -335,16 +462,22 @@ export async function updateProfileController(req, res) {
         role: updated.role,
         createdAt: updated.created_at,
         profileImageBase64: updated.profile_image_base64,
-      }
+      },
     });
   } catch (err) {
-    console.error("❌ Update profile error:", err);
-    
+    console.error("Update profile error:", {
+      message: err && (err.message || String(err)),
+      stack: err && err.stack,
+    });
+
     if (err.message === "Email already in use") {
       return res.status(409).json({ message: "Email already in use" });
     }
     if (err.message === "User not found") {
       return res.status(404).json({ message: "User not found" });
+    }
+    if (err.message === "Invalid or expired verification code.") {
+      return res.status(400).json({ message: "Invalid or expired verification code." });
     }
 
     return res.status(500).json({ message: "Server error" });
@@ -353,24 +486,25 @@ export async function updateProfileController(req, res) {
 
 export async function checkEmailController(req, res) {
   const { email } = req.body;
+  const normalizedEmail = normalizeEmail(email);
 
-  if (!email) {
+  if (!normalizedEmail) {
     return res.status(400).json({ message: "Email is required" });
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!isValidEmail(normalizedEmail)) {
     return res.status(400).json({ message: "Invalid email format" });
   }
 
   try {
-    const existingUser = await findByEmail(email.trim());
+    const existingUser = await findByEmail(normalizedEmail);
     if (existingUser) {
       return res.status(409).json({ available: false, message: "Email is already taken" });
     }
 
     return res.status(200).json({ available: true, message: "Email is available" });
   } catch (err) {
-    console.error("❌ Check email error:", err);
+    console.error("Check email error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 }
@@ -410,14 +544,14 @@ export async function testEmailController(req, res) {
         messageId: info.messageId,
       });
     }).catch((err) => {
-      console.error("❌ Test email failed:", {
+      console.error("Test email failed:", {
         message: err && (err.message || String(err)),
         stack: err && err.stack,
       });
       res.status(500).json({ message: "Failed to send test email" });
     });
   } catch (err) {
-    console.error("❌ Test email error:", err);
+    console.error("Test email error:", err);
     res.status(500).json({ message: "Server error" });
   }
 }

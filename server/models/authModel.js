@@ -1,12 +1,31 @@
 import { pool } from "../config/db.js";
 import bcrypt from "bcrypt";
-import { randomInt } from "node:crypto";
+import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import jwt from "jsonwebtoken";
+
+const EMAIL_VERIFICATION_PURPOSES = new Set(["registration", "email_change"]);
+const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
+const EMAIL_VERIFICATION_EXPIRES_MS = 10 * 60 * 1000;
+
+export function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+export function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || ""));
+}
+
+export function sanitizeName(value) {
+  return String(value || "")
+    .replace(/[\u0000-\u001f\u007f<>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 // Find user by email
 export async function findByEmail(email) {
   const query = "SELECT * FROM users WHERE email = $1";
-  const values = [email];
+  const values = [normalizeEmail(email)];
   
   const result = await pool.query(query, values);
   return result.rows[0];
@@ -16,7 +35,7 @@ export async function logUser(email) {
   const login_query = 
     `SELECT * FROM users WHERE email = $1;`
 
-  const login_result = await pool.query(login_query, [email]);
+  const login_result = await pool.query(login_query, [normalizeEmail(email)]);
   
   return login_result.rows[0] || null;
 }
@@ -34,7 +53,7 @@ export async function createUser(first_name, last_name, role, email, password_ha
     VALUES ($1, $2, $3, $4, $5)
     RETURNING id, first_name, last_name, role, email, created_at, profile_image_base64
   `;
-  const values = [first_name, last_name, role, email, password_hash];
+  const values = [sanitizeName(first_name), sanitizeName(last_name), role, normalizeEmail(email), password_hash];
   
   const result = await pool.query(query, values);
   return result.rows[0];
@@ -102,6 +121,210 @@ export async function findOrCreateGoogleUser(googleId, email, firstName, lastNam
 
 function generatePasswordResetOtp() {
   return String(randomInt(0, 1000000)).padStart(6, "0");
+}
+
+function generateEmailVerificationOtp() {
+  return String(randomInt(0, 1000000)).padStart(6, "0");
+}
+
+function getOtpHmacSecret() {
+  return process.env.OTP_HASH_SECRET || process.env.JWT_SECRET || "development-otp-secret";
+}
+
+function hashEmailVerificationOtp({ email, purpose, otp }) {
+  return createHmac("sha256", getOtpHmacSecret())
+    .update(`${purpose}:${normalizeEmail(email)}:${otp}`)
+    .digest("hex");
+}
+
+function constantTimeHexEqual(a, b) {
+  const left = Buffer.from(String(a || ""), "hex");
+  const right = Buffer.from(String(b || ""), "hex");
+
+  if (left.length !== right.length || left.length === 0) {
+    const dummy = Buffer.alloc(32);
+    timingSafeEqual(dummy, dummy);
+    return false;
+  }
+
+  return timingSafeEqual(left, right);
+}
+
+function assertEmailVerificationPurpose(purpose) {
+  const normalizedPurpose = String(purpose || "").trim().toLowerCase();
+  if (!EMAIL_VERIFICATION_PURPOSES.has(normalizedPurpose)) {
+    throw new Error("Invalid verification request");
+  }
+  return normalizedPurpose;
+}
+
+export function validateEmailVerificationToken(token, { email, purpose, userId = null } = {}) {
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    throw new Error("Invalid or expired verification code.");
+  }
+
+  const normalizedPurpose = assertEmailVerificationPurpose(purpose);
+  const normalizedEmail = normalizeEmail(email);
+
+  if (
+    !decoded ||
+    decoded.purpose !== "email_verification" ||
+    decoded.verificationPurpose !== normalizedPurpose ||
+    normalizeEmail(decoded.email) !== normalizedEmail
+  ) {
+    throw new Error("Invalid or expired verification code.");
+  }
+
+  if (userId && String(decoded.userId || "") !== String(userId)) {
+    throw new Error("Invalid or expired verification code.");
+  }
+
+  return decoded;
+}
+
+export async function requestEmailVerificationOtp({ email, purpose = "registration", userId = null }) {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPurpose = assertEmailVerificationPurpose(purpose);
+
+  if (!isValidEmail(normalizedEmail)) {
+    throw new Error("Invalid email format");
+  }
+
+  if (normalizedPurpose === "registration") {
+    const existingUser = await findByEmail(normalizedEmail);
+    if (existingUser) {
+      throw new Error("Email is already taken");
+    }
+  }
+
+  if (normalizedPurpose === "email_change" && !userId) {
+    throw new Error("User not authenticated");
+  }
+
+  if (normalizedPurpose === "email_change") {
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1 AND id != $2",
+      [normalizedEmail, userId]
+    );
+    if (existingUser.rows.length > 0) {
+      throw new Error("Email already in use");
+    }
+  }
+
+  const otp = generateEmailVerificationOtp();
+  const otpHash = hashEmailVerificationOtp({ email: normalizedEmail, purpose: normalizedPurpose, otp });
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRES_MS);
+
+  await pool.query(
+    `
+      INSERT INTO email_verification_otps (email, purpose, user_id, otp_hash, expires_at, attempts, consumed_at)
+      VALUES ($1, $2, $3, $4, $5, 0, NULL)
+      ON CONFLICT (email, purpose)
+      DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        otp_hash = EXCLUDED.otp_hash,
+        expires_at = EXCLUDED.expires_at,
+        attempts = 0,
+        consumed_at = NULL,
+        created_at = NOW()
+    `,
+    [normalizedEmail, normalizedPurpose, userId || null, otpHash, expiresAt]
+  );
+
+  return {
+    email: normalizedEmail,
+    purpose: normalizedPurpose,
+    otp,
+    expiresAt,
+  };
+}
+
+export async function verifyEmailVerificationOtp({ email, otp, purpose = "registration", userId = null }) {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedOtp = String(otp || "").trim();
+  const normalizedPurpose = assertEmailVerificationPurpose(purpose);
+
+  if (!isValidEmail(normalizedEmail) || !/^\d{6}$/.test(normalizedOtp)) {
+    throw new Error("Invalid or expired verification code.");
+  }
+
+  const verificationResult = await pool.query(
+    `
+      SELECT email, purpose, user_id, otp_hash, expires_at, attempts, consumed_at
+      FROM email_verification_otps
+      WHERE email = $1 AND purpose = $2
+      LIMIT 1
+    `,
+    [normalizedEmail, normalizedPurpose]
+  );
+
+  if (verificationResult.rows.length === 0) {
+    throw new Error("Invalid or expired verification code.");
+  }
+
+  const row = verificationResult.rows[0];
+
+  if (
+    row.consumed_at ||
+    new Date(row.expires_at).getTime() < Date.now() ||
+    Number(row.attempts || 0) >= EMAIL_VERIFICATION_MAX_ATTEMPTS ||
+    (userId && String(row.user_id || "") !== String(userId))
+  ) {
+    throw new Error("Invalid or expired verification code.");
+  }
+
+  const candidateHash = hashEmailVerificationOtp({
+    email: normalizedEmail,
+    purpose: normalizedPurpose,
+    otp: normalizedOtp,
+  });
+
+  if (!constantTimeHexEqual(candidateHash, row.otp_hash)) {
+    const nextAttempts = Number(row.attempts || 0) + 1;
+    await pool.query(
+      `
+        UPDATE email_verification_otps
+        SET attempts = $3::int,
+            consumed_at = CASE WHEN $3::int >= $4::int THEN NOW() ELSE consumed_at END
+        WHERE email = $1 AND purpose = $2
+      `,
+      [normalizedEmail, normalizedPurpose, nextAttempts, EMAIL_VERIFICATION_MAX_ATTEMPTS]
+    );
+
+    throw new Error("Invalid or expired verification code.");
+  }
+
+  await pool.query(
+    `
+      UPDATE email_verification_otps
+      SET consumed_at = NOW()
+      WHERE email = $1 AND purpose = $2
+    `,
+    [normalizedEmail, normalizedPurpose]
+  );
+
+  const payload = {
+    purpose: "email_verification",
+    verificationPurpose: normalizedPurpose,
+    email: normalizedEmail,
+    userId: userId || row.user_id || null,
+  };
+
+  const verificationToken = jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: process.env.EMAIL_VERIFICATION_TOKEN_EXPIRES_IN || "15m",
+  });
+
+  return { verificationToken };
+}
+
+export async function clearEmailVerificationOtp({ email, purpose = "registration" }) {
+  await pool.query(
+    "DELETE FROM email_verification_otps WHERE email = $1 AND purpose = $2",
+    [normalizeEmail(email), assertEmailVerificationPurpose(purpose)]
+  );
 }
 
 async function assertPasswordIsDifferent(passwordHash, newPassword) {
@@ -240,11 +463,13 @@ export async function resetPasswordWithOtp(email, otp, newPassword) {
 
 // Update user profile (first_name, last_name, email)
 export async function updateUserProfile(userId, firstName, lastName, email, profileImageBase64) {
+  const normalizedEmail = email ? normalizeEmail(email) : null;
+
   // Validate email if provided
-  if (email) {
+  if (normalizedEmail) {
     const existingUser = await pool.query(
       "SELECT id FROM users WHERE email = $1 AND id != $2",
-      [email, userId]
+      [normalizedEmail, userId]
     );
     if (existingUser.rows.length > 0) {
       throw new Error("Email already in use");
@@ -263,8 +488,8 @@ export async function updateUserProfile(userId, firstName, lastName, email, prof
   const result = await pool.query(query, [
     firstName || null,
     lastName || null,
-    email || null,
-    profileImageBase64 || null,
+    normalizedEmail || null,
+    profileImageBase64 === undefined ? null : profileImageBase64,
     userId,
   ]);
 

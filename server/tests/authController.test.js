@@ -4,18 +4,39 @@ const {
   requestPasswordResetOtpMock,
   resetPasswordWithOtpMock,
   sendPasswordResetOtpEmailMock,
+  normalizeEmailMock,
+  sanitizeNameMock,
+  isValidEmailMock,
 } = vi.hoisted(() => ({
   requestPasswordResetOtpMock: vi.fn(),
   resetPasswordWithOtpMock: vi.fn(),
   sendPasswordResetOtpEmailMock: vi.fn(),
+  normalizeEmailMock: vi.fn((email) => String(email || "").trim().toLowerCase()),
+  sanitizeNameMock: vi.fn((name) => String(name || "").trim()),
+  isValidEmailMock: vi.fn((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || ""))),
 }));
 
 vi.mock("../models/authModel.js", () => ({
+  createUser: vi.fn(),
+  logUser: vi.fn(),
+  findByEmail: vi.fn(),
+  changePassword: vi.fn(),
+  updateUserProfile: vi.fn(),
   requestPasswordResetOtp: requestPasswordResetOtpMock,
   resetPasswordWithOtp: resetPasswordWithOtpMock,
+  verifyPasswordResetOtp: vi.fn(),
+  completePasswordReset: vi.fn(),
+  normalizeEmail: normalizeEmailMock,
+  sanitizeName: sanitizeNameMock,
+  isValidEmail: isValidEmailMock,
+  requestEmailVerificationOtp: vi.fn(),
+  verifyEmailVerificationOtp: vi.fn(),
+  validateEmailVerificationToken: vi.fn(),
+  clearEmailVerificationOtp: vi.fn(),
 }));
 
 vi.mock("../utils/mailer.js", () => ({
+  sendEmailVerificationOtpEmail: vi.fn(),
   sendPasswordResetOtpEmail: sendPasswordResetOtpEmailMock,
 }));
 
