@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { getCurrentUser } from "../../services/authService";
 import { getTaskReviews, approveTaskReview, rejectTaskReview, deleteSubtask, updateSubtask, getTaskFiles, uploadTaskFile, deleteTaskFile } from "../../services/projectService";
 import { SkeletonCommentInline, SkeletonRow } from "./SkeletonComponents";
-import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon, CalendarIcon, DownloadIcon } from "./AppIcons";
+import { SendIcon, SaveIcon, CancelIcon, TrashIcon, ReviewApprovedIcon, ReviewRejectedIcon, CalendarIcon, DownloadIcon, FilterIcon } from "./AppIcons";
 import FilePreview, { isPreviewSupported } from "./FilePreview";
 import "../styles/TaskDetailsModal.css";
 import "../styles/SkeletonLoading.css";
@@ -2628,33 +2628,47 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
             }}
           >
             <div className="tdm-manage-content">
-              <h3>Manage Tags</h3>
-              <p className="tdm-manage-desc">
-                Tags help categorize and filter tasks across the project. Add new tags or choose
-                from project suggestions. A task may have up to 5 tags.
-              </p>
+              <div className="tdm-manage-header">
+                <span className="tdm-manage-icon" aria-hidden="true">
+                  <FilterIcon size={18} />
+                </span>
+                <div>
+                  <h3>Manage Tags</h3>
+                  <p className="tdm-manage-desc">
+                    Categorize and filter tasks across the project.<br />
+                    Add a new tag or choose from shared suggestions.
+                  </p>
+                </div>
+              </div>
               {tagError && <p className="tdm-tag-error">{tagError}</p>}
 
               <div className="tdm-tag-composer">
                 {canManageTags && !isCurrentTaskToReview && (
-                  <input
-                    type="text"
-                    placeholder="Type tag and press Enter"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={async (e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        await handleAddTag(tagInput);
-                      }
-                    }}
-                    className="tdm-input tdm-tag-input"
-                  />
+                  <div className="tdm-tag-input-wrap">
+                    <span className="tdm-tag-search-icon" aria-hidden="true" />
+                    <input
+                      type="text"
+                      placeholder="Type tag and press Enter"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          await handleAddTag(tagInput);
+                        }
+                      }}
+                      className="tdm-input tdm-tag-input"
+                    />
+                  </div>
                 )}
 
+                <div className="tdm-tag-section-heading">
+                  <span>Applied tags</span>
+                  <span>{(tags || []).length} / 5</span>
+                </div>
                 <div className="tdm-current-tags">
                   {(tags || []).length === 0 ? (
-                    <p className="tdm-no-current-tags">This task has no tags yet.</p>
+                    <p className="tdm-no-current-tags">No tags applied yet</p>
                   ) : (
                     (tags || []).map((t) => {
                       const name = t?.tagName || t?.tag_name || t?.name || String(t);
@@ -2682,21 +2696,29 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
               </div>
 
               <div className="tdm-suggestions-array" aria-live="polite">
-                <div className="tdm-suggestions-label">Project suggestions</div>
+                <div className="tdm-tag-section-heading">
+                  <span>Project suggestions</span>
+                </div>
                 <div className="tdm-suggestions-content tdm-suggestions-pills">
                   {(projectTagSuggestions || []).map((s) => {
                     const name = s?.tagName || s?.tag_name || s?.name || String(s);
                     const normName = String(name).replace(/\s+/g, " ").trim();
                     const key = s?.id || normName;
+                    const alreadyApplied = (tags || []).some((tag) => {
+                      const tagName = tag?.tagName || tag?.tag_name || tag?.name || String(tag);
+                      return String(tagName).replace(/\s+/g, " ").trim().toLowerCase() === normName.toLowerCase();
+                    });
                     if (!canManageTags || isCurrentTaskToReview) return null;
                     return (
                       <button
                         key={key}
                         type="button"
-                        className="tdm-suggestion-pill"
+                        className={`tdm-suggestion-pill${alreadyApplied ? " is-applied" : ""}`}
                         onClick={() => handleAddTag(name)}
+                        disabled={alreadyApplied}
                         title={`Add tag ${name}`}
                       >
+                        <span aria-hidden="true">+</span>
                         {name}
                       </button>
                     );
@@ -2705,6 +2727,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
               </div>
 
               <div className="tdm-tags-controls">
+                <span className="tdm-tags-footer-hint">Tags are shared across the project</span>
                 <button type="button" onClick={() => setShowTagsModal(false)} className="tdm-close-btn tdm-manage-close-bottom">
                   Done
                 </button>

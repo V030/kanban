@@ -1,6 +1,23 @@
 @import url('../../DesignSystem.css');
 @import "./CreateProjectModal.css";
 
+.modal-body {
+  gap: 12px;
+}
+
+.form-group {
+  gap: 6px;
+}
+
+.form-row {
+  display: grid;
+  gap: 12px;
+}
+
+.form-row-two {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .form-group select {
   appearance: none;
   -webkit-appearance: none;
@@ -15,17 +32,76 @@
   background-repeat: no-repeat;
 }
 
-.priority-select {
+.priority-segmented {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.priority-pill {
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: var(--text-sm);
   font-weight: 700;
 }
 
-.priority-unset { color: var(--color-text-secondary); }
-.priority-low { color: var(--color-success); }
-.priority-medium { color: var(--color-warning); }
-.priority-high { color: var(--color-warning-dark); }
-.priority-urgent { color: var(--color-danger); }
-
-.priority-select option {
-  color: initial;
+.priority-pill:hover {
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
 }
 
+.priority-pill.is-active {
+  background: var(--color-bg-surface);
+  box-shadow: 0 0 0 3px rgba(15, 127, 143, 0.08);
+}
+
+.priority-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+}
+
+.priority-unset .priority-dot { background: var(--color-text-muted); }
+.priority-low .priority-dot { background: var(--color-success); }
+.priority-medium .priority-dot { background: var(--color-warning); }
+.priority-high .priority-dot { background: var(--color-danger); }
+
+.priority-unset.is-active {
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.priority-low.is-active {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.priority-medium.is-active {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.priority-high.is-active {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+@media (max-width: 560px) {
+  .form-row-two,
+  .priority-segmented {
+    grid-template-columns: 1fr;
+  }
+}

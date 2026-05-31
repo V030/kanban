@@ -1878,6 +1878,7 @@
 .auth-success-actions {
   display: grid;
   gap: 12px;
+  height: 32px;
 }
 
 .profile-email-verification {

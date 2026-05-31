@@ -1506,6 +1506,7 @@ function KanbanPage() {
 					onClose={() => setAddTaskOpen(false)}
 					initialCategoryId={selectedCategoryId}
 					categories={taskCategories}
+					projectName={project?.name || ""}
 					onCreate={async (payload) => {
 						if (!canCreateTask) {
 							throw new Error("Task creation is disabled for members in this project.");

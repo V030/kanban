@@ -123,7 +123,7 @@ export default function ProjectSettingsModal({
               <>
                 <p className="ps-panel-title">Owner controls</p>
                 <p className="ps-panel-desc">
-                  Owners have full control over project settings.
+                  Owners have full control over the project.
                 </p>
 
                 <div className="ps-toggle-list">

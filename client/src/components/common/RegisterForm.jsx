@@ -9,12 +9,53 @@ import { useNavigate } from "react-router-dom";
 import "../styles/WorkspacePages.css";
 
 const OTP_LENGTH = 6;
+const REGISTER_DRAFT_KEY = "kanban:register-draft";
 
-function formatCountdown(seconds) {
-  const safe = Math.max(0, Number(seconds) || 0);
-  const minutes = String(Math.floor(safe / 60)).padStart(2, "0");
-  const rest = String(safe % 60).padStart(2, "0");
-  return `${minutes}:${rest}`;
+function loadRegisterDraft() {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.sessionStorage.getItem(REGISTER_DRAFT_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    const expiresAtMs = Number(parsed.expiresAtMs || 0);
+    const resendAtMs = Number(parsed.resendAtMs || 0);
+    let safeStep = [1, 2, 3].includes(Number(parsed.step)) ? Number(parsed.step) : 1;
+    if (safeStep === 3 && !parsed.verificationToken) {
+      safeStep = 2;
+    }
+
+    return {
+      first_name: String(parsed.first_name || ""),
+      last_name: String(parsed.last_name || ""),
+      email: String(parsed.email || ""),
+      step: safeStep,
+      verificationToken: String(parsed.verificationToken || ""),
+      codeSent: Boolean(parsed.codeSent),
+      sentCodeEmail: String(parsed.sentCodeEmail || ""),
+      showOtpEntry: Boolean(parsed.showOtpEntry),
+      expiresAtMs,
+      resendAtMs,
+      expiresIn: Math.max(0, Math.ceil((expiresAtMs - now) / 1000)),
+      resendIn: Math.max(0, Math.ceil((resendAtMs - now) / 1000)),
+    };
+  } catch {
+    return {};
+  }
+}
+
+function saveRegisterDraft(draft) {
+  if (typeof window === "undefined") return;
+
+  window.sessionStorage.setItem(REGISTER_DRAFT_KEY, JSON.stringify(draft));
+}
+
+function clearRegisterDraft() {
+  if (typeof window === "undefined") return;
+
+  window.sessionStorage.removeItem(REGISTER_DRAFT_KEY);
 }
 
 function OtpInput({ value, onChange, disabled = false, idPrefix = "register-otp" }) {
@@ -112,13 +153,19 @@ function OtpInput({ value, onChange, disabled = false, idPrefix = "register-otp"
 }
 
 function RegisterForm({ onStepChange }) {
-  const [first_name, setFirstName] = useState("");
-  const [last_name, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const initialDraftRef = useRef(null);
+  if (initialDraftRef.current === null) {
+    initialDraftRef.current = loadRegisterDraft();
+  }
+  const initialDraft = initialDraftRef.current;
+
+  const [first_name, setFirstName] = useState(initialDraft.first_name || "");
+  const [last_name, setLastName] = useState(initialDraft.last_name || "");
+  const [email, setEmail] = useState(initialDraft.email || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialDraft.step || 1);
   const [firstNameError, setFirstNameError] = useState("");
   const [lastNameError, setLastNameError] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -130,12 +177,14 @@ function RegisterForm({ onStepChange }) {
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [otp, setOtp] = useState("");
-  const [verificationToken, setVerificationToken] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
-  const [sentCodeEmail, setSentCodeEmail] = useState("");
-  const [showOtpEntry, setShowOtpEntry] = useState(false);
-  const [expiresIn, setExpiresIn] = useState(0);
-  const [resendIn, setResendIn] = useState(0);
+  const [verificationToken, setVerificationToken] = useState(initialDraft.verificationToken || "");
+  const [codeSent, setCodeSent] = useState(Boolean(initialDraft.codeSent));
+  const [sentCodeEmail, setSentCodeEmail] = useState(initialDraft.sentCodeEmail || "");
+  const [showOtpEntry, setShowOtpEntry] = useState(Boolean(initialDraft.showOtpEntry));
+  const [expiresIn, setExpiresIn] = useState(initialDraft.expiresIn || 0);
+  const [resendIn, setResendIn] = useState(initialDraft.resendIn || 0);
+  const [expiresAtMs, setExpiresAtMs] = useState(initialDraft.expiresAtMs || 0);
+  const [resendAtMs, setResendAtMs] = useState(initialDraft.resendAtMs || 0);
   const [registeredUser, setRegisteredUser] = useState(null);
   const navigate = useNavigate();
 
@@ -194,6 +243,34 @@ function RegisterForm({ onStepChange }) {
     return () => window.clearInterval(timer);
   }, [expiresIn, resendIn]);
 
+  useEffect(() => {
+    if (step === 4) return;
+
+    saveRegisterDraft({
+      first_name,
+      last_name,
+      email,
+      step,
+      verificationToken,
+      codeSent,
+      sentCodeEmail,
+      showOtpEntry,
+      expiresAtMs,
+      resendAtMs,
+    });
+  }, [
+    codeSent,
+    email,
+    expiresAtMs,
+    first_name,
+    last_name,
+    resendAtMs,
+    sentCodeEmail,
+    showOtpEntry,
+    step,
+    verificationToken,
+  ]);
+
   const resetVerification = () => {
     setOtp("");
     setOtpError("");
@@ -203,6 +280,8 @@ function RegisterForm({ onStepChange }) {
     setShowOtpEntry(false);
     setExpiresIn(0);
     setResendIn(0);
+    setExpiresAtMs(0);
+    setResendAtMs(0);
   };
 
   const validateNameStep = () => {
@@ -239,8 +318,12 @@ function RegisterForm({ onStepChange }) {
       setShowOtpEntry(true);
       setVerificationToken("");
       setOtp("");
-      setExpiresIn(result?.expiresInSeconds || 600);
-      setResendIn(result?.resendAfterSeconds || 60);
+      const nextExpiresIn = result?.expiresInSeconds || 600;
+      const nextResendIn = result?.resendAfterSeconds || 60;
+      setExpiresIn(nextExpiresIn);
+      setResendIn(nextResendIn);
+      setExpiresAtMs(Date.now() + nextExpiresIn * 1000);
+      setResendAtMs(Date.now() + nextResendIn * 1000);
     } catch (err) {
       setEmailError(err.message || "Unable to send verification code.");
     } finally {
@@ -262,6 +345,7 @@ function RegisterForm({ onStepChange }) {
     try {
       const result = await verifyEmailVerificationCode(email.trim().toLowerCase(), otp, "registration");
       setVerificationToken(result.verificationToken);
+      setShowOtpEntry(false);
       setStep(3);
     } catch (err) {
       setOtpError(err.message || "Invalid or expired verification code.");
@@ -337,6 +421,7 @@ function RegisterForm({ onStepChange }) {
     try {
       const result = await register(first_name, last_name, email.trim().toLowerCase(), password, verificationToken);
       setRegisteredUser(result?.user || { firstName: first_name });
+      clearRegisterDraft();
       setStep(4);
     } catch (err) {
       const msg = (err && err.message) ? String(err.message) : "Registration failed";
@@ -357,6 +442,7 @@ function RegisterForm({ onStepChange }) {
   };
 
   function toLogin() {
+    clearRegisterDraft();
     navigate("/login");
   }
 

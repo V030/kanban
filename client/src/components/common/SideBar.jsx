@@ -10,7 +10,7 @@ const navItems = [
     { to: "/main-page/dashboard", label: "Home", icon: <DashboardIcon /> },
     { to: "/main-page/projects", label: "Projects", icon: <FolderIcon /> },
     { to: "/main-page/friends", label: "Network", icon: <TeamIcon /> },
-    { to: "/main-page/notifications", label: "Notifs", icon: <NotificationsIcon /> },
+    { to: "/main-page/notifications", label: "Notification", icon: <NotificationsIcon /> },
     { to: "/main-page/my-tasks", label: "Tasks", icon: <TasksIcon /> },
     { to: "/main-page/feedback", label: "Feedback", icon: <SendIcon /> },
 ];

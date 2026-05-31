@@ -29,11 +29,30 @@
 
 .modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   padding: 20px 22px;
   border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.modal-icon-tile {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-header h2 {
@@ -43,15 +62,21 @@
   font-family: var(--font-display);
 }
 
-.close-btn {
-  width: auto;
-  height: auto;
-  border: none;
-  border-radius: 0;
-  background: transparent;
+.modal-header p {
+  margin: 3px 0 0;
   color: var(--color-text-secondary);
-  font-size: 1.5rem;
-  line-height: 1;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.close-btn {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -60,7 +85,11 @@
 }
 
 .close-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-subtle);
   color: var(--color-text-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .modal-body {
@@ -96,7 +125,7 @@
 .form-group input,
 .form-group textarea,
 .form-group select {
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-3);
 }
 
 .form-group input::placeholder,
@@ -112,6 +141,36 @@
 .form-group textarea {
   min-height: 100px;
   resize: vertical;
+}
+
+.project-identifier-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.project-identifier-preview code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: var(--text-xs);
+}
+
+.field-counter {
+  align-self: flex-end;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  line-height: 1;
 }
 
 .modal-subsection {
@@ -134,18 +193,49 @@
 .modal-footer {
   padding: 14px 22px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 10px;
   border-top: 1px solid var(--color-border-subtle);
 }
 
+.modal-required-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.modal-info-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1;
+}
+
+.modal-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .cancel-btn {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   background: var(--color-bg-surface);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  font-size: 0.85rem;
   font-weight: 700;
   height: 34px;
   padding: 0 16px;
@@ -158,6 +248,9 @@
 
 .cancel-btn:hover {
   background: var(--color-bg-subtle);
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .submit-btn {
@@ -415,6 +508,16 @@
 
   .modal-footer {
     flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .modal-required-hint,
+  .modal-footer-actions {
+    width: 100%;
+  }
+
+  .modal-footer-actions {
+    justify-content: flex-end;
   }
 
   .submit-btn,
