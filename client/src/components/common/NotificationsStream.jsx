@@ -91,7 +91,7 @@ export default function NotificationsStream() {
   useEffect(() => {
     if (!token) return undefined;
 
-    const url = `http://localhost:5000/auth/notifications/stream?token=${encodeURIComponent(token)}`;
+    const url = `${process.env.REACT_APP_API_URL}/auth/notifications/stream?token=${encodeURIComponent(token)}`;
     const source = new EventSource(url);
     streamRef.current = source;
 

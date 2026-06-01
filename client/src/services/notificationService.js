@@ -1,6 +1,6 @@
 import { fetchWithAuth } from "./authService";
 
-const API_URL = "http://localhost:5000";
+const API_URL = process.env.REACT_APP_API_URL;
 
 export async function getNotifications(limit = 50, offset = 0, cursor = null, signal = undefined) {
   const params = new URLSearchParams({

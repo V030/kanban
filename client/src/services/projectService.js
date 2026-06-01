@@ -1,6 +1,6 @@
 import { fetchWithAuth } from "./authService";
 
-const API_URL = "http://localhost:5000";
+const API_URL = process.env.REACT_APP_API_URL;
 const TASK_FILE_MAX_BYTES = 25 * 1024 * 1024;
 const TASK_FILE_ALLOWED_TYPES = new Set([
   "image/jpeg",

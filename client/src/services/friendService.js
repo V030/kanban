@@ -1,6 +1,6 @@
 import { fetchWithAuth } from "./authService";
 
-const API_URL = "http://localhost:5000";
+const API_URL = process.env.REACT_APP_API_URL;
 
 export async function addFriend(friendData) {
     return fetchWithAuth(`${API_URL}/auth/friends`, {
