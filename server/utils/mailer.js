@@ -1,6 +1,11 @@
-import nodemailer from "nodemailer";
+/* =========================
+   BREVO HTTP API MAILER
+   No SMTP — works on Render
+========================= */
 
-let cachedTransporter;
+/* =========================
+   SANITIZERS
+========================= */
 
 function sanitizeHeaderValue(value) {
   return String(value || "")
@@ -26,15 +31,74 @@ function sanitizeBodyText(value) {
     .trim();
 }
 
+/* =========================
+   BREVO HTTP SEND
+========================= */
+
+async function sendEmail({ from, to, replyTo, subject, html, text, attachments }) {
+  const apiKey = String(process.env.BREVO_API_KEY || "").trim();
+  const sender = sanitizeHeaderValue(from || process.env.SMTP_FROM || process.env.SMTP_USER || "");
+
+  if (!apiKey) throw new Error("BREVO_API_KEY is missing");
+  if (!sender) throw new Error("Email sender (SMTP_FROM) is not configured");
+  if (!to) throw new Error("Email recipient is missing");
+
+  const body = {
+    sender: { email: sender },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+    textContent: text,
+  };
+
+  if (replyTo) body.replyTo = { email: replyTo };
+
+  if (attachments?.length) {
+    body.attachment = attachments.map((a) => ({
+      name: a.filename,
+      content: Buffer.isBuffer(a.content)
+        ? a.content.toString("base64")
+        : String(a.content),
+    }));
+  }
+
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(`Brevo API error ${response.status}: ${err.message || JSON.stringify(err)}`);
+  }
+
+  const result = await response.json();
+  console.log("[email] sent via Brevo:", result.messageId);
+  return result;
+}
+
+/* =========================
+   ATTACHMENT BUILDER
+========================= */
+
 function buildImageAttachment(screenshot) {
   if (!screenshot?.dataUrl) return null;
 
-  const match = String(screenshot.dataUrl).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  const match = String(screenshot.dataUrl).match(
+    /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/
+  );
   if (!match) return null;
 
   const contentType = sanitizeHeaderValue(screenshot.type || match[1]);
   const extension = contentType.split("/")[1]?.replace(/[^a-zA-Z0-9]/g, "") || "png";
-  const baseName = sanitizeHeaderValue(screenshot.name || `feedback-screenshot.${extension}`)
+  const baseName = sanitizeHeaderValue(
+    screenshot.name || `feedback-screenshot.${extension}`
+  )
     .replace(/[\\/:*?"<>|]+/g, "-")
     .slice(0, 120);
 
@@ -45,106 +109,47 @@ function buildImageAttachment(screenshot) {
   };
 }
 
-function getTransporter() {
-  const host = String(process.env.SMTP_HOST || "").trim();
-  const port = Number.parseInt(process.env.SMTP_PORT || "", 10);
-  const user = String(process.env.SMTP_USER || "").trim();
-  const pass = String(process.env.SMTP_PASS || "").trim();
-
-   console.log("[mailer] Transporter config check:");
-  console.log(`[mailer]   SMTP_HOST: '${host}'`);
-  console.log(`[mailer]   SMTP_PORT: '${port}'`);
-  console.log(`[mailer]   SMTP_USER: '${user}'`);
-  console.log(`[mailer]   SMTP_PASS (present): ${!!pass}`); // Log presence, not value
-
-  if (!host || !Number.isFinite(port) || !user || !pass) {
-    return null;
-  }
-
-  if (!cachedTransporter) {
-    cachedTransporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
-      auth: { user, pass },
-    });
-  }
-
-  return cachedTransporter;
-}
+/* =========================
+   PASSWORD RESET EMAIL
+========================= */
 
 export async function sendPasswordResetOtpEmail({ to, otp, expiresAt }) {
-  const transporter = getTransporter();
-
-  if (!transporter) {
-    const env = String(process.env.NODE_ENV || "development").toLowerCase();
-    console.warn("[password-reset] SMTP transporter not configured", {
-      env,
-      SMTP_HOST: !!process.env.SMTP_HOST,
-      SMTP_PORT: !!process.env.SMTP_PORT,
-      SMTP_USER: !!process.env.SMTP_USER,
-      SMTP_FROM: !!process.env.SMTP_FROM,
-    });
-
-    if (env !== "production") {
-      console.warn(`[password-reset] SMTP is not configured. OTP for ${to}: ${otp}`);
-      return;
-    }
-
-    throw new Error("Email transport is not configured");
-  }
-
-  const sender = String(process.env.SMTP_FROM || process.env.SMTP_USER || "").trim();
   try {
-    const info = await transporter.sendMail({
-      from: sender,
+    const info = await sendEmail({
       to,
       subject: "Your password reset code",
       text: `Use this code to reset your password: ${otp}. It expires at ${expiresAt.toISOString()}.`,
-      html: `<p>Use this code to reset your password:</p><p><strong>${otp}</strong></p><p>This code expires at ${expiresAt.toISOString()}.</p>`,
+      html: `
+        <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#1f2937">
+          <p>Use this code to reset your password:</p>
+          <p style="font-size:28px;font-weight:700;letter-spacing:0.16em">${escapeHtml(otp)}</p>
+          <p>This code expires at ${escapeHtml(expiresAt.toISOString())}.</p>
+        </div>
+      `,
     });
 
-    console.info("[password-reset] Email sent", { to, messageId: info && info.messageId });
+    console.info("[password-reset] Email sent", { to, messageId: info?.messageId });
     return info;
   } catch (err) {
     console.error("[password-reset] Failed to send email", {
       to,
-      message: err && (err.message || String(err)),
-      code: err && err.code,
-      response: err && err.response,
-      stack: err && err.stack,
+      message: err?.message || String(err),
+      stack: err?.stack,
     });
     throw err;
   }
 }
 
+/* =========================
+   EMAIL VERIFICATION OTP
+========================= */
+
 export async function sendEmailVerificationOtpEmail({ to, otp, expiresAt }) {
-  const transporter = getTransporter();
-
-  if (!transporter) {
-    const env = String(process.env.NODE_ENV || "development").toLowerCase();
-    console.warn("[email-verification] SMTP transporter not configured", {
-      env,
-      SMTP_HOST: !!process.env.SMTP_HOST,
-      SMTP_PORT: !!process.env.SMTP_PORT,
-      SMTP_USER: !!process.env.SMTP_USER,
-      SMTP_FROM: !!process.env.SMTP_FROM,
-    });
-
-    if (env !== "production") {
-      console.warn("[email-verification] SMTP is not configured. Verification email skipped in development.");
-      return;
-    }
-
-    throw new Error("Email transport is not configured");
-  }
-
-  const sender = String(process.env.SMTP_FROM || process.env.SMTP_USER || "").trim();
-  const expiresText = expiresAt instanceof Date ? expiresAt.toISOString() : String(expiresAt || "");
+  const expiresText =
+    expiresAt instanceof Date ? expiresAt.toISOString() : String(expiresAt || "");
 
   try {
-    const info = await transporter.sendMail({
-      from: sender,
+    const info = await sendEmail({
       to,
       subject: "Verify Your Email",
       text: [
@@ -154,12 +159,14 @@ export async function sendEmailVerificationOtpEmail({ to, otp, expiresAt }) {
         "",
         "This code expires in 10 minutes.",
         "",
-        "If you did not request this code, please ignore this email.",
+        "If you did not request this code, ignore this email.",
       ].join("\n"),
       html: `
         <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#1f2937">
           <p>Your verification code is:</p>
-          <p style="font-size:28px;font-weight:700;letter-spacing:0.16em">${escapeHtml(otp)}</p>
+          <p style="font-size:28px;font-weight:700;letter-spacing:0.16em">
+            ${escapeHtml(otp)}
+          </p>
           <p>This code expires in 10 minutes.</p>
           <p>If you did not request this code, please ignore this email.</p>
           <p style="color:#6b7280;font-size:12px">Expires at ${escapeHtml(expiresText)}</p>
@@ -167,46 +174,32 @@ export async function sendEmailVerificationOtpEmail({ to, otp, expiresAt }) {
       `,
     });
 
-    console.info("[email-verification] Email sent", { to, messageId: info && info.messageId });
+    console.info("[email-verification] Email sent", { to, messageId: info?.messageId });
     return info;
   } catch (err) {
     console.error("[email-verification] Failed to send email", {
       to,
-      message: err && (err.message || String(err)),
-      code: err && err.code,
-      response: err && err.response,
-      stack: err && err.stack,
+      message: err?.message || String(err),
+      stack: err?.stack,
     });
     throw err;
   }
 }
 
+/* =========================
+   FEEDBACK EMAIL
+========================= */
+
 export async function sendFeedbackEmail({ to, feedback }) {
-  const transporter = getTransporter();
-
-  if (!transporter) {
-    const env = String(process.env.NODE_ENV || "development").toLowerCase();
-    console.warn("[feedback] SMTP transporter not configured", {
-      env,
-      SMTP_HOST: !!process.env.SMTP_HOST,
-      SMTP_PORT: !!process.env.SMTP_PORT,
-      SMTP_USER: !!process.env.SMTP_USER,
-      FEEDBACK_RECEIVER_EMAIL: !!process.env.FEEDBACK_RECEIVER_EMAIL,
-    });
-
-    if (env !== "production") {
-      console.warn("[feedback] SMTP is not configured. Feedback payload:", feedback);
-      return;
-    }
-
-    throw new Error("Email transport is not configured");
-  }
-
-  const sender = sanitizeHeaderValue(process.env.SMTP_FROM || process.env.SMTP_USER || "");
-  const recipient = sanitizeHeaderValue(to || process.env.FEEDBACK_RECEIVER_EMAIL || "");
+  const sender = sanitizeHeaderValue(
+    process.env.SMTP_FROM || process.env.SMTP_USER || ""
+  );
+  const recipient = sanitizeHeaderValue(
+    to || process.env.FEEDBACK_RECEIVER_EMAIL || ""
+  );
 
   if (!sender || !recipient) {
-    throw new Error("Feedback email destination is not configured");
+    throw new Error("Feedback email sender or recipient not configured");
   }
 
   const safeSubject = sanitizeHeaderValue(feedback?.subject || "Feedback submission");
@@ -218,12 +211,14 @@ export async function sendFeedbackEmail({ to, feedback }) {
   const safeBrowser = sanitizeBodyText(feedback?.browser || "");
   const safeOs = sanitizeBodyText(feedback?.os || "");
   const safeRoute = sanitizeBodyText(feedback?.route || "");
-  const safeTimestamp = sanitizeBodyText(feedback?.timestamp || new Date().toISOString());
+  const safeTimestamp = sanitizeBodyText(
+    feedback?.timestamp || new Date().toISOString()
+  );
   const screenshotAttachment = buildImageAttachment(feedback?.screenshot);
 
   const text = [
-    `New feedback submission`,
-    ``,
+    "New feedback submission",
+    "",
     `User: ${safeUserName || "Unknown user"}`,
     `Email: ${safeUserEmail || "Unknown"}`,
     `User ID: ${safeUserId || "Unknown"}`,
@@ -233,11 +228,15 @@ export async function sendFeedbackEmail({ to, feedback }) {
     safeBrowser ? `Browser: ${safeBrowser}` : null,
     safeOs ? `OS: ${safeOs}` : null,
     safeRoute ? `Current route: ${safeRoute}` : null,
-    screenshotAttachment ? `Screenshot: attached (${screenshotAttachment.filename})` : null,
-    ``,
-    `Message:`,
+    screenshotAttachment
+      ? `Screenshot: attached (${screenshotAttachment.filename})`
+      : null,
+    "",
+    "Message:",
     safeMessage || "(empty)",
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#1f2937;max-width:720px;margin:0 auto">
@@ -262,7 +261,7 @@ export async function sendFeedbackEmail({ to, feedback }) {
   `;
 
   try {
-    const info = await transporter.sendMail({
+    const info = await sendEmail({
       from: sender,
       to: recipient,
       replyTo: safeUserEmail || undefined,
@@ -272,15 +271,13 @@ export async function sendFeedbackEmail({ to, feedback }) {
       attachments: screenshotAttachment ? [screenshotAttachment] : [],
     });
 
-    console.info("[feedback] Email sent", { to: recipient, messageId: info && info.messageId });
+    console.info("[feedback] Email sent", { to: recipient, messageId: info?.messageId });
     return info;
   } catch (err) {
     console.error("[feedback] Failed to send email", {
       to: recipient,
-      message: err && (err.message || String(err)),
-      code: err && err.code,
-      response: err && err.response,
-      stack: err && err.stack,
+      message: err?.message || String(err),
+      stack: err?.stack,
     });
     throw err;
   }
