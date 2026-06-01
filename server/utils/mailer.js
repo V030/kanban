@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { sendEmail } from "./utils/resendMailer.js";
 
 let cachedTransporter;
 
@@ -96,7 +96,7 @@ export async function sendPasswordResetOtpEmail({ to, otp, expiresAt }) {
 
   const sender = String(process.env.SMTP_FROM || process.env.SMTP_USER || "").trim();
   try {
-    const info = await transporter.sendMail({
+    const info = await sendEmail({
       from: sender,
       to,
       subject: "Your password reset code",
@@ -143,7 +143,7 @@ export async function sendEmailVerificationOtpEmail({ to, otp, expiresAt }) {
   const expiresText = expiresAt instanceof Date ? expiresAt.toISOString() : String(expiresAt || "");
 
   try {
-    const info = await transporter.sendMail({
+    const info = sendEmail({
       from: sender,
       to,
       subject: "Verify Your Email",
@@ -262,7 +262,7 @@ export async function sendFeedbackEmail({ to, feedback }) {
   `;
 
   try {
-    const info = await transporter.sendMail({
+    const info = sendEmail({
       from: sender,
       to: recipient,
       replyTo: safeUserEmail || undefined,

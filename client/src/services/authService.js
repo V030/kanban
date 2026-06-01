@@ -1,7 +1,6 @@
 // src/services/authService.js
 
 import { transformErrorMessage, extractErrorMessage } from "../utils/errorTransformer";
-
 const API_URL = process.env.REACT_APP_API_URL;
 
 const NETWORK_ERROR_EVENT = "kanban:network-error";
