@@ -210,7 +210,7 @@ export default function ProjectMembersModal({
         <header className="pmv-header">
           <div>
             <h2 className="pmv-title">
-              Project members <span className="pmv-title-count">{members.length}</span>
+              Project members
             </h2>
             <p className="pmv-subtitle">
               {project?.name

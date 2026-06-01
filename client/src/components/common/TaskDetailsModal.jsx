@@ -1771,7 +1771,7 @@ export function TaskDetailsContent({ asPage = false, canMembersEditTask = false,
                           return avatarSrc ? (
                             <span className="tdm-review-avatar"><img src={avatarSrc} alt={displayName} /></span>
                           ) : (
-                            <i className="ti ti-activity" aria-hidden="true" />
+                            <span className="tdm-review-avatar" aria-label={displayName}>{getInitials(memberFromProject || actor)}</span>
                           );
                         })()}
                       </div>

@@ -45,6 +45,7 @@ export default function ProjectMembersList({
   removePending = {},
   updateRolePending = {},
 }) {
+  const hasMembers = Array.isArray(members) && members.length > 0;
   function RoleSelector({ member, disabled, onChange, pending }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
@@ -102,15 +103,16 @@ export default function ProjectMembersList({
   }
   return (
     <section className={`pm-section ${compact ? "pm-section-compact" : ""}`} aria-live="polite">
-      {loading && <p className="pm-empty">Loading members...</p>}
+      {loading && !hasMembers && <p className="pm-empty">Loading members...</p>}
       {!loading && error && <p className="pm-error">{error}</p>}
 
       {!loading && !error && members.length === 0 && (
         <p className="pm-empty">No members found for this project.</p>
       )}
 
-      {!loading && !error && members.length > 0 && (
+      {!error && members.length > 0 && (
         <ul className="pm-list">
+          {loading && <li className="pm-loading-inline">Refreshing members...</li>}
           {members.map((member) => {
             const isMe = currentUserId && member.id === currentUserId;
             const isOwner = (member.role || "").toLowerCase() === "owner";

@@ -1883,6 +1883,27 @@
   border-radius: 28px;
 }
 
+.tdm-activities-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: clamp(420px, 60vh, 520px);
+  overflow: hidden;
+}
+
+.tdm-activities-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.tdm-activities-list-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
 .tdm-comments-header {
   display: flex;
   align-items: center;

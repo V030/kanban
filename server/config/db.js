@@ -1,24 +1,26 @@
-// // database connection
-// import pkg from 'pg';
-// const { Pool } = pkg;
-// import dotenv from "dotenv";
-// dotenv.config();
-
-// export const pool = new Pool ({
-//     connectionString: process.env.DATABASE_URL,
-// });
-
-// pool.on("connect", () => {
-//   console.log("Connected to PostgreSQL");
-// });
-
-import pkg from "pg";
+// database connection
+import pkg from 'pg';
 const { Pool } = pkg;
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+import dotenv from "dotenv";
+dotenv.config();
+
+export const pool = new Pool ({
+    connectionString: process.env.DATABASE_URL,
 });
 
 pool.on("connect", () => {
   console.log("Connected to PostgreSQL");
 });
+
+//non-env
+// import pkg from "pg";
+// const { Pool } = pkg;
+
+// export const pool = new Pool({
+//   connectionString: process.env.DATABASE_URL,
+// });
+
+// pool.on("connect", () => {
+//   console.log("Connected to PostgreSQL");
+// });

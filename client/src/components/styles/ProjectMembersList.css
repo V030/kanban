@@ -351,6 +351,14 @@
   font-size: var(--text-sm);
 }
 
+.pm-loading-inline {
+  list-style: none;
+  padding: 6px 10px;
+  margin: 0 0 2px 0;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
 @media (max-width: 760px) {
   .pm-header {
     padding-left: 16px;

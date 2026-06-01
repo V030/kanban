@@ -27,6 +27,22 @@ function mapTaskActivityRow(row) {
   };
 }
 
+function normalizeReviewComment(value) {
+  return String(value ?? "").trim();
+}
+
+function getReviewSignature(row) {
+  if (!row) return null;
+  const activityType = String(row.activity_type || "").toLowerCase();
+  if (activityType !== "review_approved" && activityType !== "review_rejected") return null;
+  const details = row.details || {};
+  const actionFallback = activityType === "review_approved" ? "approved" : "rejected";
+  const action = String(details.action || actionFallback).trim().toLowerCase() || actionFallback;
+  const comment = normalizeReviewComment(details.comment);
+  const actorId = row.actor_id ? String(row.actor_id) : "";
+  return `${action}:${actorId}:${comment}`;
+}
+
 export async function createTaskActivity({ taskId, actorId, activityType, details = {} }) {
   const normalizedTaskId = Number(taskId);
   const normalizedActorId = String(actorId || "").trim();
@@ -108,8 +124,19 @@ export async function getTaskActivities({ taskId, requesterId }) {
     [normalizedTaskId]
   );
 
+  const reviewActivitySignatures = new Set();
+  activityRows.forEach((row) => {
+    const signature = getReviewSignature(row);
+    if (signature) reviewActivitySignatures.add(signature);
+  });
+
+  const reviewRows = (reviewResult.rows || []).filter((row) => {
+    const signature = getReviewSignature(row);
+    return !signature || !reviewActivitySignatures.has(signature);
+  });
+
   const byKey = new Map();
-  [...activityRows, ...reviewResult.rows].forEach((row) => {
+  [...activityRows, ...reviewRows].forEach((row) => {
     const key = `${row.activity_type}:${row.actor_id || ""}:${new Date(row.created_at).getTime()}:${JSON.stringify(row.details || {})}`;
     if (!byKey.has(key)) {
       byKey.set(key, {
