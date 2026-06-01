@@ -331,7 +331,7 @@
 .auth-google-wrap {
   display: grid;
   width: 100%;
-  min-width: 0;
+  min-width: 100%;
 }
 
 .auth-google-wrap > div,
