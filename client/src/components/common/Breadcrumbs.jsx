@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getCurrentUser, getProfile } from "../../services/authService";
 import { getMemberProjects, getProjects, getTaskById } from "../../services/projectService";
@@ -79,7 +78,6 @@ export default function Breadcrumbs() {
   const [resolvedProject, setResolvedProject] = useState(null);
   const [resolvedTaskTitle, setResolvedTaskTitle] = useState("");
   const [resolvedProfileName, setResolvedProfileName] = useState("");
-  const [portalTarget, setPortalTarget] = useState(null);
 
   useEffect(() => {
     let isActive = true;
@@ -103,8 +101,14 @@ export default function Breadcrumbs() {
 
       const projectKanbanMatch = pathname.match(/^\/main-page\/projects\/([^/]+)(?:\/kanban)?$/);
       const metricsMatch = pathname.match(/^\/main-page\/projects\/([^/]+)\/metrics$/);
-      const extractedProjectId = projectKanbanMatch ? projectKanbanMatch[1] : (metricsMatch ? metricsMatch[1] : null);
-      const taskMatch = pathname.match(/^\/main-page\/projects\/([^/]+)\/kanban\/tasks\/([^/]+)$/);
+      const extractedProjectId = projectKanbanMatch
+        ? projectKanbanMatch[1]
+        : metricsMatch
+        ? metricsMatch[1]
+        : null;
+      const taskMatch = pathname.match(
+        /^\/main-page\/projects\/([^/]+)\/kanban\/tasks\/([^/]+)$/
+      );
       const taskId = taskMatch ? taskMatch[2] : null;
       const isProfileRoute = pathname === "/main-page/profile";
 
@@ -119,8 +123,14 @@ export default function Breadcrumbs() {
           const task = data?.task || null;
           const taskTitle = getTaskTitle(task);
           const taskProject = task?.project || null;
-          const projectName = getProjectName(taskProject) || getProjectName(stateProject);
-          const projectId = getProjectId(taskProject) || getProjectId(stateProject) || task?.projectId || task?.project_id || null;
+          const projectName =
+            getProjectName(taskProject) || getProjectName(stateProject);
+          const projectId =
+            getProjectId(taskProject) ||
+            getProjectId(stateProject) ||
+            task?.projectId ||
+            task?.project_id ||
+            null;
 
           if (isActive) {
             if (taskTitle) setResolvedTaskTitle(taskTitle);
@@ -129,28 +139,35 @@ export default function Breadcrumbs() {
             if (taskProject) setResolvedProject(taskProject);
           }
         } catch (error) {
-          // Keep best-effort labels from location state/current cache.
+          console.warn("[Breadcrumbs] Failed to resolve task labels:", error?.message);
         }
       }
 
       if (extractedProjectId) {
         try {
-          // Fetch all projects and search for the matching one
           const [ownedResult, memberResult] = await Promise.allSettled([
             getProjects(),
             getMemberProjects(),
           ]);
 
-          const owned = ownedResult.status === "fulfilled" ? ownedResult.value?.projects || [] : [];
-          const member = memberResult.status === "fulfilled" ? memberResult.value?.projects || [] : [];
+          const owned =
+            ownedResult.status === "fulfilled"
+              ? ownedResult.value?.projects || []
+              : [];
+          const member =
+            memberResult.status === "fulfilled"
+              ? memberResult.value?.projects || []
+              : [];
           const allProjects = [...owned, ...member];
 
-          const selectedProject = allProjects.find((project) => isProjectMatch(project, extractedProjectId)) || null;
+          const selectedProject =
+            allProjects.find((project) =>
+              isProjectMatch(project, extractedProjectId)
+            ) || null;
 
           if (selectedProject && isActive) {
             const projectName = getProjectName(selectedProject);
             const projectId = getProjectId(selectedProject);
-            // Always update state, even if projectName is empty
             setResolvedProjectName(projectName || "Project");
             if (projectId) {
               setResolvedProjectId(String(projectId));
@@ -158,7 +175,7 @@ export default function Breadcrumbs() {
             setResolvedProject(selectedProject);
           }
         } catch (error) {
-          // Keep best-effort labels from location state/current cache.
+          console.warn("[Breadcrumbs] Failed to resolve project labels:", error?.message);
         }
       }
 
@@ -171,7 +188,7 @@ export default function Breadcrumbs() {
             setResolvedProfileName(fullName);
           }
         } catch (error) {
-          // Keep fallback text for profile name.
+          console.warn("[Breadcrumbs] Failed to resolve profile name:", error?.message);
         }
       }
     }
@@ -182,47 +199,6 @@ export default function Breadcrumbs() {
       isActive = false;
     };
   }, [location.state, pathname]);
-
-  useEffect(() => {
-    let isActive = true;
-    let host = null;
-
-    const findAndAttach = () => {
-      if (!isActive) return;
-      const hero = document.querySelector(
-        ".content-inner .page-shell .workspace-hero, .content-inner .page-shell .dashboard-hero"
-      );
-
-      if (!hero) return false;
-
-      host = document.createElement("div");
-      host.className = "breadcrumb-portal-host";
-      hero.prepend(host);
-      setPortalTarget(host);
-      return true;
-    };
-
-    // try immediately, then a couple of times in case the target mounts slightly later
-    if (!findAndAttach()) {
-      let attempts = 0;
-      const maxAttempts = 4;
-      const retry = () => {
-        if (!isActive) return;
-        attempts += 1;
-        if (findAndAttach()) return;
-        if (attempts < maxAttempts) {
-          setTimeout(retry, 80);
-        }
-      };
-      setTimeout(retry, 80);
-    }
-
-    return () => {
-      isActive = false;
-      setPortalTarget(null);
-      if (host && host.parentNode) host.parentNode.removeChild(host);
-    };
-  }, [pathname]);
 
   const segments = useMemo(() => {
     if (!pathname.startsWith("/main-page") || shouldHideBreadcrumb(pathname)) {
@@ -272,7 +248,9 @@ export default function Breadcrumbs() {
     }
 
     // Match /main-page/projects/:projectId or /main-page/projects/:projectId/kanban
-    const projectKanbanMatch = pathname.match(/^\/main-page\/projects\/([^/]+)(?:\/kanban)?$/);
+    const projectKanbanMatch = pathname.match(
+      /^\/main-page\/projects\/([^/]+)(?:\/kanban)?$/
+    );
     if (projectKanbanMatch) {
       return [
         { label: "Main Page", to: "/main-page/dashboard" },
@@ -282,7 +260,9 @@ export default function Breadcrumbs() {
     }
 
     // Match /main-page/projects/:projectId/kanban/tasks/:taskId
-    const taskMatch = pathname.match(/^\/main-page\/projects\/([^/]+)\/kanban\/tasks\/([^/]+)$/);
+    const taskMatch = pathname.match(
+      /^\/main-page\/projects\/([^/]+)\/kanban\/tasks\/([^/]+)$/
+    );
     if (taskMatch) {
       const projectId = taskMatch[1];
       const projectPath = `/main-page/projects/${projectId}/kanban`;
@@ -296,12 +276,17 @@ export default function Breadcrumbs() {
     }
 
     // Match /main-page/projects/:projectId/metrics
-    const metricsMatch = pathname.match(/^\/main-page\/projects\/([^/]+)\/metrics$/);
+    const metricsMatch = pathname.match(
+      /^\/main-page\/projects\/([^/]+)\/metrics$/
+    );
     if (metricsMatch) {
       return [
         { label: "Main Page", to: "/main-page/dashboard" },
         { label: "Projects", to: "/main-page/projects" },
-        { label: resolvedProjectName || "Project", to: `/main-page/projects/${metricsMatch[1]}/kanban` },
+        {
+          label: resolvedProjectName || "Project",
+          to: `/main-page/projects/${metricsMatch[1]}/kanban`,
+        },
         { label: "Metrics" },
       ];
     }
@@ -317,11 +302,11 @@ export default function Breadcrumbs() {
     return [];
   }, [pathname, resolvedProfileName, resolvedProjectId, resolvedProjectName, resolvedTaskTitle]);
 
-  if (segments.length === 0 || !portalTarget) {
+  if (segments.length === 0) {
     return null;
   }
 
-  const breadcrumbMarkup = (
+  return (
     <nav className="global-breadcrumb" aria-label="Breadcrumb">
       <ol className="breadcrumb-list">
         {segments.map((segment, index) => {
@@ -335,11 +320,13 @@ export default function Breadcrumbs() {
                   {segment.label}
                 </Link>
               ) : (
-                <span className="breadcrumb-current" aria-current={isLast ? "page" : undefined}>
+                <span
+                  className="breadcrumb-current"
+                  aria-current={isLast ? "page" : undefined}
+                >
                   {segment.label}
                 </span>
               )}
-
               {!isLast && <span className="breadcrumb-separator">/</span>}
             </li>
           );
@@ -358,6 +345,4 @@ export default function Breadcrumbs() {
       )}
     </nav>
   );
-
-  return createPortal(breadcrumbMarkup, portalTarget);
 }
