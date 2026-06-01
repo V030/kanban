@@ -75,9 +75,9 @@
 
 /* Auth page layout */
 .auth-page {
-  height: 100vh;
+  height: 100dvh;
   height: 100svh;
-  min-height: 100vh;
+  min-height: 100dvh;
   min-height: 100svh;
   display: flex;
   align-items: flex-start;
@@ -89,9 +89,9 @@
 
 .auth-panel {
   width: 100%;
-  height: 100vh;
+  height: 100dvh;
   height: 100svh;
-  min-height: 100vh;
+  min-height: 100dvh;
   min-height: 100svh;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(251, 253, 255, 0.92) 100%);
@@ -250,9 +250,9 @@
 .auth-content {
   position: relative;
   z-index: 1;
-  height: 100vh;
+  height: 100dvh;
   height: 100svh;
-  min-height: 100vh;
+  min-height: 100dvh;
   min-height: 100svh;
   padding: 22px 22px max(64px, 12svh);
   display: flex;
@@ -363,7 +363,7 @@
 
 /* App layout */
 .app-layout {
-  height: 100vh;
+  height: 100dvh;
   display: grid;
   grid-template-columns: var(--sidebar-width, 286px) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -453,7 +453,7 @@
 @media (max-width: 820px) {
   .app-layout {
     height: auto;
-    min-height: 100vh;
+    min-height: 100dvh;
     grid-template-columns: 1fr;
     gap: 12px;
     padding: 10px;
@@ -501,7 +501,7 @@
 @media (min-width: 520px) {
   .auth-page {
     height: auto;
-    min-height: 100vh;
+    min-height: 100dvh;
     align-items: center;
     padding: 24px 18px;
     overflow-x: hidden;
