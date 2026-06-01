@@ -108,6 +108,11 @@ export async function login(req, res) {
     });
   } catch (err) {
     console.error("Login error:", err);
+    console.error("[login] error:", {
+      email: maskEmail(normalizedEmail),   
+      message: err && (err.message || String(err)),
+      stack: err && err.stack,
+    });
     return res.status(500).json({ message: "Server error" });
   }
 }
