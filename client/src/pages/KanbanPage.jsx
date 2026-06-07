@@ -131,7 +131,7 @@ function KanbanPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { projectId: routeProjectId } = useParams();
-	const toast = useToast();
+	const { showError, showSuccess } = useToast();
 	
 	// Prefer route params over location.state
 	const initialProject = location.state?.project || null;
@@ -237,13 +237,13 @@ function KanbanPage() {
 				return;
 			}
 			
-			toast.showError(err?.message || "Error fetching task categories for this project.");
+			showError(err?.message || "Error fetching task categories for this project.");
 		} finally {
 			if (!silent) {
 				setLoading(false);
 			}
 		}
-	}, [projectId, navigate, toast]);
+	}, [projectId, navigate, showError]);
 
 	const loadProjectMembers = useCallback(async () => {
 		if (!projectId || isDeletingProjectRef.current) return;
@@ -264,14 +264,14 @@ function KanbanPage() {
 				return;
 			}
 			
-			toast.showError(membersRequestError?.message || "Unable to load project members.");
+			showError(membersRequestError?.message || "Unable to load project members.");
 			setProjectMembers([]);
 		} finally {
 			if (!isDeletingProjectRef.current) {
 				setMembersLoading(false);
 			}
 		}
-	}, [projectId, navigate, toast]);
+	}, [projectId, navigate, showError]);
 
 	const loadProjectSettings = useCallback(async () => {
 		if (!projectId || isDeletingProjectRef.current) return;
@@ -290,10 +290,10 @@ function KanbanPage() {
 				return;
 			}
 			
-			toast.showError(settingsError?.message || "Unable to load project settings.");
+			showError(settingsError?.message || "Unable to load project settings.");
 			setTaskPermissions(DEFAULT_TASK_PERMISSIONS);
 		}
-	}, [projectId, navigate, toast]);
+	}, [projectId, navigate, showError]);
 
 	useEffect(() => {
 		if (!projectId) {
@@ -549,8 +549,8 @@ function KanbanPage() {
 				await deleteTask(taskId);
 				await loadTaskCategories({ silent: true });
 			} catch (err) {
-				toast.showError(err?.message || "Unable to create task.");
-				toast.showError(err?.message || "Unable to delete task.");
+				showError(err?.message || "Unable to create task.");
+				showError(err?.message || "Unable to delete task.");
 				setTaskCategories((prev) => {
 					const updated = (prev || []).map((category) => {
 						if (String(category?.id) !== String(currentLocation.categoryId)) return category;
@@ -568,7 +568,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[canAdminManageTasks, loadTaskCategories, findTaskLocation, pendingTaskActions, setTaskPending, clearTaskPending, toast]
+		[canAdminManageTasks, loadTaskCategories, findTaskLocation, pendingTaskActions, setTaskPending, clearTaskPending, showError]
 	);
 
 	const handleSettingChange = useCallback(
@@ -583,11 +583,11 @@ function KanbanPage() {
 				const errorMsg = String(err?.message || "").toLowerCase();
 				// Check if this is a permission-denied error
 				if (errorMsg.includes("permission") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
-					toast.showError("Your permissions have changed. This action is no longer allowed.");
+					showError("Your permissions have changed. This action is no longer allowed.");
 					// Refresh permissions and re-check
 					await loadProjectSettings();
 				} else {
-					toast.showError(err?.message || "Unable to update project settings.");
+					showError(err?.message || "Unable to update project settings.");
 					loadProjectSettings();
 				}
 			} finally {
@@ -598,7 +598,7 @@ function KanbanPage() {
 				});
 			}
 		},
-		[project?.id, canEditProjectSettings, loadProjectSettings, toast]
+		[project?.id, canEditProjectSettings, loadProjectSettings, showError]
 	);
 
 	const handleDeleteProject = useCallback(
@@ -610,18 +610,18 @@ function KanbanPage() {
 
 			try {
 				await deleteProject(project.id);
-				toast.showSuccess("Project deleted successfully!");
+				showSuccess("Project deleted successfully!");
 				setSettingsOpen(false);
 				setMembersOpen(false);
 				navigate("/main-page/projects", { replace: true });
 			} catch (err) {
 				isDeletingProjectRef.current = false;
-				toast.showError(err?.message || "Unable to delete project.");
+				showError(err?.message || "Unable to delete project.");
 			} finally {
 				setDeleteProjectPending(false);
 			}
 		},
-		[project?.id, projectRole, navigate, toast]
+		[project?.id, projectRole, navigate, showError, showSuccess]
 	);
 
 	const handleReloadMembers = useCallback(async () => {
@@ -645,7 +645,7 @@ function KanbanPage() {
 				await removeMemberFromProject(project.id, memberId);
 				await handleReloadMembers();
 			} catch (err) {
-				toast.showError(err?.message || "Unable to remove member from project.");
+				showError(err?.message || "Unable to remove member from project.");
 			} finally {
 				setMemberActionPending((prev) => {
 					const next = { ...prev };
@@ -654,7 +654,7 @@ function KanbanPage() {
 				});
 			}
 		},
-		[handleReloadMembers, project?.id, projectMembers, projectRole, toast]
+		[handleReloadMembers, project?.id, projectMembers, projectRole, showError]
 	);
 
 	const handleUpdateMemberRole = useCallback(
@@ -671,7 +671,7 @@ function KanbanPage() {
 				await updateMemberRole(project.id, memberId, nextRole);
 				await handleReloadMembers();
 			} catch (err) {
-				toast.showError(err?.message || "Unable to update member role.");
+				showError(err?.message || "Unable to update member role.");
 			} finally {
 				setMemberActionPending((prev) => {
 					const next = { ...prev };
@@ -680,7 +680,7 @@ function KanbanPage() {
 				});
 			}
 		},
-		[handleReloadMembers, project?.id, projectMembers, projectRole, toast]
+		[handleReloadMembers, project?.id, projectMembers, projectRole, showError]
 	);
 
 	const getTaskAssignee = useCallback(
@@ -770,11 +770,11 @@ function KanbanPage() {
 				const errorMsg = String(err?.message || "").toLowerCase();
 				// Check if this is a permission-denied error
 				if (errorMsg.includes("permission") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
-					toast.showError("Your permissions have changed. This action is no longer allowed.");
+					showError("Your permissions have changed. This action is no longer allowed.");
 					// Refresh permissions to sync with server state
 					await Promise.all([loadProjectSettings(), loadProjectMembers()]);
 				} else {
-					toast.showError(err?.message || "Unable to take this task.");
+					showError(err?.message || "Unable to take this task.");
 				}
 				// Rollback optimistic assignment
 				setLocalTaskAssignees((prev) => {
@@ -790,7 +790,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, loadProjectSettings, loadProjectMembers, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending, toast]
+		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, loadProjectSettings, loadProjectMembers, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending, showError]
 	);
 
 	const handleDragReviewConfirm = useCallback(
@@ -817,11 +817,11 @@ function KanbanPage() {
 				const errorMsg = String(err?.message || "").toLowerCase();
 				// Check if this is a permission-denied error
 				if (errorMsg.includes("permission") || errorMsg.includes("forbidden") || errorMsg.includes("access denied")) {
-					toast.showError("Your permissions have changed. This action is no longer allowed.");
+					showError("Your permissions have changed. This action is no longer allowed.");
 					// Refresh permissions to sync with server state
 					await Promise.all([loadProjectSettings(), loadProjectMembers()]);
 				} else {
-					toast.showError(err?.message || "Unable to complete this action.");
+					showError(err?.message || "Unable to complete this action.");
 				}
 				// Revert the optimistic board state
 				setTaskCategories((prev) => {
@@ -835,7 +835,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[dragReviewModal, dragReviewReason, moveTaskToCategory, setTaskPending, clearTaskPending, findTaskLocation, loadTaskCategories, loadProjectSettings, loadProjectMembers, toast]
+		[dragReviewModal, dragReviewReason, moveTaskToCategory, setTaskPending, clearTaskPending, findTaskLocation, loadTaskCategories, loadProjectSettings, loadProjectMembers, showError]
 	);
 
 	const capitalizeFirst = (str) => {
@@ -866,20 +866,20 @@ function KanbanPage() {
 		if (!canAdminManageTasks && projectRole !== "manager") {
 			// Rule 0: TODO and In Progress cannot move directly to Done
 			if (isDoneTarget && (sourceColumnName === "todo" || sourceColumnName === "to_do" || isInProgressSource)) {
-				toast.showError("Members cannot move tasks directly to Done. Tasks must be reviewed first.");
+				showError("Members cannot move tasks directly to Done. Tasks must be reviewed first.");
 				return;
 			}
 
 			// Rule 1: Cannot move FROM in_progress TO done
 			if (isInProgressSource && isDoneTarget) {
-				toast.showError("Members cannot move tasks directly from In Progress to Done. Tasks must be reviewed first.");
+				showError("Members cannot move tasks directly from In Progress to Done. Tasks must be reviewed first.");
 				return;
 			}
 			
 			// Rule 2: Cannot move FROM to_review TO done or todo without permission
 			if (isToReviewSource && (isDoneTarget || isToDoTarget)) {
 				if (!canMembersReviewTasks) {
-					toast.showError("You don't have permission to approve or reject reviewed tasks in this project.");
+					showError("You don't have permission to approve or reject reviewed tasks in this project.");
 					return;
 				}
 			}
@@ -889,7 +889,7 @@ function KanbanPage() {
 		if (isToReviewSource && (isToDoTarget || isDoneTarget)) {
 			// Check permission for members
 			if (!canAdminManageTasks && projectRole !== "manager" && !canMembersReviewTasks) {
-				toast.showError("You don't have permission to approve or reject tasks.");
+				showError("You don't have permission to approve or reject tasks.");
 				return;
 			}
 			
@@ -927,7 +927,7 @@ function KanbanPage() {
 			}
 			await loadTaskCategories({ silent: true });
 		} catch (dropError) {
-			toast.showError(dropError?.message || "Unable to move task to this category.");
+			showError(dropError?.message || "Unable to move task to this category.");
 			// Restore the pre-move state on failure
 			setTaskCategories(preMoveState);
 		} finally {
@@ -955,8 +955,8 @@ function KanbanPage() {
 				await unassignTask(taskId);
 				await loadTaskCategories({ silent: true });
 			} catch (err) {
-				toast.showError(err?.message || "Unable to create task.");
-				toast.showError(err?.message || "Unable to unassign task.");
+				showError(err?.message || "Unable to create task.");
+				showError(err?.message || "Unable to unassign task.");
 				setLocalTaskAssignees((prev) => {
 					const next = { ...prev };
 					if (previousAssignee) {
@@ -968,7 +968,7 @@ function KanbanPage() {
 				clearTaskPending(taskId);
 			}
 		},
-		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending, toast]
+		[currentUser, canTakeTask, isTaskAssignedToMe, loadTaskCategories, localTaskAssignees, pendingTaskActions, setTaskPending, clearTaskPending, showError]
 	);
 
 
@@ -1079,7 +1079,7 @@ function KanbanPage() {
 			setProject((prev) => (prev ? { ...prev, name: updatedName } : prev));
 			setIsEditingProjectName(false);
 		} catch (err) {
-			toast.showError(err?.message || "Unable to update project name.");
+			showError(err?.message || "Unable to update project name.");
 			setProject(previousProject);
 		} finally {
 			setProjectNameSaving(false);
@@ -1104,7 +1104,7 @@ function KanbanPage() {
 			setProject((prev) => (prev ? { ...prev, description: updatedDesc } : prev));
 			setIsEditingProjectDesc(false);
 		} catch (err) {
-			toast.showError(err?.message || "Unable to update project description.");
+			showError(err?.message || "Unable to update project description.");
 			setProject(previousProject);
 		} finally {
 			setProjectDescSaving(false);
@@ -1555,7 +1555,7 @@ function KanbanPage() {
 							}
 							await loadTaskCategories({ silent: true });
 						} catch (err) {
-						toast.showError(err?.message || "Unable to create task.");
+						showError(err?.message || "Unable to create task.");
 							setTaskCategories((prev) => removeTaskById(prev, tempId).next);
 							throw err;
 						} finally {
