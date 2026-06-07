@@ -4,7 +4,6 @@ import { useToast } from "../hooks/useToast";
 import HeroActionButton from "../components/common/HeroActionButton";
 import { CreateProjectIcon, ProjectInvitationsIcon } from "../components/common/AppIcons";
 import CreateProjectModal from "../components/common/CreateProjectModal";
-import AddMemberModal from "../components/common/AddMemberModal";
 import ProjectInvitesModal from "../components/common/ProjectInvitesModal";
 import "../components/common/CreateProjectModal.css"; 
 import "../components/styles/WorkspacePages.css";
@@ -16,7 +15,6 @@ function Projects() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [projects, setProjects] = useState([]);
     const [memberProjects, setMemberProjects] = useState([]);
-    const [selectedProject, setSelectedProject] = useState(null);
     const [isInvitesOpen, setIsInvitesOpen] = useState(false);
 
     const [loading, setLoading] = useState(true);
@@ -270,13 +268,6 @@ function Projects() {
             <p>Projects sync automatically as you create or join boards.</p>
           </div>
         </section>
-
-        <AddMemberModal
-          isOpen={!!selectedProject}
-          project={selectedProject}
-          onClose={() => setSelectedProject(null)}
-          onAdded={loadProjects}
-        />
 
         <ProjectInvitesModal
           isOpen={isInvitesOpen}

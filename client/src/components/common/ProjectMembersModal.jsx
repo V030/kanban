@@ -104,8 +104,15 @@ export default function ProjectMembersModal({
   }
 
   const handleSelectFriend = async (friendId, projectId) => {
+    if (inviteLoading) return;
+
     if (!canInvite) {
       toast.showError("You don't have permission to invite members.");  
+      return;
+    }
+
+    if (!projectId) {
+      toast.showError("Project is missing.");
       return;
     }
     
@@ -257,14 +264,14 @@ export default function ProjectMembersModal({
 
             {/* Email invite */}
             <div className="pmv-invite-section">
-              <span className="pmv-col-label">Invite by email</span>
+              <span className="pmv-col-label">Invite existing user by email</span>
               <form onSubmit={handleSubmit} className="pmv-email-form">
                 <input
                   id="memberEmail"
                   name="email"
                   type="email"
                   className="pmv-input"
-                  placeholder="Invite by email address"
+                  placeholder="Existing user's email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -317,8 +324,8 @@ export default function ProjectMembersModal({
                     <button
                       type="button"
                       className="pmv-add-btn"
-                      onClick={() => handleSelectFriend(f.id, project.id)}
-                      disabled={pendingFriendId === String(f.id) || !canInvite || isAlreadyMember(f.id) }
+                      onClick={() => handleSelectFriend(f.id, project?.id)}
+                      disabled={inviteLoading || !canInvite || !project?.id || isAlreadyMember(f.id) }
                     >
                       {isAlreadyMember(f.id)
                         ? "Already in"

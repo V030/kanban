@@ -6,6 +6,7 @@ import AddTaskModal from "../components/common/AddTaskModal";
 import ColumnsReorderModal from "../components/common/ColumnsReorderModal";
 import ProjectSettingsModal from "../components/common/ProjectSettingsModal";
 import ProjectMembersModal from "../components/common/ProjectMembersModal";
+import ConfirmModal from "../components/common/ConfirmModal";
 import { SkeletonColumn } from "../components/common/SkeletonComponents";
 import { TeamIcon, SettingsIcon, MetricsIcon, ReorderIcon, SaveIcon, CancelIcon, DragHandleIcon } from "../components/common/AppIcons";
 import "../components/styles/KanbanPage.css";
@@ -161,6 +162,7 @@ function KanbanPage() {
 	const [pendingTaskActions, setPendingTaskActions] = useState({});
 	const [settingsPending, setSettingsPending] = useState({});
 	const [memberActionPending, setMemberActionPending] = useState({});
+	const [memberRemovalCandidate, setMemberRemovalCandidate] = useState(null);
 	const [deleteProjectPending, setDeleteProjectPending] = useState(false);
 	const [dragReviewModal, setDragReviewModal] = useState({ isOpen: false, taskId: null, targetColumn: null, action: null });
 	const [dragReviewReason, setDragReviewReason] = useState("");
@@ -629,17 +631,34 @@ function KanbanPage() {
 	}, [loadProjectMembers]);
 
 	const handleRemoveMember = useCallback(
-		async (memberId) => {
+		(memberId) => {
 			if (!project?.id || !memberId) return;
 			if (projectRole !== "owner" && projectRole !== "admin") return;
 
 			const member = projectMembers.find((entry) => entry.id === memberId);
 			if (!member) return;
 
-			const confirmed = window.confirm(`Remove ${getDisplayName(member)} from this project?`);
-			if (!confirmed) return;
+			setMemberRemovalCandidate(member);
+		},
+		[project?.id, projectMembers, projectRole]
+	);
+
+	const confirmRemoveMember = useCallback(
+		async () => {
+			const member = memberRemovalCandidate;
+			const memberId = member?.id;
+
+			if (!project?.id || !memberId) {
+				setMemberRemovalCandidate(null);
+				return;
+			}
+			if (projectRole !== "owner" && projectRole !== "admin") {
+				setMemberRemovalCandidate(null);
+				return;
+			}
 
 			setMemberActionPending((prev) => ({ ...prev, [memberId]: "remove" }));
+			setMemberRemovalCandidate(null);
 
 			try {
 				await removeMemberFromProject(project.id, memberId);
@@ -654,7 +673,7 @@ function KanbanPage() {
 				});
 			}
 		},
-		[handleReloadMembers, project?.id, projectMembers, projectRole, showError]
+		[handleReloadMembers, memberRemovalCandidate, project?.id, projectRole, showError]
 	);
 
 	const handleUpdateMemberRole = useCallback(
@@ -1589,14 +1608,25 @@ function KanbanPage() {
 					canUpdateRoles={projectRole === "owner"}
 					canInvite={
 						isOwner ||
-						isAdmin ||
-						taskPermissions.allow_member_add_member
+						(isAdmin && taskPermissions.allow_admin_add_member) ||
+						(!isAdmin && taskPermissions.allow_member_add_member)
 					}
 					onRemoveMember={handleRemoveMember}
 					onUpdateRole={handleUpdateMemberRole}
 					removePending={memberActionPending}
 					updateRolePending={memberActionPending}
 					onAdded={handleReloadMembers}
+				/>
+
+				<ConfirmModal
+					isOpen={!!memberRemovalCandidate}
+					title="Remove member"
+					message={`Remove ${getDisplayName(memberRemovalCandidate)} from this project?`}
+					confirmLabel="Remove"
+					cancelLabel="Cancel"
+					onConfirm={confirmRemoveMember}
+					onCancel={() => setMemberRemovalCandidate(null)}
+					topLayer
 				/>
 
 				<ColumnsReorderModal

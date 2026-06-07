@@ -1,62 +1,19 @@
-Here's a cleaner, documentation-style version with consistent formatting, headings, and code blocks.
+# Project Invite Flow Summary
 
-# Invite a Friend to a Project — End-to-End Flow Trace
+This summary reflects the current invite flow in the app. Project invitations are stored as project requests for existing users, not as external email invitation records.
 
-This traces the complete flow when a user invites a friend (or enters an email address) from the **Project Members** modal.
-
-**Scope:** Documentation/tracing only. No code changes are suggested.
-
----
-
-## 1. UI Layer — User Clicks "Invite"
+## Entry Point
 
 **File:** `client/src/components/common/ProjectMembersModal.jsx`
 
-### Invite Existing Friend
+The active project invite UI is `ProjectMembersModal`. It supports:
 
-```js
-const handleSelectFriend = async (friendId, projectId) => {
-  ...
-  await inviteMemberToProject({ projectId, friendId });
-  toast.showSuccess("Invitation sent successfully!");
-};
-```
+- Inviting a friend by user id.
+- Inviting an existing registered user by email address.
 
-### Invite via Email
+`AddMemberModal` was removed because it was an outdated, unused invite path.
 
-```js
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  ...
-
-  await inviteMemberToProject({
-    projectId: project.id,
-    email: email.trim(),
-  });
-
-  toast.showSuccess("Invitation sent successfully!");
-};
-```
-
-### What Happens
-
-The modal calls `inviteMemberToProject()` (imported from `projectService.js`) with either:
-
-```js
-{ projectId, friendId }
-```
-
-or
-
-```js
-{ projectId, email }
-```
-
-depending on how the invitation is initiated.
-
----
-
-## 2. Service Layer — Convert Data into an HTTP Request
+## Frontend Service
 
 **File:** `client/src/services/projectService.js`
 
@@ -69,25 +26,29 @@ export async function inviteMemberToProject(inviteData) {
 }
 ```
 
-### What Happens
-
-The service sends a **POST** request to:
-
-```text
-/auth/projects/send-invite
-```
-
-using the configured API URL:
+The service sends either:
 
 ```js
-process.env.REACT_APP_API_URL
+{ projectId, friendId }
 ```
 
-The request body contains the JSON-stringified invitation payload.
+or:
 
----
+```js
+{ projectId, email }
+```
 
-## 3. Express Router — Request Enters the Backend
+## Frontend Permission Gate
+
+**File:** `client/src/pages/KanbanPage.jsx`
+
+The members modal receives `canInvite` using the same role split as the backend:
+
+- Owners can invite.
+- Admins can invite only when `allow_admin_add_member` is enabled.
+- Regular members can invite only when `allow_member_add_member` is enabled.
+
+## Route
 
 **File:** `server/routes/authRoutes.js`
 
@@ -100,375 +61,110 @@ router.post(
 );
 ```
 
-### What Happens
+Requests must be authenticated and pass the invite rate limiter.
 
-Before reaching the controller, the request passes through:
-
-1. `authenticateToken`
-
-   * Verifies the user is authenticated.
-   * Populates `req.user`.
-
-2. `inviteLimiter`
-
-   * Applies rate limiting.
-   * Helps prevent invitation spam/abuse.
-
-After those checks, the request is forwarded to:
-
-```js
-inviteMemberToProject
-```
-
-(controller function)
-
----
-
-## 4. Controller Layer — Validation & Delegation
+## Controller
 
 **File:** `server/controllers/projectController.js`
 
+`inviteMemberToProject()` validates:
+
+- The user is authenticated.
+- A project id is provided.
+- Either a friend id or email is provided.
+
+It calls the model with either:
+
 ```js
-export async function inviteMemberToProject(req, res) {
-  const projectId =
-    (req.body?.project || req.body?.projectId || "").trim();
-
-  const inviteeId =
-    (req.body?.friend || req.body?.friendId || "").trim();
-
-  const inviteeEmail =
-    (req.body?.email || req.body?.emailAddress || "").trim();
-
-  try {
-    const inviteRequest = await inviteMemberToProjectModel({
-      inviter_id: req.user.userId,
-      invitee_id: inviteeId,
-      invitee_email: inviteeEmail,
-      project_id: projectId,
-    });
-
-    return res.status(200).json({
-      message: "Invitation sent",
-      invitation: inviteRequest,
-    });
-  } catch (err) {
-    console.error("[invite] error:", err);
-
-    return res.status(400).json({
-      message: err.message || "Unable to send invitation",
-    });
-  }
+{
+  inviter_id: req.user.userId,
+  invitee_id: inviteeId,
+  project_id: projectId,
 }
 ```
 
-### What Happens
-
-The controller:
-
-1. Extracts:
-
-   * `projectId`
-   * `friendId` → normalized to `invitee_id`
-   * `email` → normalized to `invitee_email`
-
-2. Retrieves the authenticated user's ID:
+or:
 
 ```js
-req.user.userId
+{
+  inviter_id: req.user.userId,
+  invitee_email: inviteeEmail,
+  project_id: projectId,
+}
 ```
 
-3. Calls the model:
+Successful invites return:
+
+```text
+201 Created
+```
+
+with:
 
 ```js
-inviteMemberToProjectModel(...)
+{ message: "Invite sent", inviteRequest }
 ```
 
-4. Returns:
+The controller also creates a `project_invitation` notification for the invite recipient when the invite is stored successfully.
 
-   * **200 OK** on success
-   * **400 Bad Request** on failure
-
----
-
-## 5. Model Layer — Database Insert
+## Model
 
 **File:** `server/models/projectModel.js`
 
-```js
-export async function inviteMemberToProject({
-  inviter_id,
-  invitee_id,
-  invitee_email,
-  project_id,
-}) {
-  const fields = [
-    "inviter_id",
-    "project_id",
-    "status",
-    "created_at",
-  ];
+`inviteMemberToProject()` resolves and validates the invite before writing to the database.
 
-  const values = [
-    inviter_id,
-    project_id,
-    "pending",
-    new Date(),
-  ];
-
-  let placeholderIdx = 3;
-
-  if (invitee_id) {
-    fields.push("invitee_id");
-    values.push(invitee_id);
-    placeholderIdx++;
-  }
-
-  if (invitee_email) {
-    fields.push("invitee_email");
-    values.push(invitee_email);
-    placeholderIdx++;
-  }
-
-  const query = `
-    INSERT INTO project_invitations (${fields.join(", ")})
-    VALUES (${fields.map((_, i) => `$${i + 1}`).join(", ")})
-    RETURNING *
-  `;
-
-  const { rows } = await pool.query(query, values);
-
-  return rows[0];
-}
-```
-
-### What Happens
-
-The model dynamically constructs an `INSERT` statement for the `project_invitations` table.
-
-Common fields:
-
-```text
-inviter_id
-project_id
-status = "pending"
-created_at
-```
-
-Additionally, it includes either:
-
-```text
-invitee_id
-```
-
-or
-
-```text
-invitee_email
-```
-
-depending on the invitation type.
-
-The newly created row is returned via:
+For email invites, the model looks up the email in `users`:
 
 ```sql
-RETURNING *
+SELECT id FROM users WHERE email = $1 LIMIT 1
 ```
 
----
+If no registered user exists for that email, it throws `USER_NOT_FOUND`. The current implementation does not store or deliver external email invitations.
 
-## 6. Database Layer — Invitation Stored
+After resolving the invitee, the model checks:
 
-**Table:** `project_invitations`
+- Inviter id exists.
+- Invitee id exists.
+- Project id exists.
+- The inviter is not inviting themselves.
+- The inviter has permission for their project role.
+- The invitee is not already a project member.
+- The invitee does not already have a pending or accepted project request.
 
-### Relevant Columns
+## Database
 
-```text
-id
-project_id
-inviter_id
-invitee_id
-invitee_email
-status
-created_at
-updated_at
+**File:** `server/migrations/001_create_project_requests.sql`
+
+Invites are stored in `project_requests`:
+
+```sql
+CREATE TABLE IF NOT EXISTS project_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  requester_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status text NOT NULL DEFAULT 'pending',
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 ```
 
-### Status Values
+Important columns:
 
-```text
-pending
-accepted
-declined
-```
+- `requester_id`: user sending the invite.
+- `recipient_id`: registered user receiving the invite.
+- `project_id`: invited project.
+- `status`: `pending`, `accepted`, or `declined`.
 
-### What Happens
+There is no `project_invitations` table in the current flow and no `invitee_email` column in `project_requests`.
 
-A new invitation record is created and stored.
+## Current Behavior
 
-This record is later used by invitation-management endpoints such as:
-
-```text
-/projects/invitations/:requestId/accept
-/projects/invitations/:requestId/decline
-```
-
----
-
-## 7. Response Returns to the Client
-
-**Controller Response**
-
-```js
-res.status(200).json({
-  message: "Invitation sent",
-  invitation: inviteRequest,
-});
-```
-
-### What Happens
-
-1. Controller returns the newly created invitation.
-2. Service promise resolves.
-3. UI displays:
-
-```text
-Invitation sent successfully!
-```
-
-via:
-
-```js
-toast.showSuccess(...)
-```
-
----
-
-# Complete Data Flow
-
-```text
-ProjectMembersModal
-        │
-        ▼
-inviteMemberToProject()
-        │
-        ▼
-fetchWithAuth()
-        │
-        ▼
-POST /auth/projects/send-invite
-        │
-        ▼
-authenticateToken
-        │
-        ▼
-inviteLimiter
-        │
-        ▼
-projectController.inviteMemberToProject()
-        │
-        ▼
-projectModel.inviteMemberToProject()
-        │
-        ▼
-INSERT INTO project_invitations
-        │
-        ▼
-PostgreSQL
-        │
-        ▼
-Created invitation row returned
-        │
-        ▼
-Controller returns JSON
-        │
-        ▼
-Service promise resolves
-        │
-        ▼
-Success toast displayed in UI
-```
-
----
-
-# Key Observations
-
-### Flexible Payload Format
-
-The frontend may submit either:
-
-```js
-{
-  projectId,
-  friendId
-}
-```
-
-or
-
-```js
-{
-  projectId,
-  email
-}
-```
-
-The controller normalizes these into:
-
-```js
-invitee_id
-invitee_email
-```
-
-before passing data to the model.
-
-### Authentication
-
-Authentication is enforced by:
-
-```js
-authenticateToken
-```
-
-The authenticated user's ID is automatically injected as:
-
-```js
-req.user.userId
-```
-
-and becomes:
-
-```js
-inviter_id
-```
-
-in the database.
-
-### Rate Limiting
-
-```js
-inviteLimiter
-```
-
-helps protect the endpoint from excessive invitation requests.
-
-### Error Handling
-
-Errors are:
-
-```js
-console.error("[invite] error:", err);
-```
-
-logged on the server and returned as:
-
-```js
-res.status(400).json(...)
-```
-
-The frontend can then surface the error message to the user.
-
----
-
-## One-Sentence Summary
-
-The invitation flow starts in `ProjectMembersModal`, sends either a `friendId` or `email` through `projectService`, passes authentication and rate-limiting middleware, is normalized and processed by the controller, stored in `project_invitations` by the model, and finally returns a success response that triggers the UI toast notification.
+1. The user opens `ProjectMembersModal`.
+2. The UI checks `canInvite`.
+3. The user invites a friend by id or an existing user by email.
+4. The service posts to `/auth/projects/send-invite`.
+5. The controller validates the request and delegates to the model.
+6. The model stores a pending row in `project_requests`.
+7. The controller sends a notification.
+8. The frontend shows a success toast and refreshes the member list.

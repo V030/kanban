@@ -9,6 +9,7 @@ export default function ConfirmModal({
   cancelLabel = "Cancel",
   onConfirm,
   onCancel,
+  topLayer = false,
 }) {
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
@@ -36,7 +37,7 @@ export default function ConfirmModal({
   if (!shouldRender) return null;
 
   return (
-    <div className={`modal-overlay${isClosing ? " is-closing" : ""}`}>
+    <div className={`modal-overlay${topLayer ? " modal-overlay-top" : ""}${isClosing ? " is-closing" : ""}`}>
       <div className={`modal-content${isClosing ? " is-closing" : ""}`}>
         <div className="modal-header">
           <h2>{title}</h2>

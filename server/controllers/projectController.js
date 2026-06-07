@@ -307,11 +307,15 @@ export async function inviteMemberToProject(req, res) {
     return res.status(401).json({ message: "Authentication required" });
   }
 
-  if (inviteeId) {
-    if(!projectId) {
-      return res.status(400).json({ message: "A project is required."});
-    }
+  if (!projectId) {
+    return res.status(400).json({ message: "A project is required." });
+  }
 
+  if (!inviteeId && !inviteeEmail) {
+    return res.status(400).json({ message: "An invitee is required." });
+  }
+
+  if (inviteeId) {
     try {
       const inviteRequest = await inviteMemberToProjectModel({
         inviter_id: req.user.userId,
@@ -347,15 +351,23 @@ export async function inviteMemberToProject(req, res) {
           return res.status(409).json({ message: error.message });
         }
 
+        if (error?.code === "USER_NOT_FOUND") {
+          return res.status(404).json({ message: "No registered user was found for this invite." });
+        }
+
+        if (error?.code === "PROJECT_FORBIDDEN") {
+          return res.status(403).json({ message: error.message });
+        }
+
+        if (error?.code === "INVALID_INVITEE" || error?.code === "SELF_INVITE") {
+          return res.status(400).json({ message: error.message });
+        }
+
         return res.status(500).json({ message: error.message || "Failed to send invite" });
       }
   }
 
   if (inviteeEmail) {
-    if(!projectId) {
-      return res.status(400).json({ message: "A project is required."});
-    }
-
     try {
       const inviteRequest = await inviteMemberToProjectModel({
         inviter_id: req.user.userId,
@@ -390,6 +402,19 @@ export async function inviteMemberToProject(req, res) {
         if (error?.code === "ALREADY_PENDING" || error?.code === "ALREADY_MEMBER") {
           return res.status(409).json({ message: error.message });
         }
+
+        if (error?.code === "USER_NOT_FOUND") {
+          return res.status(404).json({ message: "No registered user was found for this invite." });
+        }
+
+        if (error?.code === "PROJECT_FORBIDDEN") {
+          return res.status(403).json({ message: error.message });
+        }
+
+        if (error?.code === "INVALID_INVITEE" || error?.code === "SELF_INVITE") {
+          return res.status(400).json({ message: error.message });
+        }
+
         return res.status(500).json({ message: error.message || "Failed to send invite" });
     }
 
