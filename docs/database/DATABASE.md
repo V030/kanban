@@ -1,6 +1,6 @@
 # Database
 
-Last updated: 2026-05-30
+Last updated: 2026-06-09
 
 This document describes the PostgreSQL schema as inferred from the codebase, migrations, and SQL queries. It focuses on actual relationships and lifecycle behavior that the application depends on.
 
@@ -9,6 +9,7 @@ This document describes the PostgreSQL schema as inferred from the codebase, mig
 - The database is the source of truth for project ownership, membership, and task placement.
 - Multi-step operations use transactions where consistency matters.
 - Permission checks often depend on joins against project_members and project_settings.
+- UI-only preferences, such as the Kanban board/table view mode, are not stored in PostgreSQL.
 
 ## Relationship Overview
 
@@ -392,3 +393,4 @@ Recommended indexes if they are not already present:
 
 - Some permissions rely on columns that are not yet defined in the visible migrations, so schema updates must be coordinated with permission helper updates.
 - Category names are semantically important; changing them without migration/backfill logic will break review and status flows.
+- Do not add database columns for browser-only display preferences unless the product explicitly needs cross-device synchronization.

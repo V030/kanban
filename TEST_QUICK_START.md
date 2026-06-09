@@ -300,4 +300,11 @@ Before deploying to production:
 
 **Happy testing! 🎉**
 
-Last updated: 2024-01-01
+## Client Preference Testing Notes
+
+- The auth token uses `localStorage.token`.
+- The Kanban board/table preference uses `localStorage["kanban:viewMode"]`.
+- Tests that render `KanbanPage` can seed `kanban:viewMode` with `board` or `table` to verify the initial view.
+- Clear localStorage between tests so view preference state does not leak across cases.
+
+Last updated: 2026-06-09

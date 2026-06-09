@@ -1,6 +1,6 @@
 # Contributor Guide
 
-Last updated: 2026-05-13
+Last updated: 2026-06-09
 
 This guide explains how to add features without breaking the project’s layering or authorization model.
 
@@ -36,6 +36,15 @@ This guide explains how to add features without breaking the project’s layerin
 4. Ensure any dependent UI flags come from the server response, not hard-coded assumptions.
 5. Add tests for both allowed and denied cases.
 
+## Adding Frontend State or Preferences
+
+1. Keep route-specific UI state in the owning page when possible.
+2. Use localStorage only for small, non-sensitive UI preferences.
+3. Validate stored values before using them.
+4. Provide a safe default when storage is unavailable.
+5. Document new storage keys in `docs/frontend/STATE_AND_PREFERENCES.md`.
+6. Do not store server-owned project/task/member data or permission facts in browser storage.
+
 ## Adding a DB Migration
 
 - Use sequential naming in server/migrations.
@@ -62,4 +71,5 @@ UI event
 - Direct fetch calls inside components when a service already exists.
 - Repeating permission logic in the frontend.
 - Adding global state when the current pages already own the data.
+- Adding API/database persistence for a browser-only display preference.
 - Breaking the current /auth route convention without a migration plan.

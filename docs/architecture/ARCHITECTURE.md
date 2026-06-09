@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-13
+Last updated: 2026-06-09
 
 This document describes the runtime architecture, request lifecycle, layering rules, and the real request/data flow used by the application.
 
@@ -49,6 +49,14 @@ The actual middleware stack matters:
 - The client stores the token in localStorage.
 - On 401, fetchWithAuth logs the user out and redirects to /login.
 - hydrateUserFromToken attempts to restore the in-memory user object from /api/protected/profile on startup.
+
+## Frontend State Flow
+
+- API-backed project, task, member, notification, and permission data is loaded through `client/src/services`.
+- Route-level pages own the state for their active workflow instead of pushing feature-specific state into global context.
+- `KanbanPage.jsx` owns the project board data and renders the same category/task payload through `KanbanBoard.jsx` or `KanbanTable.jsx`.
+- The board/table preference is the only documented Kanban UI preference stored in `localStorage`; it uses `kanban:viewMode` with `board` as the safe default.
+- Browser storage is never treated as authoritative for permissions, task data, project membership, or profile data.
 
 ## Authorization Flow
 
@@ -124,6 +132,15 @@ Should not:
 - Hold UI state.
 - Reimplement server-side authorization.
 
+### Frontend Pages
+- Own route-level UI state, filters, drafts, optimistic updates, and display preferences.
+- Subscribe to realtime window events only for the project/task slices they render.
+- Keep browser-local preferences small, validated, and documented in [Frontend State and Preferences](../frontend/STATE_AND_PREFERENCES.md).
+
+Should not:
+- Persist server-owned entities in localStorage.
+- Treat localStorage values as permission or identity facts.
+
 ## Design Rationale
 
 MVC is used here because it keeps request handling readable while allowing the model layer to enforce the real invariants. That matters in this codebase because permissions depend on a combination of ownership, membership, and project settings that cannot safely live in the UI.
@@ -133,3 +150,4 @@ MVC is used here because it keeps request handling readable while allowing the m
 - Rate limiting can use Redis when deployed across multiple instances.
 - Metrics are cached in-process and refreshed periodically.
 - The current architecture can scale further, but the metrics cache and stateful localStorage auth are the first obvious pressure points.
+- UI preferences such as `kanban:viewMode` are intentionally client-local and do not add backend scaling concerns.

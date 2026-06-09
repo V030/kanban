@@ -1,6 +1,6 @@
 # Security
 
-Last updated: 2026-05-13
+Last updated: 2026-06-09
 
 This document focuses on trust boundaries, authorization, and the operational risks visible in the current codebase.
 
@@ -16,6 +16,19 @@ This document focuses on trust boundaries, authorization, and the operational ri
 - JWTs are signed with JWT_SECRET and expire using JWT_EXPIRES_IN or the default of 7d.
 - Tokens are stored in localStorage, which is convenient but vulnerable to XSS.
 - fetchWithAuth logs the user out and redirects to /login when a 401 is returned.
+
+## Browser Storage
+
+Known localStorage keys:
+
+- `token`: JWT used by authenticated API requests. This is sensitive and exposed to XSS risk.
+- `kanban:viewMode`: non-sensitive UI preference with values `board` or `table`.
+
+Rules:
+
+- Never trust browser storage for authorization.
+- Never store project membership, task data, permission flags, or profile objects in localStorage.
+- Validate any non-sensitive preference before using it and provide a safe default.
 
 ## Authorization
 
@@ -71,6 +84,7 @@ Operational note:
 4. Add audit logging for permission-changing actions.
 5. Align schema and permission helpers for all referenced settings.
 6. Add explicit authorization tests for every mutating endpoint.
+7. Keep the documented localStorage key list current when adding client-only preferences.
 
 ## Production Hardening Checklist
 

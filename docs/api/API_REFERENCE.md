@@ -1,11 +1,12 @@
 # API Reference
 
-Last updated: 2026-05-21
+Last updated: 2026-06-09
 
-Recent updates (2026-05-21):
-- Notification URLs used by the frontend are now project-scoped. Examples and client routing reference `/main-page/projects/:projectId/kanban/tasks/:taskId` instead of the older `/main-page/kanban/task/:taskId` style. The client also performs a payload-based fallback when older notifications still contain legacy URLs.
-- The server includes a self-notification guard for assign/unassign flows so owners/admins are not notified when they perform an action on themselves.
-- SVG assets used across the UI were centralized into a single `AppIcons` module; documentation examples now reference shared icon names rather than inline SVG snippets.
+Recent updates:
+- 2026-06-09: The Kanban board/table view preference is documented as client-only state in [Frontend State and Preferences](../frontend/STATE_AND_PREFERENCES.md). It does not introduce an API route or database change.
+- 2026-05-21: Notification URLs used by the frontend are now project-scoped. Examples and client routing reference `/main-page/projects/:projectId/kanban/tasks/:taskId` instead of the older `/main-page/kanban/task/:taskId` style. The client also performs a payload-based fallback when older notifications still contain legacy URLs.
+- 2026-05-21: The server includes a self-notification guard for assign/unassign flows so owners/admins are not notified when they perform an action on themselves.
+- 2026-05-21: SVG assets used across the UI were centralized into a single `AppIcons` module; documentation examples now reference shared icon names rather than inline SVG snippets.
 
 This document describes the actual API surface used by the frontend services. It includes examples so humans and AI agents can infer request shapes without reverse-engineering components.
 
@@ -399,6 +400,8 @@ Success example:
 ```
 
 ## Kanban and Tasks
+
+The Kanban page can display task categories as a board or table. That display choice is stored locally in the browser under `kanban:viewMode`; the API always returns the same project/category/task data for both views.
 
 ### GET /auth/projects/:projectId/get-task-categories
 Purpose: fetch columns and nested task data.

@@ -235,9 +235,9 @@ client/
 ## DOCUMENTATION LINKS
 
 📄 Full Implementation Guide: [GOOGLE_OAUTH_IMPLEMENTATION.md](GOOGLE_OAUTH_IMPLEMENTATION.md)
-📄 Project Architecture: [ARCHITECTURE.md](ARCHITECTURE.md)
-📄 API Reference: [API_REFERENCE.md](API_REFERENCE.md)
-📚 JWT/RBAC Guide: [JWT_RBAC_TUTORIAL.md](JWT_RBAC_TUTORIAL.md)
+📄 Project Architecture: [ARCHITECTURE.md](../../architecture/ARCHITECTURE.md)
+📄 API Reference: [API_REFERENCE.md](../../api/API_REFERENCE.md)
+📚 JWT/RBAC Guide: [JWT_RBAC_TUTORIAL.md](../../../JWT_RBAC_TUTORIAL.md)
 
 ---
 

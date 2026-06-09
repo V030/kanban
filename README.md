@@ -1,95 +1,79 @@
-We need to output full modified README with updated list. Replace the list at top. Provide whole file.```
 # Kanban App
 
-This repository’s canonical documentation lives in:
+This repository contains a collaborative Kanban application with a React frontend, an Express API, and PostgreSQL persistence.
 
-- [Project Source of Truth](docs/PROJECT_SOURCE_OF_TRUTH.md)
+## Documentation
+
+Start with the canonical docs:
+
+- [Documentation index](docs/README.md)
+- [Project source of truth](docs/PROJECT_SOURCE_OF_TRUTH.md)
 - [Architecture](docs/architecture/ARCHITECTURE.md)
-- [API Reference](docs/api/API_REFERENCE.md)
+- [API reference](docs/api/API_REFERENCE.md)
 - [Database](docs/database/DATABASE.md)
+- [Frontend state and preferences](docs/frontend/STATE_AND_PREFERENCES.md)
 - [Security](SECURITY.md)
-- [Contributor Guide](CONTRIBUTING.md)
-- [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)
-- [Toast Services Quick Reference](docs/toast/TOAST_SERVICES_QUICK_REFERENCE.md)
-- [Toast Integration Guide](docs/toast/TOAST_INTEGRATION_GUIDE.md)
-
-Start there for the real system behavior, API contracts, schema constraints, and contribution rules.
+- [Contributor guide](CONTRIBUTING.md)
+- [Test quick start](TEST_QUICK_START.md)
 
 ## Project Overview
 
-This project is a Kanban application with a React frontend and a Node.js/Express backend, utilizing PostgreSQL as its database. It features user authentication, project management, task tracking, notifications, and real-time updates.
+The app supports account authentication, Google OAuth, project creation, project invitations, member roles, task boards, table views, task details, tags, comments, file attachments, review flows, metrics, notifications, and real-time refreshes.
 
 ## Frontend Architecture (`client/`)
 
-The frontend is a React application built with `create-react-app` (implied by `react-scripts`).
+The frontend is a React SPA built with `react-scripts`.
 
-- **Frameworks & Libraries**:
-    - React 19.x
-    - React Router DOM 7.x for navigation
-    - `@react-oauth/google` for Google OAuth integration
-    - `@testing-library/react`, `jest-dom`, `user-event` for testing
-    - TypeScript for type checking
+- React 19.x
+- React Router DOM 7.x
+- `@react-oauth/google` for Google OAuth
+- Testing Library and Jest tooling
+- CSS files colocated by page/component area
 
-- **Directory Structure**:
-    - `src/App.js`: Main application component.
-    - `src/index.js`: Entry point for the React application.
-    - `src/components/`: Reusable UI components.
-        - `common/`: General-purpose components (e.g., `AppIcons`, `SideBar`, `KanbanBoard`, modals, forms).
-        - `protected/`: Components for authenticated routes (e.g., `ProtectedRoutes`).
-        - `public/`: Components for public routes (e.g., `PublicRoutes`).
-        - `styles/`: Component-specific CSS files.
-    - `src/pages/`: Top-level components representing different views/routes (e.g., `Dashboard`, `Projects`, `KanbanPage`, `LoginPage`).
-    - `src/contexts/`: React Context API for global state management (e.g., `ToastContext`).
-    - `src/hooks/`: Custom React hooks for encapsulating reusable logic (e.g., `useInfiniteList`, `useToast`).
-    - `src/services/`: Client-side API interaction logic (e.g., `authService`, `projectService`, `notificationService`).
-    - `src/utils/`: Utility functions (e.g., `errorTransformer`, `toastHelpers`).
+Important folders:
 
-- **Styling**:
-    - Global styles in `src/App.css` and `src/index.css`.
-    - A design system foundation in `src/DesignSystem.css` which enforces a two-font policy and defines CSS variables.
-    - Component-specific styles located in `src/components/styles/` and directly alongside components (e.g., `src/components/Toast.css`).
+- `client/src/pages/`: route-level screens such as `Dashboard`, `Projects`, `KanbanPage`, `TaskDetailsPage`, `Metrics`, and `Profile`.
+- `client/src/components/common/`: shared UI such as `KanbanBoard`, `KanbanTable`, modals, toasts, icons, and project/member controls.
+- `client/src/services/`: API wrappers such as `authService`, `projectService`, `notificationService`, `friendService`, and `feedbackService`.
+- `client/src/hooks/`: shared React hooks.
+- `client/src/contexts/`: shared React context, currently including toast state.
+- `client/src/utils/`: small client utilities.
 
-- **Testing**:
-    - Unit tests for components, hooks, and pages are located in `client/src/**/*.test.js(x)` and `client/tests/`.
+The Kanban page owns the current board data and can render it as either a board or table. The selected view is stored locally under `kanban:viewMode` so returning users keep their last selected board/table mode.
 
 ## Backend Architecture (`server/`)
 
-The backend is a Node.js application built with Express.js.
+The backend is an Express app using PostgreSQL through `pg`.
 
-- **Technologies**:
-    - Node.js/Express.js framework.
-    - `pg` for PostgreSQL database interaction.
-    - `jsonwebtoken` for JWT-based authentication.
-    - `bcrypt` for password hashing.
-    - `nodemailer` for email services.
-    - `express-rate-limit` and `rate-limit-redis` for API rate limiting.
-    - `cors` for handling Cross-Origin Resource Sharing.
-    - `dotenv` for environment variable management.
-    - `redis` for caching and potentially session management/rate limiting.
+Important folders:
 
-- **Directory Structure**:
-    - `server.js`: Main entry point for the Express application.
-    - `routes/`: Defines API endpoints and maps them to controller functions (e.g., `authRoutes`, `protectedRoutes`).
-    - `controllers/`: Contains the business logic for handling requests and preparing responses.
-    - `models/`: Database interaction logic and data schemas (e.g., using `pg` directly or an ORM).
-    - `middleware/`: Express middleware functions for tasks like authentication, authorization, error handling, and rate limiting.
-    - `migrations/`: Database schema migration files (e.g., SQL scripts or ORM migration files).
-    - `utils/`: Shared utility functions and helper modules.
-        - `jwt.js`: JWT token generation and verification.
-        - `mailer.js`: Email sending utilities.
-        - `notificationStream.js`: Logic for Server-Sent Events (SSE) or similar real-time notification handling.
-        - `projectPermissions.js`: Functions to manage project-specific access control.
-        - `realtimeBroadcaster.js`: Utility for broadcasting real-time updates.
-        - `googleAuth.js`: Google authentication helpers.
-    - `config/`: Configuration files for the server.
+- `server/routes/`: HTTP route definitions and middleware attachment.
+- `server/controllers/`: request validation, response mapping, and orchestration.
+- `server/models/`: SQL, transactions, and server-side permission enforcement.
+- `server/middleware/`: authentication, authorization, rate limiting, and shared request middleware.
+- `server/utils/`: JWT helpers, mailers, notification streaming, realtime broadcasting, Google auth, and project permission helpers.
+- `server/migrations/`: database schema changes.
 
-- **Testing**:
-    - Server-side tests are located in `server/tests/`, covering controllers, middleware, and models.
-## Recent highlights:
+## Common Commands
 
-- Icons and reusable SVGs have been centralized into `client/src/components/common/AppIcons.jsx` to provide consistent, solid-style iconography across the app.
-- The client enforces a two-font policy (one display, one body) for consistent typography across pages; see `client/src/DesignSystem.css` for the current font variables.
-- Real-time notifications are implemented using `utils/notificationStream.js` and `utils/realtimeBroadcaster.js` on the server, likely leveraging Server-Sent Events (SSE) for efficient updates to the client.
-- Robust authentication and authorization are in place, with JWTs, Google OAuth, and granular project permissions managed through `utils/jwt.js`, `utils/googleAuth.js`, and `utils/projectPermissions.js` respectively.
-- API rate limiting is applied using `express-rate-limit` and `rate-limit-redis` to protect against abuse.
+From `client/`:
 
+```bash
+npm start
+npm run build
+npm test
+```
+
+From `server/`:
+
+```bash
+npm run dev
+npm test
+```
+
+## Current Notes
+
+- Server-side authorization is the source of truth. UI permission checks are only for affordances.
+- Project notification URLs are project-scoped: `/main-page/projects/:projectId/kanban/tasks/:taskId`.
+- Real-time updates use the existing notification stream and client-side window events.
+- JWTs are stored in `localStorage`; see [Security](SECURITY.md) for the risk profile.
