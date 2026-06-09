@@ -56,6 +56,17 @@ export function TasksIcon({ className = "", size = 24 }) {
   );
 }
 
+export function BoardViewIcon({ className = "", size = 20 }) {
+  return (
+    <IconShell className={className} size={size} viewBox="0 0 20 20">
+      <rect x="4" y="4" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="11" y="4" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="4" y="11" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="11" y="11" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </IconShell>
+  );
+}
+
 export function NotificationsIcon({ className = "", size = 24 }) {
   return (
     <IconShell className={className} size={size}>

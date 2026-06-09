@@ -5,6 +5,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 const NETWORK_ERROR_EVENT = "kanban:network-error";
 const SESSION_EXPIRED_EVENT = "kanban:session-expired";
+let sessionExpiryInProgress = false;
 
 function redirectToConnectionErrorPage() {
   if (typeof window === "undefined") {
@@ -20,6 +21,10 @@ function redirectToLoginPage() {
   }
 
   window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+
+  if (window.location.pathname !== "/login") {
+    window.location.replace("/login");
+  }
 }
 
 /**
@@ -29,8 +34,7 @@ function redirectToLoginPage() {
  */
 function handleAuthFailure(status) {
   console.log(`Auth failure detected (${status}). Logging out...`);
-  logout();
-  redirectToLoginPage();
+  expireSession();
 }
 
 function handleNetworkFailure(error) {
@@ -52,6 +56,7 @@ export async function fetchWithAuth(url, options = {}) {
   const token = getToken();
   
   if (!token) {
+    expireSession();
     throw new Error("No token found. Please log in.");
   }
   
@@ -86,6 +91,7 @@ export async function fetchWithAuth(url, options = {}) {
   // 403 means the user is authenticated but not authorized, so keep the token.
   if (response.status === 401) {
     handleAuthFailure(response.status);
+    logout();
     throw new Error("Session expired. Please log in again.");
   }
 
@@ -143,6 +149,7 @@ export async function login(email, password) {
 
     console.log("Login successful. Storing token...");
 
+    sessionExpiryInProgress = false;
     localStorage.setItem("token", data.token);
     // cache user in-memory only; do not persist user object to localStorage
     cachedUser = data.user || null;
@@ -198,6 +205,7 @@ export async function register(
 
   const data = await response.json();
 
+  sessionExpiryInProgress = false;
   localStorage.setItem("token", data.token);
   cachedUser = data.user || null;
   return data;
@@ -279,6 +287,7 @@ export async function googleLogin(credentialResponse) {
 
     console.log("Google login successful. Storing token...");
 
+    sessionExpiryInProgress = false;
     localStorage.setItem("token", data.token);
     cachedUser = data.user || null;
 
@@ -388,6 +397,16 @@ export function logout() {
   localStorage.removeItem("token");
   cachedUser = null;
   console.log("Token cleared");
+}
+
+export function expireSession() {
+  if (sessionExpiryInProgress) {
+    return;
+  }
+
+  sessionExpiryInProgress = true;
+  logout();
+  redirectToLoginPage();
 }
 
 export function getCurrentUser() {

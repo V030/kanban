@@ -1,11 +1,26 @@
 import { useEffect, useRef } from "react";
 import { useToast } from "../../hooks/useToast";
-import { getToken, invalidateUserCache, hydrateUserFromToken } from "../../services/authService";
+import { expireSession, getToken, invalidateUserCache, hydrateUserFromToken } from "../../services/authService";
 
 // Track seen event IDs to prevent duplicates during reconnects
 // Use a Set with a maximum size to avoid unbounded memory growth
 const MAX_DEDUP_SIZE = 1000;
 let seenEventIds = new Set();
+
+function isSessionExpiryPayload(payload) {
+  const eventType = String(payload?.eventType || "").toLowerCase();
+  const toastType = String(payload?.toastType || "").toLowerCase();
+  const message = String(payload?.message || "").toLowerCase();
+
+  return (
+    eventType === "session_expired" ||
+    toastType === "unauthorized" ||
+    message.includes("session expired") ||
+    message.includes("session has expired") ||
+    message.includes("log in again") ||
+    message.includes("invalid / expired token")
+  );
+}
 
 export default function NotificationsStream() {
   const streamRef = useRef(null);
@@ -35,6 +50,14 @@ export default function NotificationsStream() {
 
   const handleIncomingPayload = (payload) => {
     if (!payload || typeof payload !== "object") return;
+
+    if (isSessionExpiryPayload(payload)) {
+      const message = String(payload.message || "").trim();
+      toast.showUnauthorized(message || "Your session has expired. Please log in again.");
+      streamRef.current?.close();
+      expireSession();
+      return;
+    }
 
     // Check for duplicate event IDs to prevent replay of the same event
     if (isDuplicateEvent(payload.eventId)) {

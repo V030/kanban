@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
 import KanbanBoard from "../components/common/KanbanBoard";
+import KanbanTable from "../components/common/KanbanTable";
 import AddTaskModal from "../components/common/AddTaskModal";
 import ColumnsReorderModal from "../components/common/ColumnsReorderModal";
 import ProjectSettingsModal from "../components/common/ProjectSettingsModal";
 import ProjectMembersModal from "../components/common/ProjectMembersModal";
 import ConfirmModal from "../components/common/ConfirmModal";
 import { SkeletonColumn } from "../components/common/SkeletonComponents";
-import { TeamIcon, SettingsIcon, MetricsIcon, ReorderIcon, SaveIcon, CancelIcon, DragHandleIcon } from "../components/common/AppIcons";
+import { TeamIcon, SettingsIcon, MetricsIcon, SaveIcon, CancelIcon, DragHandleIcon, TasksIcon, BoardViewIcon } from "../components/common/AppIcons";
 import "../components/styles/KanbanPage.css";
 import "../components/styles/ColumnsReorderModal.css";
 import "../components/styles/SkeletonLoading.css";
@@ -34,6 +35,17 @@ const DEFAULT_TASK_PERMISSIONS = {
 	allow_admin_create_tag: true,
 	allow_member_create_tag: false,
 };
+
+const VIEW_MODE_STORAGE_KEY = "kanban:viewMode";
+
+function getStoredViewMode() {
+	try {
+		const storedViewMode = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+		return storedViewMode === "table" || storedViewMode === "board" ? storedViewMode : "board";
+	} catch {
+		return "board";
+	}
+}
 
 function getDisplayName(user) {
 	if (!user) return "Unassigned";
@@ -141,6 +153,7 @@ function KanbanPage() {
 	const [taskCategories, setTaskCategories] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [reorderOpen, setReorderOpen] = useState(false);
+	const [viewMode, setViewMode] = useState(getStoredViewMode);
 	const [addTaskOpen, setAddTaskOpen] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [membersOpen, setMembersOpen] = useState(false);
@@ -199,6 +212,15 @@ function KanbanPage() {
 	const canDeleteTask = canAdminManageTasks || taskPermissions.allow_member_delete_task;
 	const canEditProjectSettings = isAdminOrOwner;
 	const canEditProjectName = projectRole === "owner";
+
+	const handleViewModeChange = useCallback((nextViewMode) => {
+		setViewMode(nextViewMode);
+		try {
+			window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, nextViewMode);
+		} catch {
+			// Ignore storage failures; the toggle still works for the current session.
+		}
+	}, []);
 
 	const columnsForBoard =
 		taskCategories.length > 0
@@ -1004,6 +1026,42 @@ function KanbanPage() {
 		setTaskCategories(newColumns.map((c, idx) => ({ id: c.id, name: c.name, position: idx + 1, tasks: [] })));
 	}
 
+	const handleOpenTask = useCallback(
+		(task) => {
+			if (pendingTaskActions[String(task?.id)] || task?.isPending) return;
+			navigate(`/main-page/projects/${projectId}/kanban/tasks/${task.id}`, {
+				state: {
+					isAdminOrOwner,
+					canAdminsManageTasks: canAdminManageTasks,
+					canMembersAssignTaskToOthers: taskPermissions.allow_assign_task_to_member,
+					canMembersReviewTasks,
+					canMembersDeleteTask: canDeleteTask,
+					canMembersEditTask: taskPermissions.allow_member_edit_task,
+				},
+			});
+		},
+		[
+			canAdminManageTasks,
+			canDeleteTask,
+			canMembersReviewTasks,
+			isAdminOrOwner,
+			navigate,
+			pendingTaskActions,
+			projectId,
+			taskPermissions.allow_assign_task_to_member,
+			taskPermissions.allow_member_edit_task,
+		]
+	);
+
+	const handleAddTaskFromColumn = useCallback(
+		(column) => {
+			if (!canCreateTask) return;
+			setSelectedCategoryId(column?.id || "");
+			setAddTaskOpen(true);
+		},
+		[canCreateTask]
+	);
+
 	useEffect(() => {
 		if (!isEditingProjectName) return;
 		const el = projectNameRef.current;
@@ -1309,6 +1367,32 @@ function KanbanPage() {
 					>
 							<MetricsIcon />
 					</button>
+					<div className="view-mode-toggle" data-view-mode={viewMode} role="group" aria-label="View mode toggle">
+						<button
+							type="button"
+							className="view-mode-toggle-btn"
+							onClick={() => handleViewModeChange("board")}
+							title="Board view"
+							aria-label="Board view"
+							aria-pressed={viewMode === "board"}
+						>
+							<BoardViewIcon />
+							<span>Kanban</span>
+						</button>
+						<button
+							type="button"
+							className="view-mode-toggle-btn"
+							onClick={() => handleViewModeChange("table")}
+							title="Table view"
+							aria-label="Table view"
+							aria-pressed={viewMode === "table"}
+						>
+							<TasksIcon />
+							<span>Table</span>
+						</button>
+						<span className="toggle-thumb" aria-hidden="true" />
+					</div>
+					
 					<div className="kanban-mobile-overflow">
 						<button
 							type="button"
@@ -1354,30 +1438,15 @@ function KanbanPage() {
 				)}
 				{!loading && (
 					<>
+						{viewMode === "board" ? (
 						<KanbanBoard
 							columns={columnsForBoard}
 							isTaskAssignedToMe={isTaskAssignedToMe}
-					canDragTask={canDragTask}
-					onTaskClick={(task) => {
-						if (pendingTaskActions[String(task?.id)] || task?.isPending) return;
-						navigate(`/main-page/projects/${projectId}/kanban/tasks/${task.id}`, {
-							state: {
-								isAdminOrOwner,
-								canAdminsManageTasks: canAdminManageTasks,
-								canMembersAssignTaskToOthers: taskPermissions.allow_assign_task_to_member,
-								canMembersReviewTasks,
-								canMembersDeleteTask: canDeleteTask,
-								canMembersEditTask: taskPermissions.allow_member_edit_task,
-							}
-						});
-					}}
+							canDragTask={canDragTask}
+							onTaskClick={handleOpenTask}
 					showAddTaskButton={canCreateTask}
 					onTaskDrop={handleTaskDrop}
-					onAddTask={(column) => {
-						if (!canCreateTask) return;
-						setSelectedCategoryId(column?.id || "");
-						setAddTaskOpen(true);
-					}}
+					onAddTask={handleAddTaskFromColumn}
 					renderTask={(task, column) => {
 						const isAssignedToMe = isTaskAssignedToMe(task);
 						const columnName = String(column?.title || "").toLowerCase();
@@ -1519,6 +1588,26 @@ function KanbanPage() {
 						);
 					}}
 				/>
+						) : (
+							<KanbanTable
+								columns={columnsForBoard}
+								onAddTask={handleAddTaskFromColumn}
+								onTaskClick={handleOpenTask}
+								onTakeTask={handleTakeTask}
+								onUnassignTask={handleUnassignTask}
+								onRemoveTask={handleRemoveTask}
+								isTaskAssignedToMe={isTaskAssignedToMe}
+								getTaskAssignedMembers={getTaskAssignedMembers}
+								getDisplayName={getDisplayName}
+								getInitials={getInitials}
+								getProfileImageSrc={getProfileImageSrc}
+								formatDateShort={formatDateShort}
+								pendingTaskActions={pendingTaskActions}
+								canTakeTask={canTakeTask}
+								canAdminManageTasks={canAdminManageTasks}
+								showAddTaskButton={canCreateTask}
+							/>
+						)}
 
 				<AddTaskModal
 					isOpen={addTaskOpen}
